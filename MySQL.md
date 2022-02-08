@@ -1,5 +1,28 @@
 
 
+# SQL
+
+## 类型
+
+DDL：数据定义语言，如CREATE、DROP、ALTER
+
+DQL：数据查询语言（**Query**），如SELECT
+
+DML：数据操作语言，如INSERT、UPDATE、DELETE
+
+DCL：数据控制语言，如GRANT、REVOKE、COMMIT、ROLLBACK
+
+### DROP、DELETE 与 TRUNCATE 的区别
+
+|      | DROP          | DELETE           | TRUNCATE |
+| ---- | ------------- | ---------------- | -------- |
+| 类型 | DDL           | DML              | DDL      |
+| 回滚 | 不可          | 可               | 可       |
+| 范围 | 全表数据+结构 | 全表或某些行数据 | 全表数据 |
+| 速度 | 最快          | 慢               | 快       |
+
+
+
 # SQL执行过程
 
 1. 通过连接器跟客户端**「建立连接」**
@@ -376,3 +399,15 @@ MySQL 支持单向、异步复制，复制过程中有一主一从、一主多�
 
    sharding-sphere 是强大的读写分离、分表分库中间件，sharding-jdbc 是 sharding-sphere 的核心模块。
 
+# 表优化
+
+1. 纵向拆分（分表）：字段太多的表拆成多个表
+2. 横向拆分（分库）：同一个表的数据按某个键hash，分配到不同的库
+3. 中间表：需要经常join的一些表，拆分重组放入中间表，代替join
+4. 增加冗余字段
+
+# MySQL使用CPU100%原因
+
+1. 慢sql：优化
+2. 死锁：直接kill查询进程
+3. 访问激增：减少连接数
