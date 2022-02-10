@@ -162,7 +162,9 @@ CREATE TABLE `category` (
 
 ## 7、未开启事务
 
+原因：springboot通过`DataSourceTransactionManagerAutoConfiguration`类，默认开启了事务。只需要配置.yml文件的`spring.datasource`相关参数即可
 
+解决：传统的spring项目，则需要在applicationContext.xml手动配置
 
 # 事务不回滚场景
 
