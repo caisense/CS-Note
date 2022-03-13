@@ -1,6 +1,12 @@
-# spring事务不生效场景
+# @Transacational原理
 
-## 1、访问权限问题
+根据 @Transactional 的属性配置信息，这个代理对象（AOP Proxy）决定该声明的目标方法是否由拦截器 `TransactionInterceptor` 来使用**拦截**。
+
+拦截时，会在目标方法开始执行之前**创建并加入事务**，执行目标方法逻辑，最后根据执行情况是否出现异常，利用抽象事务管理器 `AbstractPlatformTransactionManager` 操作数据源 `DataSource` 来提交或回滚事务
+
+# Spring事务不生效场景
+
+## 1、方法访问权限问题（非public）
 
 spring要求被代理方法必须是`public`
 
@@ -8,13 +14,19 @@ spring要求被代理方法必须是`public`
 
 
 
-## 2、方法用final修饰
+## 2、方法用final、static修饰
 
 原因：spring事务底层使用了aop，也就是通过jdk动态代理或者cglib，帮我们生成了代理类，在代理类中实现的事务功能。如果方法是final或static，则不会被拦截，代理类无法重写该方法
 
 
 
-## 3、方法内部调用
+## 3、类是final
+
+也是cglib的限制，final类无法生成代理
+
+
+
+## 4、方法内部调用
 
 ```java
 @Service
@@ -41,6 +53,8 @@ public class UserService {
 原因：调用了this对象
 
 ### 解决
+
+总之就是不让当前对象的方法a直接调方法b，可以分两个对象调用，或者让代理对象来调用
 
 #### 3.1、方法拆分
 
@@ -74,7 +88,7 @@ public class ServiceA {
 
 #### 3.3、通过AopContent类
 
-在该Service类中使用AopContext.currentProxy()获取代理对象
+在该Service类中使用AopContext.currentProxy()获取代理对象，然后由代理对象调事务方法
 
 ```java
 @Servcie
