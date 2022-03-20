@@ -716,7 +716,7 @@ feign:
 
 页面空白，因为DeptClientServiceFallbackFactory中没有处理该请求，直接返回null
 
-# 服务监控
+# 七、服务监控
 
 hystrixDashboard 组件
 
@@ -795,7 +795,7 @@ server:
 
 
 
-# zuul路由网关
+# 八、zuul路由网关
 
 ## 1、新建模块springcloud-zuul-9527，添加pom依赖
 
@@ -934,7 +934,7 @@ zuul:
 
 要加前缀才能 访问:http://www.css.com:9527/css/mydept/dept/get/1
 
-# 分布式配置
+# 九、分布式配置
 
 Spring cloud config分为服务端和客户端
 
