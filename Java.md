@@ -1,5 +1,11 @@
 
 
+# Java与JDK版本对应关系
+
+从 Java1.0 到 Java9 ，每个Java版本对应一个JDK版本 ：JDK1.0、JDK1.2 ... JDK1.8、JDK1.9。
+
+Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12。
+
 # 数据结构
 
 ## 一、基本数据类型
@@ -147,6 +153,16 @@ byte、char、short三种类型实际存储的数据都是整数，在实际使�
 
 ### String
 
+String 类被声明为 final，因此它不可被继承。(Integer 等包装类也不能被继承）
+
+String底层实现数组也被声明为 final，意味着数组初始化后地址不能改变，且内部不提供改变数组的方法，保证了**String不可变**。
+
+#### 底层实现
+
+在 jdk1.8 中，String 内部使用 **char 数组 **存储数据。
+
+jdk1.9 起，String 类的实现改用 **byte 数组** 存储字符串，同时使用 `coder` 来标识使用了哪种编码。
+
 #### 空和非空判断
 
 ```java
@@ -191,11 +207,51 @@ public static boolean isBlank(String str) {
 
 #### String, StringBuffer and StringBuilder区别
 
-可变性：String不可变，剩下两个可变。
+|          | String           | StringBuffer                     | StringBuilder |
+| -------- | ---------------- | -------------------------------- | ------------- |
+| 可变性   | 不可变           | 可变                             | 可变          |
+| 线程安全 | 无（因为不可变） | 是（内部使用 synchronized 同步） | 否            |
+| 性能     | 无               | 低                               | 高            |
 
-线程安全：StringBuffer 是线程安全的（内部使用 synchronized 进行同步），而 StringBuilder 是非线程安全的，但 StringBuilder 的性能却高于 StringBuffer，所以在单线程环境下推荐使用 StringBuilder，多线程环境下推荐使用 StringBuffer。
+所以在单线程环境下推荐使用 StringBuilder，多线程环境下推荐使用 StringBuffer。
 
 
+
+### 包装类型
+
+| 原始类型 | byte | short | char      | int     | long | float | double | boolean |
+| -------- | ---- | ----- | --------- | ------- | ---- | ----- | ------ | ------- |
+| 封装类   | Byte | Short | Character | Integer | Long | Float | Double | Boolean |
+
+包装类**默认值**都为`null`
+
+包装类提供了多种**静态方法**，主要是parsexxx（将string转为基本类型）和valueOf（将string或基本类型转为包装类）
+
+#### parsexxx
+
+是封装类型提供的将String转换为基本类型的api，常用一个参数（默认十进制），还支持第二个参数表示进制radix
+
+注意String没有parse
+
+| `api`                | 参数类型 | 返回类型 |
+| -------------------- | -------- | -------- |
+| `Integer.parseInt`   | `String` | `int`    |
+| `Float.parseFloat`   | `String` | `float`  |
+| `Double.parseDouble` | `String` | `double` |
+| `Long.parseLong`     | `String` | `long`   |
+
+#### valueOf
+
+是封装类型提供的将String或基本类型转换为封装类型的api，常用一个参数（默认十进制），也支持第二个参数表示进制
+String.valueOf 返回其他基本类型的String形式
+
+| `api`             | 参数类型                  | 返回类型  |
+| ----------------- | ------------------------- | --------- |
+| `Integer.valueOf` | String、int               | `Integer` |
+| `Float.valueOf`   | String 、float            | `Float`   |
+| `Double.valueOf`  | String  、double          | `Double`  |
+| `Long.valueOf`    | String  、long            | `Long`    |
+| `String.valueOf`  | int,  float, double, long | `String`  |
 
 ### 自动装箱和拆箱
 
@@ -211,13 +267,7 @@ Integer n1  = new Integer(1);  // 常规写法，创建对象
 Integer n2  = 1;   // 自动装箱，直接赋值  
 ```
 
-#### 包装类型
 
-| 原始类型 | byte | short | char      | int     | long | float | double | boolean |
-| -------- | ---- | ----- | --------- | ------- | ---- | ----- | ------ | ------- |
-| 封装类   | Byte | Short | Character | Integer | Long | Float | Double | Boolean |
-
-包装类**默认值**都为`null`
 
 #### 规则
 
@@ -336,6 +386,10 @@ public static void main(String[] args) {
    System.out.println(num1 == num2); // true
    ```
 
+    若封装类型未初始化或为null，则与原始类型比较，自动拆箱时调用obj.xxxValue()，会抛空指针异常
+   
+4. 不仅是==运算符，其他比较运算符<、>等同理。
+
 ### 缓存池
 
 只要不是用new显式创建包装类型，当值在一定范围内，jvm优先从缓存池中获取对象，不会另外创建
@@ -361,8 +415,32 @@ System.out.println(obj3 == obj2); // false
 
 String和浮点数没有缓存池很好理解：String取值原本就没规律，浮点数的范围也很难限定
 
-注意：Int的上限high可以用jvm命令 `-XX:AutoBoxCacheMax=<high>` 设置，high大于127时有效，小于等于时上限仍为127
+**注意**：只有Integer的上限可以修改。
+
+用jvm命令 `-XX:AutoBoxCacheMax=<high>` 设置，high应大于127，若小于等于127则上限不变。额
 Long的范围无法设置
+
+### 字符串常量池
+
+字符串常量池（String Pool）保存着所有字符串字面量（literal strings），这些字面量在编译时期就确定。
+
+**intern方法**
+
+调用 intern() 方法时，如果 String Pool 中已经存在一个字符串和该字符串值相等（使用 equals() 方法判断），那么就会返回 String Pool 中字符串的引用；否则，就会在 String Pool 中添加一个新串
+
+```java
+String s1 = new String("aaa");
+String s2 = new String("aaa");
+System.out.println(s1 == s2);        // false
+String s3 = s1.intern();
+String s4 = s2.intern();
+System.out.println(s3 == s4);        // true
+String s5 = "bbb";
+String s6 = "bbb";
+System.out.println(s5 == s6);       // true
+```
+
+
 
 ### 常量
 
@@ -398,7 +476,7 @@ var sb = new StringBuilder();
 
 ## 三、集合
 
-### 数组 `[]`
+### 1.数组 `[]`
 
 1.是一种引用数据类型（非基本类型），实际上并不属于java集合，但功能类似
 
@@ -439,7 +517,7 @@ System.out.println(intArray.getClass());    //class [I
 System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 ```
 
-### ArrayList
+### 2.ArrayList
 
 #### 扩容
 
@@ -455,7 +533,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 | 长度     | .length属性获取，一旦创建不可变 | size()方法获取，可动态增减       |
 | 元素类型 | 单一类型即可                    | 单一类型，且必须为**引用类型**   |
 
-#### 注意
+#### 单一类型默认向下兼容
 
 1. 单一类型指的是泛型，默认**向下兼容**。
 
@@ -480,26 +558,699 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 | 插入（指定位置）：`add(index, e)`  | 慢，因为数组要整体移动。若触发扩容更慢 | 快，且不会扩容，但要遍历链表                   |
 | 插入（不指定位置，尾插）：`add(e)` | 快。若触发扩容慢                       | 快，且不会扩容                                 |
 
-### HashMap
+### 3.HashMap
 
 #### 1.存储结构
 
-内部包含一个Entry类型数组，Entry 存储着键值对，包含四个字段
+本质是一个链表数组table。
+
+内部包含一个Entry类型数组，Entry 存储着键值对，包含四个字段，next字段表示 Entry 是一个链表。即数组中的每个位置被当成一个**桶**，一个桶存放一个链表。HashMap 使用拉链法来解决冲突，同一个链表中存放哈希值和散列桶取模运算结果相同的 Entry。
 
 <img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/image-20191208234948205.png" alt="img" style="zoom:50%;" />
 
-#### 2.扩容
+#### 2.put方法(1.7与1.8变化)
+
+1. 根据key和哈希算法计算数组下标：**index = HashCode(Key) & (Length - 1)**，相当于取HashCode的后N位
+
+2. 如果数组下标位置桶为空，则将key和value封装为Entry对象（1.7是Entry，1.8是Node），并放入该桶
+
+3. 如果数组下标位置桶不为空，则分情况：
+
+    - jdk1.7：先判断是否需要扩容
+
+     若不用则生成Entry，并用头插法加入桶。
+   
+   - jdk1.8：先判断当前位置桶类型是红黑树还是链表
+   
+     - 若是红黑树Node，则封装节点并插入红黑树，判断红黑树是否存在当前key，存在则直接更新value
+     - 若是链表Node，则封装节点并用尾插法，遍历链表过程中判断是否存在当前key，存在则直接更新value。插入后统计链表长度，**若>=8则转红黑树**
+   
+     - 插入之后再判断是否扩容
+   
+
+##### 链表转红黑树的阈值被设置为8的原因
+
+1. 当选用的hash算法离散性很好时，数组中同一位置出现碰撞的概率很低，几乎不会出现达到阈值的情况；然而采用随机hash算法时，离散性可能会变差，理想情况下随机hash算法计算出的位置分布遵循**泊松分布**，根据概率统计，同一位置的元素达到8个概率只有大约1亿分之6，几乎是不可能事件。**若这种小概率事件都发生了，说明HashMap的元素个数相当多，有提高查找效率的必要。**
+2. 另一种解释是链表查找的平均查找次数是n/2，而红黑树的平均查找次数是log(n)，8/2=4而log(8)=3，3<4因此有必要转换，但这种说法存在问题，如果是这个理由那应该选择在节点数达到5时就转换，5/2同样大于log(5)。
+
+树退化的阈值被设为6而不是7，主要是为了避免频繁的树结构的转换，减少系统开销。
+
+##### 使用红黑树的原因
+
+首先二叉搜索树（BST）的查找肯定效率比链表高。
+
+但BST有缺点，在元素插入时会导致树倾斜，插入顺序会影响树的高度，而树的高度直接影响了BST的查找效率，在极端情况下BST会退化成链表（所有节点都在一条斜线上）。
+
+红黑树具有性质：任一节点到其子树中的每个叶子节点的路径都包含相同数量的黑色节点，可推导出从红黑树的根节点到叶子节点的最长可能路径不超过最短可能路径的两倍，即红黑树可以保持其大致是平衡的。因此红黑树可以保持**在最坏情况下都相对高效**。作为代价，红黑树的插入删除操作可能会引起树的旋转。
+
+为什么不直接使用红黑树：
+
+由于TreeNodes占用空间是普通Nodes的两倍（相较于链表结构，链表只有指向下一个节点的指针，二叉树则需要左右指针，分别指向左节点和右节点），因此使用红黑树取代链表需要以**额外的空间为代价**。只有当节点较多时，才有转换的必要。
+
+#### 3.扩容
 
 注意：这里的扩容指table扩容，而不是桶（因为桶是链表，没有上限）。
 
-相关参数主要有4个：
+相关参数主要有3个：
 
 - capacity：Entry数组长度，初始为16。
+
 - size：键值对数量。
+
 - loadFactor：加载因子，表示table数组填满的程度，取0~1之间的值，默认0.75
-- Threshold = loadFactor * capacity：扩容临界值，当HashMap中的元素个数超过该值时，就会进行Entry数组扩容（capacity*2）
+
+扩容时机：由扩容临界值决定，Threshold = loadFactor * capacity。当HashMap中的元素个数超过该值时，就会进行Entry数组扩容（**翻倍**，capacity * 2）
+
+扩容操作：
+
+1. 扩容：创建新的Entry空数组，长度是原数组2倍
+
+2. ReHash：遍历原Entry数组，把所有Entry重写Hash到新数组
+
+   需要reHash的原因：hashMap计算数组下标逻辑是`index = HashCode(Key) & (Length - 1)`，数组长度倍增后，需要重新计算下标
+
+扩容结果：
+
+jdk1.7：由于ReHash，可能导致原来在一个桶的结点分散到不同桶
+
+jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，或链表进化为红黑树
+
+![image-20220322102957906](D:\CS-Note\images\Java\image-20220322102957906.png)
+
+#### hashMap线程不安全分析
+
+线程1和线程2分别将Entry1、Entry2插入同一个桶时，无论桶空还是非空，都会出现竞争问题。
+
+由于jdk1.7使用头插法，扩容时还可能造成**循环链表**问题。假设有线程1和线程2，都尝试向HashMap中插入新的条目，并触发了HashMap的扩容，两个线程都新建了新的扩容数组nextTable。假设在原table某位置，存在一个链表，其顺序为A-->B-->C，线程1在执行到头节点A时就挂起了，但此时对线程1而言，A的next节点是B。在这同时线程2执行了完整的迁移操作，扩容后新的链表顺序为C-->B-->A。随后线程1恢复，但由于其挂起时，已经将当前位置指向了节点A，而next节点指向了B，此时就出现了loop，A-->B-->A
+
+jdk1.8虽然用尾插法不会出现循环链表，但还是会有某个桶**覆盖问题**。例如线程1和2都争抢table位置A的空桶，线程1先插入，线程2认为此时A桶仍为空，覆盖了线程1插入的Entry
+
+#### 为什么重写equals()方法一定要重写hashCode()方法
+
+如果我们要使用自定义类的对象作为Entry的key，那么就有必要重写equals()方法，确定判断key相等的规则。
+
+但重写equals()方法后又会产生新的问题，如果不重写Object的hashCode()，则默认基于内存地址计算hashcode，可能会出现两个key相等但hashcode不同的情况，这样即使两个Entry的key相等，却落入不同的桶。
+
+因此重写hashCode应满足：
+
+1. 如果两个对象**等价**（即用equals比较返回true），那么它们的hashCode值一定要相同；
+2. 如果两个对象的hashCode相同，它们并不一定等价；
+
+**hashCode和地址的关系**：地址相同，hashcode一定相等；hashcode相等，地址不一定相同。
+
+### 4.ConcurrentHashMap
+
+![image-20191209001038024](D:\CS-Note\images\Java\image-20191209001038024.png)
+
+和 HashMap 实现上类似，主要差别是 ConcurrentHashMap 使用**两级数组**：
+
+第一级 Segment （分段锁）数组，segment个数就是并发度，表示同时支持几个线程并发，多线程同时操作不同的segment不冲突。
+
+第二级：每个Segment维护着一个Entry数组（HashEntry链表)
+
+ConcurrentHashMap 中的重要变量有：
+
+- table：默认为null，**延迟初始化**，第一次插入操作时初始化，默认大小为**16**的数组，size总是2的幂次方，用来存储Node节点数据，扩容时大小总是2的幂次方；
+- nextTable：默认为null，扩容时新生成的数组，其大小为原数组的两倍；
+- Node：保存key，value及key的hash值的数据结构；
+- sizeCtl：table数组的容量阈值，默认为0，用来控制table的初始化和扩容操作；
+- ForwardingNode：一个特殊的Node节点，hash值为-1，其中存储nextTable的引用。只有table发生扩容的时候，ForwardingNode才会发挥作用，作为一个占位符放在table中表示当前节点为null或已经被移动。
+
+ConcurrentHashMap 包含两个核心内部类：Segment 和 HashEntry
+
+
+
+#### 初始化的线程安全
+
+table初始化操作会延缓到第一次put操作。在ConcurrentHashMap在构造函数中只会初始化sizeCtl值，并不会直接初始化table，sizeCtl的默认初始值为0，若构造方法传入了自定义的initialCapacity值，那么sizeCtl的值默认为大于initialCapacity的最小的2的次幂。但是put操作是可以并发执行的，在put操作中进行了如下处理：
+
+尝试执行put操作的线程会判断table是否已经被初始化，若table尚未被初始化，则尝试进行初始化操作。初始化方法中，线程会执行Unsafe.compareAndSwapInt方法修改sizeCtl为-1，并且只有一个线程可以执行成功，其余的线程如果进来发现sizeCtl=-1，那么就会执行Thread.yield()让出CPU时间片等待table初始化完成。
+
+#### put操作的线程安全
+
+执行put操作的线程在判断table已经初始化的前提下，还会对put操作的目标位置Node进行如下判断：
+
+- 若目标位置的Node为null，则说明该位置第一次插入数据，利用Unsafe.compareAndSwapObject安全插入数据，两种可能结果：
+  - CAS成功，则说明操作成功，退出；
+  - CAS失败，则说明其他线程抢先一步插入了数据，进行自旋，再次尝试插入数据，后续逻辑与目标位置已存在数据的逻辑相同；
+- 若目标位置的Node为ForwardingNode，表明有其他线程在进行扩容操作，当前线程会帮助扩容；
+- 若目标位置已存在普通Node，则将新的Node节点按链表或红黑树的方式插入到合适的位置，这个过程采用Synchronized实现并发；
+
+#### 数组扩容的线程安全
+
+当table数组的元素个数达到容量阀值sizeCtl的时候，需要对table进行扩容，扩容氛围两个阶段：
+
+- 构建一个新的nextTable，容量为原先table的两倍；
+
+- 把原先table中的数据进行迁移；
+
+
+第一步nextTable的构建只能单线程进行操作，同样是通过对sizeClt值进行CAS操作，确保只有一个线程能初始化nextTable成功。
+
+第二步中的逻辑则类似put操作，对每个尝试复制数据的位置进行CAS操作，若失败则说明已有别的线程对该位置进行扩容，后续使用Synchronized锁进行并发的迁移操作。
+
+#### jdk1.7和1.8变化
+
+JDK 1.7 使用分段锁机制来实现并发更新操作，核心类为 Segment，它继承自重入锁 ReentrantLock充当锁。
+
+JDK1.8 使用CAS 操作支持更高并发度，CAS失败时使用内置锁 synchronized。底层与HashMap相同，链表长度大于8时转红黑树
 
 # 方法
+
+# 面向对象
+
+## Object
+
+所有类的父类，本身再无父类。是java继承树的根。
+
+通用方法
+
+```java
+public native int hashCode()
+
+public boolean equals(Object obj)
+
+protected native Object clone() throws CloneNotSupportedException
+
+public String toString()
+
+public final native Class<?> getClass()
+
+protected void finalize() throws Throwable {}
+
+public final native void notify()
+
+public final native void notifyAll()
+
+public final native void wait(long timeout) throws InterruptedException
+
+public final void wait(long timeout, int nanos) throws InterruptedException
+
+public final void wait() throws InterruptedException
+```
+
+### 等价与相等
+
+- 对于基本类型，== 判断两个值是否相等，基本类型没有 equals() 方法。
+- 对于引用类型，== 判断两个变量是否引用同一个对象（地址相同），而 equals() 判断引用的对象是否等价。
+
+# JVM
+
+意义：从软件层面屏蔽不同操作系统在底层硬件与指令上的区别。（一次编译，处处运行，而没有虚拟机的语言，如c++，在win和linux上执行要编译为不同的程序
+
+## JVM模型
+
+这段代码运行时的jvm模型如下图
+
+```java
+public class Math {
+    public static final int initDate = 666;
+    public User user = new User();
+
+    public Math() {
+    }
+
+    public int compute() {
+        int a = 1;
+        int b = 2;
+        int c = (a + b) * 3;
+        return c;
+    }
+
+    public static void main(String[] args) {	// 主函数调用compute
+        Math math = new Math();
+        math.compute();
+    }
+}
+```
+
+![20200904134738400](D:\CS-Note\images\Java\20200904134738400.png)
+
+图中蓝色区域（栈、本地方法栈、程序计数器）是**线程私有**的。
+
+例如，执行main方法的主线程会在内存中开启一片区域，存放其私有的程序计数器、虚拟机栈、本地方法栈等，如图左边所示，框住只是为了说明其逻辑上的关系，物理上并不在一起。
+
+1. 虚拟机栈 VM Stack：又称栈 or 线程栈。创建一个线程就在虚拟机栈中分配一块私有的栈，每个线程中的方法**调用**又会在本栈中创建一个**栈帧**。存储局部变量、对象指针、操作栈、动态链接、方法出口。
+
+   - 局部变量表： 存放着方法中的局部变量，包括基本类型和引用类型。在编译期间就已确定空间大小，运行期间大小不变。
+
+   - 操作数栈：用来操作方法中的数的一个临时栈
+
+   - 动态链接： 把符号引用（字面量，例如方法名）转换为直接引用（指针，指向真实地址）存在内存空间中
+
+   - 方法出口：记录该方法调用完毕应该回到的地方 (放到我们这个例子中就是回到Main函数的下一行)
+
+   栈由多个栈帧组成，栈帧具有栈数据结构FIFO的特性，栈顶存放**当前执行方法**的栈帧，下一层调用上一层。
+
+   JVM为这个区域规定了两种异常状况：
+
+   - StackOverflowError：线程请求的栈深度大于虚拟机所允许的深度时抛出；
+   - OutOfMemoryError：虚拟机栈无法申请到足够的内存时抛出。
+
+2. 本地方法栈Native Method Stack：为JVM使用的Native方法（C、C++代码）提供运行空间。功能上与虚拟机栈是类似。
+
+   该区域JVM也规定了StackOverflowError和OutOfMemoryError异常。
+
+3. 程序计数器 Program Counter Register：当前线程所执行的**字节码的行号**指示器，指向下一条要执行的命令。方法执行完返回时必须要用到。
+
+   该区域没有规定任何异常。
+
+图中黄色区域（堆、方法区）是**线程共享**的，虽然逻辑上分区，但物理上是**连续的区域**。
+
+1. 堆 Heap：存储所有对象实例。JVM的垃圾回收主要发生在该区域。（与栈具有数据结构FIFO特性不同，jvm的堆和数据结构的堆没有关系）
+
+   从结构上，堆被划分为新生代和老年代；而新生代又分为Eden区、To Survivor区、From Survivor区，大小比例为8:1:1。
+
+   当堆中没有内存可供完成实例分配，且堆也无法再扩展时，将会抛出OutOfMemoryError异常。
+
+2. 方法区 Method Area：存储类的静态信息（.class）、常量、静态变量（指针，指向堆）、即时编译器（JIT）编译产生的代码
+
+   由于HotSpot虚拟机将GC算法拓展到了该区域，因此方法区有时也被称为**永久代**，1.8之后改称元空间metaspace。
+
+   当方法区无法满足内存分配需求时，将抛出OutOfMemoryError异常。
+
+## JVM版本的更新
+
+jdk1.7版本中，将字符串常量池从方法区移动到了堆中，避免方法区内存有限从而出现OOM错误。而jdk1.8版本则将方法区从运行时内存移动到了本地内存中，方法区不再与堆相连。
+
+## Java内存模型
+
+Java Memory Model（JMM）是一种规范，规定了以下两点：
+
+1. 一个线程如何以及何时可以看到其他线程修改过后的共享变量的值（共享变量的可见性）；
+2. 如何在需要的时候对共享变量进行同步。
+
+**JMM定义了Java虚拟机（JVM）在计算机内存（RAM）中的工作方式。**
+
+并发编程中的两个关键问题就是这两条标准的体现：**线程之间如何通信和线程之间如何同步**。
+
+在命令式的编程中，线程之间的通信和同步机制有两种：**共享内存和消息传递**。
+
+- 通信机制：
+
+  在共享内存的并发模型里，线程之间共享程序的公共状态，线程之间通过读-写内存中的公共状态来隐式进行通信。典型的共享内存通信方式就是通过**共享对象**进行通信。
+
+  在消息传递的并发模型里，线程之间没有公共状态，线程之间必须通过明确的发送消息来显示进行通信，在Java中典型的消息传递方式就是` wait() `和` notify() `。
+
+- 同步机制：
+
+  同步是指程序用于控制不同线程之间操作发生相对顺序的机制。
+
+  在共享内存的并发模型里，同步是显示进行的，必须显示指定某个方法或某段代码需要在线程之间互斥进行。
+
+  在消息传递的并发模型里，由于消息的发送必须在消息的接受之前，因此同步是隐式进行的。
+
+Java的并发采用的是共享内存模型，Java线程之间的通信总是隐式进行的。
+
+在JMM中，线程之间的共享变量存储在主内存（main memory）中，每个线程都有一个私有的本地内存（local memory），本地内存中存储了共享变量的副本。本地内存是JMM中的抽象概念，并不真实存在。
+
+### Java类加载
+
+#### 什么是类加载
+
+类加载的概念：JVM将类的`.class `文件中的二进制数据读入到内存中，将其放在方法区内，然后在堆区创建一个 `java.lang.Class`对象。 `Class`对象封装了类在方法区内的数据结构，并提供访问方法区内的数据结构的接口。
+
+#### 类加载的时机
+
+类加载的时机：JVM规范允许类加载器在预料某个类将要被使用时就预先加载它，不需要等到某个类被“首次主动使用”时再加载。如果在预先加载的过程中遇到了` .class `文件缺失或存在错误，类加载器必须在程序首次主动使用该类时才报告错误（LinkageError错误）如果这个类一直没有被程序主动使用，那么类加载器就不会报告错误。
+
+#### 类加载的过程
+
+类加载包括3个阶段：加载（Load）、链接（Link）、初始化（Init），其中链接又分为3个具体步骤。
+
+1）加载
+
+查找并加载类的二进制数据。
+
+- 通过一个类的全限定名来获取其定义的二进制字节流。
+- 将这个字节流所代表的静态存储结构转化为方法区的运行时数据结构。
+- 在Java堆中生成一个代表这个类的 `java.lang.Class`对象，作为对方法区中这些数据的访问入口。
+
+可以使用系统提供的类加载器或自定义自己的类加载器来完成加载。
+
+2）验证
+
+确保被加载的类的正确性，确保` .Class `文件的字节流中包含的信息符合当前虚拟机的要求，并且不会危害虚拟机自身的安全。
+
+- 文件格式验证：验证字节流是否符合Class文件格式的规范；
+- 元数据验证：对字节码描述的信息进行语义分析以保证其描述的信息符合Java语言规范的要求；
+- 字节码验证：通过数据流和控制流分析，确定程序语义是合法的、符合逻辑的；
+- 符号引用验证：确保解析动作能正确执行。
+
+验证阶段非常重要但不是必须的，它对程序运行期没有影响。如果所引用的类经过反复验证，可以考虑采用 `-Xverifynone`参数来关闭大部分的类验证措施，以缩短虚拟机类加载的时间。
+
+3）准备
+
+为类的静态变量分配内存，并将其初始化为默认值。这些内存都在方法区中分配。
+
+- 该阶段进行内存分配的仅包括static变量，不包括实例变量，实例变量会在对象实例化时随着对象分配在Java堆中；
+- 该阶段设置的初始值通常情况下是数据类型默认的零值，而不是在Java代码中被显式地赋予的值；
+- 如果存在 `ConstantValue`属性（同时被final和static修饰），那么在该阶段变量就会被初始化为指定的值。
+
+4）解析
+
+把类中的符号引用转换为直接引用。
+
+符号引用就是一组符号来描述目标，可以是任何字面量。
+
+直接引用就是直接指向目标的指针、相对偏移量或一个间接定位到目标的句柄。
+
+5）初始化
+
+为类的静态变量赋予正确的初始值。步骤如下：
+
+- 假如该类还没有被加载和连接，则程序先加载并连接该类；
+- 假如该类的直接父类还没有被初始化，则先初始化其直接父类；
+- 假如类中有初始化语句，则系统依次执行这些初始化语句。
+
+#### 类初始化的时机
+
+类初始化时机：只有当对类进行主动使用的时候才会导致类的初始化。类的主动使用包括以下六种：
+
+- 创建类的实例（new）；
+- 访问某个类或接口的静态变量，或者对该静态变量赋值；
+- 调用类的静态方法；
+- 反射；
+- 初始化某个类的子类，则其父类也会被初始化；
+- Java虚拟机启动时被标明为启动类的类（ `JavaTest`），直接使用 `java.exe`命令来运行某个主类。
+
+#### Java中的类加载器
+
+类加载器包括：
+
+- Bootstrap ClassLoader 启动类加载器
+- ExtClassLoader 扩展类加载器
+- AppClassLoader 应用类加载器
+- User ClassLoader 自定义类加载器
+
+从JVM的角度而言，类加载器只分为两种：启动类加载器和其他类加载器。启动类加载器由C++实现，是JVM的一部分（Hotspot虚拟机），其他所有类加载器都由Java实现，独立于虚拟机之外，继承自抽象类` java.lang.ClassLoader `，需要由启动类加载器加载到内存后才能去加载其他类。
+
+具体地：
+
+启动类加载器负责加载存放在 `\jre\lib`下的类库（如所有的java.开头的类）。启动类加载器无法被Java程序直接引用。
+
+扩展类加载器负责加载 `\jre\lib\ext`目录中的所有类库（如javax.开头的类）。开发者可以直接使用扩展类加载器。
+
+应用程序类加载器负责加载用户类路径（ClassPath）所指定的类，开发者可以直接使用该类加载器。如果应用程序中没有自定义类加载器，一般情况下这就是程序中默认的类加载器。
+
+#### JVM类加载机制
+
+- **全盘负责**，当一个类加载器负责加载某个Class时，该Class所依赖的和引用的其他Class也将由该类加载器负责载入，除非显示使用另外一个类加载器来载入；
+- **父类委托**，先让父类加载器试图加载该类，只有在父类加载器无法加载该类时才尝试从自己的类路径中加载该类；
+- **缓存机制**，缓存机制保证所有加载过的Class都会被缓存，当程序中需要使用某个Class时，类加载器先从缓存区寻找该Class，只有缓存区不存在，系统才会读取该类对应的二进制数据，并将其转换成Class对象，存入缓存区。当修改了Class后，必须重启JVM，程序的修改才会生效。
+
+#### 类加载的方式
+
+- 启动应用时候由JVM初始化加载
+- 通过Class.forName()方法动态加载
+- 通过ClassLoader.loadClass()方法动态加载
+
+Class.forName()和ClassLoader.loadClass()的区别？
+
+- `Class.forName()`除了将类的.class文件加载到jvm中之外，还会对类进行解释，执行类中的static块；
+- `ClassLoader.loadClass()`只将.class文件加载到jvm中，不会执行static中的内容，只有在newInstance()创建实例时才会去执行static块。
+- `Class.forName(name,initialize,loader)`通过传入参数也可控制是否加载static块。
+
+#### 双亲委派机制？
+
+如果一个类加载器收到了类加载的请求，它首先不会自己去尝试加载这个类，而是把请求委托给父加载器去完成，依次向上，因此，所有的类加载请求最终都应该被传递到顶层的启动类加载器中，只有当父加载器在它的搜索范围中没有找到所需的类时，即无法完成该加载时，子加载器才会尝试自己去加载该类。
+
+双亲委派机制意义：
+
+- 防止内存中出现多份同样的字节码；
+- 保证Java程序安全稳定运行。如，即使重写` java.lang.System `类，在类加载的过程中，启动类加载器还是会加载Java提供的System类，避免System类遭到恶意修改。
+
+#### Java反射
+
+通常情况下，Java中使用某个类时，需要先知道它是什么类，对外暴露了哪些方法，然后创建类的实例，之后通过类的对象进行操作。所谓反射就是并不知道要初始化的类是什么，而是通过类的全限定名，调用class.forName()方法获取类，然后再通过类对象的getMethod()方法获取要调用的方法的对象，再通过类的getConstructor()方法获取类的构造器，最后通过Constructor的getInstance()方法创建类的实例，并通过方法对象的invoke()方法调用真正想要使用的方法。总结地讲，反射就是在运行时才知道要操作的类是什么，并且可以在运行时获取类的完整构造，并调用对应的方法。
+
+Java反射的基本流程大致如下：
+
+```java
+Class clz = Class.forName("com.xxx.xxx");
+Method method = clz.getMethod("methodName", int.class);
+Constructor constructor = clz.getConstructor();
+Object object = constructor.newInstance();
+method.invoke(object, 1);
+```
+
+
+
+## 垃圾回收
+
+就是将没有引用的对象回收。
+
+![image-20220324020703131](D:\CS-Note\images\Java\image-20220324020703131.png)
+
+新生代与老年代是1：3；
+
+新生代包括eden区、s0和s1（Survivor缩写），大小比例是8：1：1。
+
+HotSpot虚拟机中的GC可分为两种：Partial GC和Full GC。
+
+- FGC（Full Gc，或Major GC）：全堆（新生代+老年代）范围gc，在老年代满时发生。使用**标记压缩**算法
+- Partial GC：对堆的一部分gc，具体又可分为：
+  - YGC（Young GC，或minor GC）：对新生代堆gc，在eden区（也包含某个s0/s1）满时发生。使用**拷贝算法**，频率较高，性能耗费小
+  - Old GC：对堆中的老年代进行gc，只有CMS的concurrent collection是这个模式；
+  - Mixed GC：收集整个新生代以及 部分 老年代。只有G1有这个模式；
+
+### 堆对象生命周期
+
+1. 新建对象，默认先放入eden区，此时年龄为0
+
+2. eden区放满，触发YGC，还存活的对象放入s0，且年龄+1
+
+3. 下一次YGC，扫描并回收eden + s0，还存活的对象放s1，且年龄+1
+
+   也就是每次YGC，存活的交替放入s0或s1
+
+4. 当**年龄足够**时（一般15，CMS是6），放入老年代
+
+   若YGC的存活对象s区装不下，不管年龄多少，**多余的**直接放入老年代。见下文年龄动态判断
+
+5. 当老年代放满，触发FGC
+
+#### JVM如何判断对象存活？
+
+1. 引用计数法
+
+   为每个对象设置一个引用计数器，每当有引用时，计数器+1，引用失效时计数器-1。当对象引用为0时，判断对象失效。
+
+   优点：实现简单，效率高；缺点：难以解决对象间循环引用。
+
+2. 根可达分析法
+
+   从**GC Roots**出发，与之直接或间接关联的对象就是有效对象，反之就是无效对象。
+
+   可作为GC Roots的对象包括：
+
+   - 虚拟机栈中引用的对象（局部变量）
+   - 方法区中类静态属性引用的对象（静态变量）
+   - 方法区中常量引用的对象（常量）
+   - 本地方法栈中JNI引用的对象（JNI指针）
+
+#### Java中引用的类型
+
+JDK1.2之后，Java中存在4种引用类型，从强到弱包括：强、软、弱、虚
+
+- 强引用 Strong Reference
+
+  Java中的**默认引用**声明就是强引用，如new instance语句和显式赋值语句等。只要强引用存在，垃圾回收器永远不会回收被引用的对象，即使内存不足时，JVM也会直接抛出OutOfMemoryError，而不会回收对象。
+
+  将引用赋值为null，则中断强引用。
+
+- 软引用 Soft Reference
+
+  用于描述一些非必需但有用的对象，可通过` java.lang.ref.SoftReference `来使用软引用，如：
+
+  ```java
+  SoftReference<Object> obj = new SoftReference<>();
+  ```
+
+  在内存足够的时候，软引用对象不会被回收；内存不足时，JVM则会回收软引用对象。如果回收了软引用对象之后仍然没有足够的内存，JVM才会抛出OutOfMemoryError。
+
+  软引用的特性可以很好地解决OOM问题，适用于很多缓存场景，如网页缓存、图片缓存等。
+
+- 弱引用 Weak Reference
+
+  弱引用的强度比软引用要更弱，无论内存是否足够，只要 JVM 开始进行垃圾回收，那被弱引用关联的对象都会被回收。可通过` java.lang.ref.WeakReference ` 来使用弱引用，如：
+
+  ```java
+  WeakReference<Object> obj = new WeakReference<>();
+  ```
+
+- 虚引用 Phantom Reference
+
+  最弱的引用类型，如果一个对象仅持有虚引用，那么它等同于没有持有任何引用。
+
+  ```java
+  PhantomReference<Object> obj = new PhantomReference<>();
+  ```
+
+  无法通过虚引用获得对象。虚引用必须与**引用队列**配合使用。虚引用的实际应用场景为当对象被回收时，收到系统通知。
+
+  > **引用队列**
+  >
+  > 可以与软引用、弱引用以及虚引用一起配合使用，当垃圾回收器准备回收一个对象时，如果发现它还有引用，那么就会在回收对象之前，把这个引用加入到与之关联的引用队列中去。程序可以通过判断引用队列中是否已经加入了引用，来判断被引用的对象是否将要被垃圾回收，这样就可以在对象被回收之前采取一些必要的措施。  
+
+#### 被标记为失效的对象是否一定会被回收？
+
+被标记为失效的对象被回收前会经历如下步骤：
+
+1. JVM判断对象是否重写了finalize()方法：
+
+   - 若重写了finalize()，则将其放入F-Queue队列中；
+   - 若未重写，则直接回收。
+
+2. 执行队列中的finalize()方法：
+
+   JVM自动创建一个优先级较低的线程执行队列中的finalize()方法，只负责触发，不保证执行完毕。若finalize()方法执行了耗时操作，则JVM会停止执行方法并立刻回收对象。
+
+3. 对象销毁/重生：
+
+   若finalize()方法中将this赋值给了某个引用，则该对象会重生，否则会被回收。
+
+#### 为什么年龄达15时放入老年代？
+
+因为对象markword中的分代年龄用4bit表示，最大15
+
+此外还有**对象年龄动态判断**机制，当单个 Survivor 区占用超过 50% (对应虚拟机参数: `-XX:TargetSurvivorRatio`)，则年龄最老的，即使没到15，也直接放入老年代。例如50%的对象最大年龄为8，则年龄>8的放入老年代。
+
+
+
+### 主流垃圾收集器
+
+![微信截图_20220324211950](D:\CS-Note\images\Java\微信截图_20220324211950.png)
+
+实线连接表示配合使用
+
+发展路线：内存越来越大，**STW**（stop the world，停止所有用户线程）时间越来越短。从分代到不分代。
+
+|                   | 管理内存 | STW时间 |
+| ----------------- | -------- | ------- |
+| Serial            | 几十M    |         |
+| Parallel Scavenge | 几个G    |         |
+| CMS               | 几十G    | 200ms   |
+| G1                | 上百G    | 10ms    |
+| ZGC               | 4TB      | 1ms     |
+
+
+
+#### 为什么要STW机制？
+
+如果不暂停线程，让其继续执行，会破坏GC Root的依赖关系，导致某些对象被回收，增加gc的复杂性
+
+#### 垃圾回收算法
+
+1. 标记清除：缺点是不连续。只有CMS使用
+
+2. 拷贝算法：优点是无碎片，缺点是空间大
+
+3. 标记整理（标记压缩）：优点是无碎片，缺点是时间长
+
+   回收器主要使用2和3
+
+#### 年轻代垃圾收集器
+
+1. Serial 串行垃圾回收器：串行回收，STW
+
+   <img src="D:\CS-Note\images\Java\image-20220325014554879.png" alt="image-20220325014554879" style="zoom:50%;" />
+
+2. ParNew 并行垃圾回收器：可以理解为Serial回收器的多线程版，STW时多个线程并行回收
+
+   <img src="D:\CS-Note\images\Java\image-20220325014725018.png" alt="image-20220325014725018" style="zoom:50%;" />
+
+3. Parallel Scavenge（ParallelGC）
+
+#### 老年代垃圾收集器
+
+1. SerialOld：可理解为Serial回收器的老年代版本，同样是一个单线程回收器，使用的是**标记整理**算法。其作用主要有：
+
+   - 在JDK1.5及之前的版本中与Parallel Scavenge收集器搭配使用；
+   - 作为CMS收集器的后备预案，如果CMS出现Concurrent Mode Failure，则SerialOld将作为后备收集器进行垃圾回收；
+   - JVM使用的实际上是基于SerialOld改进的PS MarkSweep收集器。
+
+2. ParallelOld：类似新生代的Parallel Scavenge，也是一种多线程的回收器，关注的重点同样在于吞吐量。使用了标记-整理算法进行垃圾回收。
+
+3. CMS：
+
+   CMS即Concurrent Mark Sweep，并发标记清除，使用的是**标记清除**算法，主要关注系统停顿时间。
+
+   共有四个阶段：
+
+   初始标记：STW，但是非常短
+
+   并发标记：用户线程与gc线程**并发执行**（最耗时，因此才用并发，不会产生长时间STW）
+
+   重新标记：STW，因为上一个阶段可能会存在标记失误（从线程角度理解），需要再次标记保证正确性  
+
+   并发清理：一次性完成回收
+   
+   <img src="D:\CS-Note\images\Java\未命名图片.png" alt="未命名图片" style="zoom:50%;" />
+
+
+
+#### 不分代垃圾收集器
+
+1. G1（Garbage First，垃圾优先）：也有STW。逻辑分代，但物理不分代
+
+   三色标记 + SATB
+
+2. ZGC：oracle官方，java11引入，逻辑和物理都不分代
+
+   颜色指针 + 读屏障
+
+3. Shenandoah ：redhat开发，和ZGC差不多
+
+4. Epsilon：啥也不干（调试用，或确认不用GC的场景）
+
+### JVM默认回收器
+
+- 1.7和1.8：PS+PO （Parallel Scavenge + ParallelOld）
+- 1.9：G1
+
+### 调优
+
+减少FGC（实际上是减少STW）
+
+## JVM命令
+
+- 标准：-开头，所有Hotspot都支持
+
+- 非标准：-X开头，特定版本hotspot支持特定命令
+
+- 不稳定：-XX开头，下个版本可能取消
+
+  -XX: +PrintCommandLineFlags 打印命令行参数值
+
+#### 线上JVM启动参数
+
+```shell
+/usr/java/default/jre/bin/java -server -Xmx4g -Xms4g -Xmn2g -Xss256K -XX:SurvivorRatio=8 -XX:MetaspaceSize=512m -Xnoclassgc -XX:MaxTenuringThreshold=7 -XX:GCTimeRatio=19 -XX:+DisableExplicitGC -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+UseCMSCompactAtFullCollection -XX:CMSFullGCsBeforeCompaction=0 -XX:+CMSParallelRemarkEnabled -XX:+CMSClassUnloadingEnabled -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:SoftRefLRUPolicyMSPerMB=0 -XX:+UseFastAccessorMethods -XX:+UseCompressedOops -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -Xloggc:/data/logs/xxx/debug/gc.20210331_082950.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump -Dfile.encoding=UTF-8 -Djava.awt.headless=true -Djetty.logging.dir=/data/logs/xxx -Djava.io.tmp=/tmp -jar xxx.jar --spring.profiles.active=prod
+```
+
+\####
+
+```shell
+-server 服务器模式
+-Xmx4g 最大堆内存
+-Xms4g 初始堆内存
+-Xmn2g 新生代内存大小
+-Xss256K 线程栈大小
+-XX:SurvivorRatio=8 eden与survivor比例
+-XX:MetaspaceSize=512m 元空间大小
+-XX:MaxTenuringThreshold=7 该参数主要是控制新生代需要经历多少次GC晋升到老年代中的最大阈值。
+-XX:GCTimeRatio=19 吞吐量 垃圾收集时间为1/(1+19),默认值为99，即1%时间用于垃圾收集。
+-XX:+UseParNewGC 使用ParNew收集器
+-XX:+CMSParallelRemarkEnabled 开启并发标记
+-XX:+UseConcMarkSweepGC 使用CMS收集器
+-XX:+UseCMSCompactAtFullCollection 和-XX:CMSFullGCsBeforeCompaction=0配合使用 意思就是GC之后对堆内存进行压缩整理
+-XX:CMSFullGCsBeforeCompaction=0 
+-XX:+UseCompressedOops 开启对象压缩
+-XX:+PrintGCDetails 打印gc详情
+-XX:+HeapDumpOnOutOfMemoryError OOM时生成dump文件
+-XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump dump存放路径
+```
 
 # 代理
 
@@ -514,12 +1265,6 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 代理对象不需要实现接口，利用反射，在运行时构建代理对象（需要指定创建的类和接口）
 
 ### 1、jdk动态代理
-
-
-
-[TOC]
-
-
 
 1. 通过 Proxy.getProxyClass() 方法获取代理类 Class 对象；
 2. 通过反射 aClazz.getConstructor() 获取构造器对象；
