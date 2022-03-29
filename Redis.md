@@ -30,11 +30,11 @@ Master可写可读，Slave 只能读。
 
 一主多从，一对多。 
 
-![GetImage](D:\CS-Note\images\Redis\GetImage.png)
+<img src="D:\CS-Note\images\Redis\GetImage.png" alt="GetImage" style="zoom:50%;" />
 
 特殊的链式架构，中间的结点整体作为从机，但同时也是最右边从机的主机。 
 
-![GetImage](D:\CS-Note\images\Redis\GetImage-16442891132211.png)
+<img src="D:\CS-Note\images\Redis\GetImage-16442891132211.png" alt="GetImage" style="zoom:50%;" />
 
 ## 复制原理 
 
