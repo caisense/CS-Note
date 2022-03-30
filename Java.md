@@ -1303,7 +1303,13 @@ JDK1.2之后，Java中存在4种引用类型，从强到弱包括：强、软、
 
 因为对象markword中的分代年龄用4bit表示，最大15
 
+对象内存布局
 
+<img src="D:\CS-Note\images\Java\未命名图片-16485691371701.png" alt="未命名图片" style="zoom:50%;" />
+
+markword结构（64位系统中是8B=64bit）
+
+![20180322153316377](D:\CS-Note\images\Java\20180322153316377.jpg)
 
 ### 主流垃圾收集器
 
