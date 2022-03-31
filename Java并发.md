@@ -350,13 +350,28 @@ Java中线程的状态有以下几种：
 
 
 
-## 共享变量（volatile）
+## 共享变量（volatile关键字）
 
+volatile关键字解决的是可见性问题：当一个线程修改了某个共享变量的值，其他线程能够立刻看到修改后的值。但是volatile无法保证线程安全，因为不能保证原子性，例如两个线程同时写冲突
 
+在 Java 内存模型中，允许编译器和处理器对指令进行重排序，重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
 
- 
+volatile 关键字通过添加内存屏障的方式来禁止指令重排，即重排序时不能把后面的指令放到内存屏障之前。
 
-## 线程同步（synchronized）
+Java内存模型中定义的8种工作内存和主内存之间的原子操作
+
+<img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/8b7ebbad-9604-4375-84e3-f412099d170c.png" alt="img" style="zoom:50%;" />
+
+  Lock unlock read load use assign store write
+
+- lock：作用于主内存的变量
+- unlock
+
+如果赋值了一个变量volatile后，该变量对对象的操作更严格 限制use之前不能被read和load，assign之后必须紧跟store和write，将read-load-use和assign-store-write成为一个原子操作
+
+  synchronized 互斥锁来保证操作的原子性。它对应的内存间交互操作为：lock 和 unlock，在虚拟机实现上对应的字节码指令为 monitorenter 和 monitorexit。
+
+## 线程同步（synchronized关键字）
 
 1. 用于代码块
 
