@@ -566,7 +566,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 内部包含一个Entry类型数组，Entry 存储着键值对，包含四个字段，next字段表示 Entry 是一个链表。即数组中的每个位置被当成一个**桶**，一个桶存放一个链表。HashMap 使用拉链法来解决冲突，同一个链表中存放**hashCode 和 桶大小 取模运算结果**相同的 Entry。
 
-<img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/image-20191208234948205.png" alt="img" style="zoom:50%;" />
+<img src="images\Java\image-20191208234948205.png" alt="img" style="zoom:50%;" />
 
 #### 2.put方法(1.7与1.8变化)
 
