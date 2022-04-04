@@ -113,7 +113,7 @@ BigInteger sum = i1.add(i2); // 12345678902469135780
 
 类型的转换关系如下：
 
-![92a2d60aba1ca69c33ec051a89941c1a](D:\CS-Note\images\Java\92a2d60aba1ca69c33ec051a89941c1a.png)
+![92a2d60aba1ca69c33ec051a89941c1a](./images/Java/92a2d60aba1ca69c33ec051a89941c1a.png)
 
 - 自动类型转换(隐式类型转换)：从小类型到大类型可以**自动完成**。
 - 强制转换：从大类型到小类型需要加括号，但这样转换有可能会造成**精度损失或溢出**。
@@ -572,7 +572,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 1. 根据key和哈希算法计算数组下标：**index = hashCode(Key) & (capacity - 1)**，相当于对hashCode取模：`hashCode % capacity`。
 
-    使用&运算原因：位运算更快
+    **使用&运算原因：位运算比取模更快**
 
 2. 如果数组下标位置桶为空，则将key和value封装为Entry对象（1.7是Entry，1.8是Node），并放入该桶
 
