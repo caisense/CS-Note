@@ -113,7 +113,7 @@ BigInteger sum = i1.add(i2); // 12345678902469135780
 
 类型的转换关系如下：
 
-![92a2d60aba1ca69c33ec051a89941c1a](./images/Java/92a2d60aba1ca69c33ec051a89941c1a.png)
+![92a2d60aba1ca69c33ec051a89941c1a](./images/Java基础/92a2d60aba1ca69c33ec051a89941c1a.png)
 
 - 自动类型转换(隐式类型转换)：从小类型到大类型可以**自动完成**。
 - 强制转换：从大类型到小类型需要加括号，但这样转换有可能会造成**精度损失或溢出**。
@@ -566,7 +566,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 内部包含一个Entry类型数组，Entry 存储着键值对，包含四个字段，next字段表示 Entry 是一个链表。即数组中的每个位置被当成一个**桶**，一个桶存放一个链表。HashMap 使用拉链法来解决冲突，同一个链表中存放**hashCode 和 桶大小 取模运算结果**相同的 Entry。
 
-<img src="images\Java\image-20191208234948205.png" alt="img" style="zoom:50%;" />
+<img src="images\Java基础\image-20191208234948205.png" alt="img" style="zoom:50%;" />
 
 #### 2.put方法(1.7与1.8变化)
 
@@ -637,7 +637,7 @@ jdk1.7：由于ReHash，可能导致原来在一个桶的结点分散到不同�
 
 jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，或链表进化为红黑树
 
-![image-20220322102957906](D:\CS-Note\images\Java\image-20220322102957906.png)
+![image-20220322102957906](images\Java基础\image-20220322102957906.png)
 
 #### hashMap线程不安全分析
 
@@ -662,7 +662,7 @@ jdk1.8虽然用尾插法不会出现循环链表，但还是会有某个桶**覆
 
 ### 4.ConcurrentHashMap
 
-![image-20191209001038024](D:\CS-Note\images\Java\image-20191209001038024.png)
+![image-20191209001038024](images\Java基础\image-20191209001038024.png)
 
 和 HashMap 实现上类似，主要差别是 ConcurrentHashMap 使用**两级数组**：
 
@@ -786,7 +786,7 @@ public class Math {
 }
 ```
 
-![20200904134738400](D:\CS-Note\images\Java\20200904134738400.png)
+![20200904134738400](images\Java基础\20200904134738400.png)
 
 图中蓝色区域（栈、本地方法栈、程序计数器）是**线程私有**的。
 
@@ -1045,7 +1045,7 @@ JVM将类的`.class `文件中的二进制数据读入到内存中，将其放�
 
 该模型要求除了顶层的启动类加载器外，其它的类加载器都要有自己的父类加载器。这里的父子关系一般通过**组合**关系（Composition）来实现，而不是继承关系（Inheritance）。
 
-<img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/0dd2d40a-5b2b-4d45-b176-e75a4cd4bdbf.png" alt="img" style="zoom:50%;" />
+<img src="D:\CS-Note\images\Java基础\0dd2d40a-5b2b-4d45-b176-e75a4cd4bdbf.png" alt="img" style="zoom:50%;" />
 
 双亲委派机制意义：
 
@@ -1161,7 +1161,7 @@ method.invoke(object, 1);
 
 程序计数器、虚拟机栈和本地方法栈这三个区域属于线程私有的，只存在于线程的生命周期内，线程结束之后就会消失，因此不需要回收。
 
-![image-20220324020703131](D:\CS-Note\images\Java\image-20220324020703131.png)
+![image-20220324020703131](images\Java基础\image-20220324020703131.png)
 
 新生代与老年代是1：3；
 
@@ -1305,15 +1305,15 @@ JDK1.2之后，Java中存在4种引用类型，从强到弱包括：强、软、
 
 对象内存布局
 
-<img src="D:\CS-Note\images\Java\未命名图片-16485691371701.png" alt="未命名图片" style="zoom:50%;" />
+<img src="images\Java基础\未命名图片-16485691371701.png" alt="未命名图片" style="zoom:50%;" />
 
 markword结构（64位系统中是8B=64bit）
 
-![20180322153316377](D:\CS-Note\images\Java\20180322153316377.jpg)
+![20180322153316377](images\Java基础\20180322153316377.jpg)
 
 ### 主流垃圾收集器
 
-![微信截图_20220324211950](D:\CS-Note\images\Java\微信截图_20220324211950.png)
+![微信截图_20220324211950](images\Java基础\微信截图_20220324211950.png)
 
 实线连接表示配合使用
 
@@ -1337,15 +1337,15 @@ markword结构（64位系统中是8B=64bit）
 
 1. 标记清除：缺点是不连续。只有CMS使用
 
-   <img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
+   <img src="D:\CS-Note\images\Java基础\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
 
 2. 拷贝算法：优点是无碎片，缺点是浪费空间
 
-   <img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
+   <img src="D:\CS-Note\images\Java基础\b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
 
 3. 标记整理（标记压缩）：优点是无碎片，缺点是时间长
 
-   <img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
+   <img src="D:\CS-Note\images\Java基础\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
    
    回收器主要使用2和3
 
@@ -1353,13 +1353,13 @@ markword结构（64位系统中是8B=64bit）
 
 1. Serial 串行垃圾回收器：串行回收，STW
 
-   <img src="D:\CS-Note\images\Java\image-20220325014554879.png" alt="image-20220325014554879" style="zoom:50%;" />
+   <img src="images\Java基础\image-20220325014554879.png" alt="image-20220325014554879" style="zoom:50%;" />
 
 2. ParNew 并行垃圾回收器：可以理解为Serial回收器的多线程版，STW时多个线程并行回收。
 
    默认开启的线程数与CPU数量相同，在CPU核数很多的机器上，可以通过参数`-XX:ParallelGCThreads`来设置线程
 
-   <img src="D:\CS-Note\images\Java\image-20220325014725018.png" alt="image-20220325014725018" style="zoom:50%;" />
+   <img src="images\Java基础\image-20220325014725018.png" alt="image-20220325014725018" style="zoom:50%;" />
 
 3. Parallel Scavenge（ParallelGC）
 
@@ -1387,7 +1387,7 @@ markword结构（64位系统中是8B=64bit）
 
    并发清理：一次性完成回收
    
-   <img src="D:\CS-Note\images\Java\未命名图片.png" alt="未命名图片" style="zoom:50%;" />
+   <img src="images\Java基础\未命名图片.png" alt="未命名图片" style="zoom:50%;" />
 
 
 
@@ -1457,7 +1457,7 @@ markword结构（64位系统中是8B=64bit）
 
 是一种常用的设计模式，其目的就是为其他对象提供一个代理以控制对某个对象的访问。代理类负责为委托类**预处理**、**后处理**等增强操作。
 
-![img](D:\CS-Note\images\Java\Center.png)
+<img src="images\Java基础\Center.png" alt="img" style="zoom:50%;" />
 
 ## 动态代理
 
