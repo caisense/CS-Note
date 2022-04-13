@@ -195,27 +195,51 @@ public static boolean isBlank(String str) {
 }
 ```
 
-#### String s = new String(“abc”) 会创建几个对象
+#### String s = new String("abc") 会创建几个对象
 
-使用这种方式一共会创建两个字符串对象（前提是 String Pool 中还没有 “abc” 字符串对象）。
+- 若String Pool 中不存在 “abc” 字符串对象：创建两个对象
 
-“abc” 属于字符串字面量，因此编译时期会在 String Pool 中创建一个字符串对象，指向这个 “abc” 字符串字面量；
+  “abc” 属于字符串字面量（或称字符串常量），因此编译时期会检查 String Pool（运行时常量池，在**方法区**） 中是否存在“abc”，若不存在就创建一个字符串对象，指向这个 “abc” 字符串字面量；
 
-而使用 new 的方式会在堆中创建一个字符串对象。
+  而使用 new 的方式会在**堆**中创建一个字符串对象。
+
+- 若存在：只创建一个new
 
 
 
 #### String, StringBuffer and StringBuilder区别
 
-|          | String           | StringBuffer                     | StringBuilder |
-| -------- | ---------------- | -------------------------------- | ------------- |
-| 可变性   | 不可变           | 可变                             | 可变          |
-| 线程安全 | 无（因为不可变） | 是（内部使用 synchronized 同步） | 否            |
-| 性能     | 无               | 低                               | 高            |
+|          | String           | StringBuffer                     | StringBuilder            |
+| -------- | ---------------- | -------------------------------- | ------------------------ |
+| 可变性   | 不可变           | 可变（操作不生成新对象）         | 可变（操作不生成新对象） |
+| 线程安全 | 无（因为不可变） | 是（内部使用 synchronized 同步） | 否                       |
+| 性能     | 无               | 低                               | 高                       |
 
 所以在单线程环境下推荐使用 StringBuilder，多线程环境下推荐使用 StringBuffer。
 
 
+
+#### jdk1.8 String + 操作自动转换为StringBuilder操作
+
+- 如果是变量拼接
+
+  ```java
+  String c = "gc";
+  c = c + "hc";
+  // 第二行操作会由jvm转换为如下等价操作
+  StringBuilder sbc1 = new StringBuilder();
+  sbc1.append("gc");
+  sbc1.append("hc");
+  return sbc1.toString();
+  ```
+
+- 如果是常量拼接，则编译阶段直接优化
+
+  ```java
+  String s = "a" + "b" + "c";  // 编译器优化为s="abc"
+  ```
+
+如果string pool中存在字符串常量“abc”则不再新建对象。
 
 ### 包装类型
 
@@ -570,9 +594,15 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 #### 2.put方法(1.7与1.8变化)
 
-1. 根据key和哈希算法计算数组下标：**index = hashCode(Key) & (capacity - 1)**，相当于对hashCode取模：`hashCode % capacity`。
+1. 根据key和哈希算法计算数组下标：**index = hashCode(Key) & (capacity - 1)**，相当于对hashCode取模：`hashCode % capacity`，前提是 capacity = 2 ^ n 。
 
-    **使用&运算原因：位运算比取模更快**
+    **使用&运算原因：位运算比取模更快**。
+
+    **1.8中对hashCode计算还做了改进**
+
+    <img src="D:\CS-Note\images\Java基础\45205ec2.png" alt="img" style="zoom:50%;" />
+
+    优化了高位运算的算法：hash**无符号右移**16位后与自身异或，目的是当桶长度较小时，也能保证高低位的bit都参与到hash计算中，同时不会有太大开销。
 
 2. 如果数组下标位置桶为空，则将key和value封装为Entry对象（1.7是Entry，1.8是Node），并放入该桶
 
@@ -615,13 +645,21 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 相关参数主要有3个：
 
-- capacity：Entry数组长度，初始为16。
+- capacity：Entry数组长度，初始为16，且始终保持capacity = 2 ^ n。
 
 - size：键值对数量。
 
 - loadFactor：加载因子，表示table数组填满的程度，取0~1之间的值，默认0.75
 
 扩容时机：由扩容临界值决定，Threshold = loadFactor * capacity。当HashMap中的元素个数超过该值时，就会进行Entry数组扩容（**翻倍**，capacity * 2）
+
+**capacity = 2^n 的原因**
+
+前面已经解释过，求元素放几号桶时用&运算代替取模，前提是要求capacity = 2^n 。
+
+这是一种非常规的设计，常规设计是把桶大小设为**素数**（hashTable初始化桶大小就是11），相对来说素数的hash冲突概率小于合数
+
+
 
 扩容操作：
 

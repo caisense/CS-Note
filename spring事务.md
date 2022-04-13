@@ -180,6 +180,18 @@ CREATE TABLE `category` (
 
 解决：传统的spring项目，则需要在applicationContext.xml手动配置
 
+
+
+## 8、UDAL分片键不一致
+
+分库的系统中，fence_subscribe_record表分片键是prod_inst_id，elec_fence表分片键是elec_fence_id，两个表分片键不一致，则要做成事务的两条数据不一定在同一片中（下面报错，一条在corp_1分片，另一条在corp_2），无法构成事务。
+
+```
+[PUB-1201]UDAL - Handler process error: Distributed transaction occurred, statement : /*89a86853fed14f1ebcced2c1f1ef57ae ElecFenceController.disableFenceForWeb*/  update fence_subscribe_record set  update_date = '2022-04-06 10:37:21'  ,status = 0 ,subscribe_type = 1 where prod_inst_id = 980016408905 and shard = 980016408905 is executed on cmp_corp_2 while the last statement : /*89a86853fed14f1ebcced2c1f1ef57ae ElecFenceController.disableFenceForWeb*/  update elec_fence set status_cd='1100', status_date='2022-04-06 14:49:55', update_date='2022-04-06 14:49:55'  where elec_fence_id=100000000007000 and shard=100000000007000 was executed on cmp_corp_1
+```
+
+
+
 # 事务不回滚场景
 
 ## 1、错误的传播特性
