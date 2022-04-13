@@ -203,13 +203,13 @@ Java中线程的状态有以下几种：
 
    
 
-4. `Object.wait()/wait(long timeout)`
+4. `Object.wait() / wait(long timeout)`
 
    必须在synchronized块或方法中使用
 
    当前线程调用对象的wait()方法，当前线程**释放对象锁**并进入WAITING/TIMED_WAITING状态，**当前线程**进入等待队列。依靠**同一个被锁的对象**调用notify() / notifyAll()唤醒，或timeout时间到自动唤醒。
 
-5. `Object.notify()/notifyAll()`
+5. `Object.notify() / notifyAll()`
 
    也必须在synchronized块或方法中使用
 
@@ -371,7 +371,9 @@ Java内存模型中定义的8种工作内存和主内存之间的原子操作
 
   synchronized 互斥锁来保证操作的原子性。它对应的内存间交互操作为：lock 和 unlock，在虚拟机实现上对应的字节码指令为 monitorenter 和 monitorexit。
 
-## 线程同步（synchronized关键字）
+## 线程同步
+
+### 1. synchronized关键字
 
 1. 用于代码块
 
@@ -475,6 +477,105 @@ Java内存模型中定义的8种工作内存和主内存之间的原子操作
    > 2. 引用类型赋值，例如：`List <String> list = anotherList`。
 
    但是多条语句操作就需要同步。
+
+### 2. Lock
+
+Java内置的synchronized关键字锁相对比较重量级，且使用时存在以下局限：
+
+- 当一个线程获取了对应的锁，并执行同步代码块时，其他线程只能一直等待，等待获取锁的线程释放锁，而获取锁的线程释放锁只会有两种情况：
+
+  - 获取锁的线程执行完了代码块，线程释放对锁的占有；
+  - 线程执行发生异常，JVM自动释放锁；
+
+  如果这个获取锁的线程由于要等待IO或者其他原因（如调用sleep方法）被阻塞了，但是又没有释放锁，其他线程便会长时间地等待下去。等待中的线程**不会响应中断**。
+
+- 如果多个线程都只是进行读操作，当一个线程在进行读操作时，其他线程也只能等待无法进行读操作。
+
+- synchronized机制无法感知线程是否成功获取了锁。
+
+因此Java中提供了**Lock接口**，用于在部分场景下取代synchronized关键字，进行更轻量级的实现。但注意，采用Lock方式获取必须主动去释放锁，且Lock在发生异常时，不会自动释放锁。因此一般来说，使用Lock必须配合try-catch块，在try之前获取锁，并且在finally释放锁，以保证锁一定被被释放，防止死锁。
+
+#### 可重入锁ReentrantLock
+
+ReentrantLock实现了Lock接口。可重入锁即表示可反复进入的锁，但仅限于当前线程。当前线程可以反复加锁，但也需要释放同样加锁次数的锁，即重入了多少次，就要释放多少次，不然也会导入锁不被释放。
+
+**几个重要方法：**
+
+1. lock()
+
+   获取锁，有三种情况：
+
+   - 锁空闲：直接获取锁并返回，同时设置锁持有者数量为：1；
+
+   - 当前线程持有锁：直接获取锁并返回，同时锁持有者数量+1；
+
+   - 其他线程持有锁：当前线程会休眠等待，直至获取锁为止；
+
+     ```java
+     Lock lock = new ReentrantLock();
+     lock.lock();
+     try {
+         // 处理任务
+     } catch(Exception e) {
+         
+     } finally {
+         lock.unlock(); // 释放锁
+     }
+     ```
+
+     注意，lock()方法的调用在try之前，原因是加锁操作可能会抛出异常，如果加锁在try块之前，那么出现异常时try-finally块不会执行；如果加锁操作在try块中，由于finally一定会执行，此时try中的加锁操作出现异常，finally依然会执行解锁操作，而此时并没有获取到锁，执行解锁操作会抛出另外一个异常，可能将加锁的异常信息覆盖，导致信息丢失。
+
+     因此应该将加锁操作放在try块之前。
+
+2. tryLock()
+
+   尝试获取锁，与lock()相比多了**返回值**。获取成功返回：true，获取失败返回：false。
+
+   还可以带参数`tryLock(long time, TimeUnit unit)`，在拿不到锁时会等待重试一定的时间time，在时间期限之内如果还拿不到锁，就返回false
+
+   同样有以下三种情况：
+
+   - 锁空闲：直接获取锁并返回：true，同时设置锁持有者数量为：1；
+
+   - 当前线程持有锁：直接获取锁并返回：true，同时锁持有者数量+1；
+
+   - 其他线程持有锁：获取锁失败，返回：false；
+
+     ```java
+     Lock lock = new ReentrantLock();
+     if (lock.tryLock(1, TimeUnit.SECONDS)) {  // 尝试获取锁，最多等待1秒
+          try {
+              // 处理任务
+          } catch(Exception e){
+              
+          } finally{
+              lock.unlock();   // 释放锁
+          } 
+     } else {
+         // 如果不能获取锁，则直接做其他事情
+     }
+     ```
+
+     
+
+3. unlock()
+
+   释放锁，每次锁持有者数量递减 1，直到 0 为止。
+
+lock()方法和unlock()方法间的代码块即为加锁的代码块。Lock只有代码块加锁的方式，不能对方法加锁。
+
+### synchronized和ReentrantLock区别
+
+|      | synchronized       | ReentrantLock                    |
+| ---- | ------------------ | -------------------------------- |
+|      | 能锁方法和代码块   | 只能锁代码块                     |
+|      | 是关键字           | 是实现类                         |
+|      | jvm层面            | api层面                          |
+|      | 非公平锁           | 公平或非公平                     |
+|      | 锁信息保存在对象头 | 通过代码中int类型state标识锁状态 |
+|      | 有锁升级过程       |                                  |
+
+
 
 ## 线程池
 
@@ -682,6 +783,8 @@ Synchronized不论是修饰方法还是代码块，都是通过持有修饰对�
 - 线程将修改后的副本的值刷新回主内存中；
 - 线程释放锁；
 
+
+
 ## 乐观锁 VS 悲观锁
 
 乐观锁与悲观锁是一种广义上的概念，体现了看待线程同步的不同角度。在Java和数据库中都有此概念对应的实际应用。
@@ -722,7 +825,7 @@ ReentrantLock里面有一个内部类Sync，Sync继承AQS（AbstractQueuedSynchr
 
 ## 可重入锁 VS 非可重入锁
 
-可重入锁又名递归锁，是指在同一个线程在外层方法获取锁的时候，再进入该线程的内层方法会自动获取锁（前提锁对象得是同一个对象或者class），不会因为之前已经获取过还没释放而阻塞。Java中ReentrantLock和synchronized都是可重入锁，可重入锁的一个优点是可一定程度避免死锁。
+可重入锁又名递归锁，是指在同一个线程在外层方法获取锁的时候，再进入该线程的内层方法会自动获取锁（前提锁对象得是同一个对象或者class），不会因为之前已经获取过还没释放而阻塞。Java中ReentrantLock和synchronized都是可重入锁，可重入锁的一个优点是可一定程度**避免死锁**。
 
 ```Java
 public class Widget {
@@ -751,7 +854,7 @@ public class Widget {
 
 通过重入锁ReentrantLock以及非可重入锁NonReentrantLock的源码来对比分析一下为什么非可重入锁在重复调用同步资源时会出现死锁。
 
-首先ReentrantLock和NonReentrantLock都继承父类AQS，其父类AQS中维护了一个同步状态status来计数重入次数，status初始值为0。
+首先ReentrantLock和NonReentrantLock都继承父类AQS，其父类AQS中维护了一个同步状态**status**来计数重入次数，status初始值为0。
 
 当线程尝试获取锁时，可重入锁先尝试获取并更新status值，如果status == 0表示没有其他线程在执行同步代码，则把status置为1，当前线程开始执行。如果status != 0，则判断当前线程是否是获取到这个锁的线程，如果是的话执行status+1，且当前线程可以再次获取锁。而非可重入锁是直接去获取并尝试更新当前status的值，如果status != 0的话会导致其获取锁失败，当前线程阻塞。
 

@@ -1,5 +1,73 @@
 
 
+# 数据结构
+
+Redis本质都是**k - v键值对**，用一个唯一的字符串key来标识存储，数据结构指value的存储结构。
+
+- Key的大小上限为512MB，但建议不超过1KB，这样既节约存储空间，也利于检索。
+
+基本数据结构共有5种：字符串string、列表list、字典hash、集合set、有序集合zset。
+
+此外还有3种特殊类型：
+
+- Geo：地理位置定位，用于存储地理位置信息，并对存储的信息进行操作（Redis 3.2 推出）。
+- HyperLogLog：用来做基数统计算法的数据结构，如统计网站的 UV。
+- Bitmaps：用一个比特位来映射某个元素的状态，在 Redis 中，它的底层是基于字符串类型实现的，可以把 bitmaps 成作一个以比特位为单位的数组。
+
+<img src="D:\CS-Note\images\Redis\640.png" alt="图片" style="zoom:50%;" />
+
+## String（字符串）
+
+- 简介：最常用的数据结构，是一个k-v键值对，v是字符串。它是二进制安全的，最大存储为 512M
+- 简单使用举例：set key value、get key 等
+- 应用场景：共享session、分布式锁，计数器、限流、存储图片或序列化的对象
+- 内部编码有 3 种：
+  1. int（8 字节，java的Long）
+  2. embstr（小于等于 39 字节字符串）
+  3. raw（大于 39 个字节字符串）
+
+## List（列表）
+
+- 简介：k-v 键值对，v是列表（list）类型，从左向右存储多个有序的字符串，一个列表最多可存储 **2^32-1** 个元素
+
+- 简单实用举例：lpush key value [value ...] 、lrange key start end
+
+- 内部编码：ziplist（压缩列表）、linkedlist（链表）
+
+- 应用场景：消息队列，文章列表。
+
+  异步队列：将需要延后处理的任务结构体序列化为字符串，放入Redis列表，再用一个线程从列表中轮询处理。
+
+## Hash（哈希）
+
+- 简介：存储二级map，无序，第一级是 k - v 键值对，其中 v 本身又是一个 k-v 键值对
+- 简单使用举例：hset key field value 、hget key field
+- 内部编码：ziplist（压缩列表） 、hashtable（哈希表）
+- 应用场景：缓存用户信息等
+
+
+
+## Set（集合）
+
+- 简介：k-v 键值对，其中v是字符串集合（元素不重复），无序
+- 简单使用举例：sadd key element [element ...]、smembers key
+- 内部编码：intset（整数集合）、hashtable（哈希表）
+- 应用场景：用户标签,生成随机数抽奖、社交需求
+
+
+
+## 有序集合（zset）
+
+- 简介：k-v 键值对，v是**已排序**的字符串集合
+- 简单格式举例：zadd key score member [score member ...]，zrank key member
+- 底层内部编码：ziplist（压缩列表）、skiplist（跳跃表）
+- 应用场景：排行榜，社交需求（如用户点赞）。
+
+
+
+- Redis采用渐进式rehash，同时保留新旧两个hash结构，在后续的定时任务和hash操作中，逐渐将旧hash的内容转移到新hash中。
+
+
 # 主从复制
 
 是指将一台Redis服务器的数据，复制到其他的Redis服务器。前者称为主节点(master/leader)，后者称为从节点(slave/follower)； 
@@ -98,9 +166,27 @@ Redis server是**事件驱动**的程序，要处理两种事件：
 2. when：记录时间事件的到达时刻
 3. timeProc：时间事件处理器
 
-# 单线程为何高效
+# 为何高效？
 
-文件事件Proc使用**IO多路复用程序**监听多个socket，实现高性能网络通信模型
+1. 单线程
+
+   在4.0之前是单线程，具体而言网络I/O以及Set 和 Get操作是单线程，持久化、集群同步还是用其他线程完成
+
+   4.0之后添加多线程，主要是体现在大数据的异步删除功能上，例如 `unlink key`、`flushdb async`、`flushall async` 等
+
+2. 基于内存存储实现，省去磁盘IO开销
+
+1. 文件事件Proc使用**IO多路复用程序**监听多个socket，基于非阻塞IO模型，实现高性能网络通信模型
+
+
+
+# 如何实现数据不丢失？
+
+把数据从内存存储到磁盘上（持久化），三种方式
+
+- AOF 日志（Append Only File，文件追加方式）：记录所有的操作命令，并以文本的形式追加到文件中。
+- RDB 快照（Redis DataBase）：将某一个时刻的内存数据，以二进制的方式写入磁盘。
+- 混合持久化方式：Redis 4.0 新增了混合持久化的方式，集成了 RDB 和 AOF 的优点。
 
 # 淘汰策略
 

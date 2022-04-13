@@ -1671,6 +1671,44 @@ public class Test {
 
 # 反射
 
+## Class类
+
+由于JVM为每个加载的class创建了对应的Class实例，且这个Class实例是**单例**，并在实例中保存了该class的所有信息，包括类名、包名、父类、实现的接口、所有方法、字段等，因此，如果获取了某个Class实例，我们就可以通过这个Class实例获取到该实例对应的class的所有信息。
+
+这种通过Class实例获取class信息的方法称为**反射**（Reflection）。
+
+获取class的**Class实例**方式
+
+1. 直接通过一个class的静态变量class获取
+
+   ```java
+   Class cls = String.class;
+   System.out.println(cls);  // class java.lang.String
+   ```
+
+2. 通过类实例的getClass()方法获取
+
+   ```java
+   String s = "Hello";
+   Class cls = s.getClass();
+   System.out.println(cls); // class java.lang.String
+   ```
+
+3. 如果知道一个class的**完整类名**，可以通过静态方法Class.forName()获取
+
+   ```java
+   Class cls = Class.forName("java.lang.String");
+   ```
+
+注意，.class获取到的类实例再用getClass，得到的是java的Class类，因为所有类实例的类型都是java.lang.Class
+
+```java
+System.out.println(String.class.class);  // 报错，String.class是类实例，实例无法再获取实例
+System.out.println(String.class.getClass());  // class java.lang.Class
+```
+
+
+
 ## 获取构造方法
 
 - getConstructor(Class...)：获取某个public的Constructor；
