@@ -408,7 +408,7 @@ update T set c=c+1 where id=2;
 
 是 InnoDB 存储引擎所特有的一种日志，用于**记录事务操作的变化**，记录的是数据修改之后的值，不管事务是否提交都会记录下来。
 
-执行DML时，先记录到InnoDB 的redo log和缓存页中，再批量写入磁盘文件
+执行DML时，先记录到 InnoDB 的 redo log 和缓存页中，再批量写入磁盘文件
 
 作用：数据恢复、crash-safe
 
