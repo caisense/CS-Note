@@ -794,6 +794,24 @@ public final void wait() throws InterruptedException
 - 对于基本类型，== 判断两个值是否相等，基本类型没有 equals() 方法。
 - 对于引用类型，== 判断两个变量是否引用同一个对象（地址相同），而 equals() 判断引用的对象是否等价。
 
+### equals()和Objects.equals()
+
+对象实例的equals()可能报空指针异常，而`Objects.equals()`方法不会
+
+`java.util`包下提供的Objects类（不是java.land.Object），有许多对象操作的辅助方法
+
+```java
+Integer a = 1;
+int b = 1;
+Integer c = null;
+// System.out.println(c.equals(a));  //报错, null不存在，不能调用实例方法
+System.out.println(a.equals(c));  // true
+System.out.println(Objects.equals(a, c)); //false
+System.out.println(Objects.equals(a, b)); //true
+```
+
+
+
 # JVM
 
 意义：从软件层面屏蔽不同操作系统在底层硬件与指令上的区别。（一次编译，处处运行，而没有虚拟机的语言，如c++，在win和linux上执行要编译为不同的程序
