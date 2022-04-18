@@ -697,7 +697,7 @@ try (var ctx = new UserContext()) {
 
 synchronized关键字是Java内置的原子性锁，使用者看不到，是一种监视器（Monitor）锁。当对象锁升级为重量级锁时，markWord存储指向Monitor的指针。
 
-<img src="D:\CS-Note\images\Java并发\未命名图片-164978366864511.png" alt="未命名图片" style="zoom: 50%;" />
+<img src="images\Java并发\未命名图片-164978366864511.png" alt="未命名图片" style="zoom: 50%;" />
 
 Monitor是线程私有的数据结构，也是一个对象，每一个被锁住的对象都会和一个monitor关联，每个线程都有一个可用monitor record列表，同时还有一个全局的可用列表。
 
@@ -758,7 +758,7 @@ count是锁计数器。执行monitorenter指令时会尝试获取对象锁，如
 
 Synchronized不论是修饰方法还是代码块，都是通过持有修饰对象的锁来实现同步，原因就是Synchronized锁存在锁对象的对象头的**MarkWord**中，如下图（64位系统）
 
-![20180322153316377](D:\CS-Note\images\Java并发\20180322153316377.jpg)
+![20180322153316377](images\Java并发\20180322153316377.jpg)
 
 **可重入性**
 
@@ -801,7 +801,7 @@ Synchronized不论是修饰方法还是代码块，都是通过持有修饰对�
 
 例：CAS算法（自旋）
 
-<img src="D:\CS-Note\images\Java并发\c8703cd9.png" alt="img" style="zoom:33%;" />
+<img src="images\Java并发\c8703cd9.png" alt="img" style="zoom:33%;" />
 
 ## 公平锁 VS 非公平锁
 
@@ -811,15 +811,15 @@ Synchronized不论是修饰方法还是代码块，都是通过持有修饰对�
 
 ReentrantLock里面有一个内部类Sync，Sync继承AQS（AbstractQueuedSynchronizer），添加锁和释放锁的大部分操作实际上都是在Sync中实现的。它有公平锁FairSync和非公平锁NonfairSync两个子类。ReentrantLock默认使用非公平锁，也可以通过构造器来显示的指定使用公平锁。
 
-<img src="D:\CS-Note\images\Java并发\6edea205.png" alt="img" style="zoom:50%;" />
+<img src="images\Java并发\6edea205.png" alt="img" style="zoom:50%;" />
 
 公平锁与非公平锁的lock()方法
 
-<img src="D:\CS-Note\images\Java并发\bc6fe583.png" alt="img" style="zoom:33%;" />
+<img src="images\Java并发\bc6fe583.png" alt="img" style="zoom:33%;" />
 
 唯一的区别就在于公平锁在获取同步状态时多了一个限制条件：hasQueuedPredecessors()。该方法主要做一件事情：主要是判断当前线程是否位于同步队列中的第一个。如果是则返回true，否则返回false。
 
-![img](D:\CS-Note\images\Java并发\bd0036bb.png)
+![img](images\Java并发\bd0036bb.png)
 
 
 
@@ -846,11 +846,11 @@ public class Widget {
 
 例如，有多个人在排队打水，此时管理员允许锁和同一个人的多个水桶绑定。这个人用多个水桶打水时，第一个水桶和锁绑定并打完水之后，第二个水桶也可以直接和锁绑定并开始打水，所有的水桶都打完水之后打水人才会将锁还给管理员。这个人的所有打水流程都能够成功执行，后续等待的人也能够打到水。这就是可重入锁。
 
-<img src="D:\CS-Note\images\Java并发\58fc5bc9.png" alt="img" style="zoom: 33%;" />
+<img src="images\Java并发\58fc5bc9.png" alt="img" style="zoom: 33%;" />
 
 但如果是非可重入锁的话，此时管理员只允许锁和同一个人的一个水桶绑定。第一个水桶和锁绑定打完水之后并不会释放锁，导致第二个水桶不能和锁绑定也无法打水。当前线程出现死锁，整个等待队列中的所有线程都无法被唤醒。
 
-<img src="D:\CS-Note\images\Java并发\ea597a0c.png" alt="img" style="zoom:33%;" />
+<img src="images\Java并发\ea597a0c.png" alt="img" style="zoom:33%;" />
 
 通过重入锁ReentrantLock以及非可重入锁NonReentrantLock的源码来对比分析一下为什么非可重入锁在重复调用同步资源时会出现死锁。
 
@@ -860,7 +860,7 @@ public class Widget {
 
 释放锁时，可重入锁同样先获取当前status的值，在当前线程是持有锁的线程的前提下。如果status-1 == 0，则表示当前线程所有重复获取锁的操作都已经执行完毕，然后该线程才会真正释放锁。而非可重入锁则是在确定当前线程是持有锁的线程之后，直接将status置为0，将锁释放。
 
-<img src="D:\CS-Note\images\Java并发\32536e7a.png" alt="img" style="zoom: 50%;" />
+<img src="images\Java并发\32536e7a.png" alt="img" style="zoom: 50%;" />
 
 ## 独享锁 VS 共享锁
 
@@ -872,7 +872,7 @@ public class Widget {
 
 ReentrantReadWriteLock的部分源码
 
-![img](D:\CS-Note\images\Java并发\762a042b.png)
+![img](images\Java并发\762a042b.png)
 
 ReentrantReadWriteLock有两把锁：ReadLock和WriteLock，由词知意，一个读锁一个写锁，合称“读写锁”。再进一步观察可以发现ReadLock和WriteLock是靠内部类Sync实现的锁。Sync是AQS的一个子类，这种结构在CountDownLatch、ReentrantLock、Semaphore里面也都存在。
 
@@ -882,7 +882,7 @@ ReentrantReadWriteLock有两把锁：ReadLock和WriteLock，由词知意，一�
 
 在独享锁中这个值通常是0或者1（如果是重入锁的话state值就是重入的次数），在共享锁中state就是持有锁的数量。但是在ReentrantReadWriteLock中有读、写两把锁，所以需要在一个整型变量state上分别描述读锁和写锁的数量（或者也可以叫状态）。于是将state变量“按位切割”切分成了两个部分，高16位表示读锁状态（读锁个数），低16位表示写锁状态（写锁个数）。如下图所示：
 
-![img](D:\CS-Note\images\Java并发\8793e00a.png)
+![img](images\Java并发\8793e00a.png)
 
 再回头看一下互斥锁ReentrantLock中公平锁和非公平锁，它们添加的都是独享锁。根据源码所示，当某一个线程调用lock方法获取锁时，如果同步资源没有被其他线程锁住，那么当前线程在使用CAS更新state成功后就会成功抢占该资源。而如果公共资源被占用且不是被当前线程占用，那么就会加锁失败。所以可以确定ReentrantLock无论读操作还是写操作，添加的锁都是都是独享锁。
 
@@ -968,7 +968,7 @@ public static String concatString(String s1, String s2, String s3) {
 
 无锁 -> 偏向锁 -> 轻量级锁 -> 重量级锁
 
-<img src="D:\CS-Note\images\Java并发\markword-64.png" alt="markword-64" style="zoom:50%;" />
+<img src="images\Java并发\markword-64.png" alt="markword-64" style="zoom:50%;" />
 
 ### **无锁**
 
