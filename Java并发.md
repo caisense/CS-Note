@@ -620,7 +620,7 @@ ThreadLocal相当于给**每个线程**都开辟了一个独立的存储空间�
 
 ThreadLocalMap 是 ThreadLocal 的 **内部类**，没有实现 Map 接口，用独立的方式实现了 Map 的功能，其内部的 Entry 也是独立实现。
 
-<img src="D:\CS-Note\images\Java并发\image-20220329110107310.png" alt="image-20220329110107310" style="zoom:50%;" />
+<img src="images\Java并发\image-20220329110107310.png" alt="image-20220329110107310" style="zoom:50%;" />
 
 Entry 中的 key 只能是 **ThreadLocal 对象**，value可以是任意类型。设计目的是只能通过 ThreadLocal 索引存储的数据。
 
