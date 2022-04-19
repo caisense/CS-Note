@@ -14,54 +14,174 @@ Redis本质都是**k - v键值对**，用一个唯一的字符串key来标识存
 - HyperLogLog：用来做基数统计算法的数据结构，如统计网站的 UV。
 - Bitmaps：用一个比特位来映射某个元素的状态，在 Redis 中，它的底层是基于字符串类型实现的，可以把 bitmaps 成作一个以比特位为单位的数组。
 
-<img src="./images/Redis/640.png" alt="图片" style="zoom:50%;" />
+<img src="images/Redis/image-20220419002910447.png" alt="image-20220419002910447" style="zoom:80%;" />
 
 ## String（字符串）
 
 - 简介：最常用的数据结构，是一个k-v键值对，v是字符串。它是二进制安全的，最大存储为 512M
+
 - 简单使用举例：set key value、get key 等
+
 - 应用场景：共享session、分布式锁，计数器、限流、存储图片或序列化的对象
+
 - 内部编码有 3 种：
   1. int（8 字节，java的Long）
+  
   2. embstr（小于等于 39 字节字符串）
+  
   3. raw（大于 39 个字节字符串）
+  
+     
+
+## Hash（哈希）
+
+- 简介：存储二级map，无序，第一级是 k - v 键值对，其中 v 本身又是一个 k-v 键值对
+
+- 简单使用举例：
+
+  1. **hset** key field value：设置map（key对应的map，下文不再强调）中的k-v为 field value 
+
+  2. **hget** key field：获取map中的k = field的v
+
+  3. **hgetall** key：获取map中所有k-v
+
+  4. **hlen** key：得到map的k-v对总数
+
+  5. **hdel** key ：删除map
+
+  6. **hincrby** key filed inc：map中k=field的值加上inc
+
+- 内部编码：ziplist（压缩列表） 、hashtable（哈希表）
+
+- 应用场景：存对象（k为对象唯一id，v为map，恰好存放对象的所有属性）
+
+
 
 ## List（列表）
 
 - 简介：k-v 键值对，v是列表（list）类型，从左向右存储多个有序的字符串，一个列表最多可存储 **2^32-1** 个元素
 
-- 简单实用举例：lpush key value [value ...] 、lrange key start end
+- 简单使用举例：
+
+  1. **lpush** key value [value ...]：列表（key对应的列表，下文不再强调）头插一个（或多个）
+
+  2. **rpush** key value [value ...]：列表尾插一个（或多个）
+
+  3. **lpop** key：从列表头部弹出
+
+  4. **rpop** key：从列表尾部弹出
+
+  4. **blpop** key [key ...] timeout：从列表头部弹出一个（或多个）元素，若**列表空**则阻塞等待timeout秒，若=0则一直阻塞
+
+  4. **brpop** key [key ...] timeout：从列表尾部弹出一个（或多个）元素，若**列表空**则阻塞等待timeout秒，若=0则一直阻塞
+
+  7. **lindex** key idx：通过索引取值：
+
+     - 若下标（idx）为非负数，返回`list[idx]`元素，idx=0为最左元素。
+
+     - 若下标为负，从右向左，idx=-1为最右元素。
+
+     - 若下标超过数组长度，返回nil
+
+     <img src="images/Redis/image-20220419093351771.png" alt="image-20220419093351771" style="zoom: 67%;" />
+
+  6. **lset** key idx val：通过索引设值：`list[idx] = val`
+
+  7. **lrange** key start end：获取`[start, stop]`区间元素，与java数组不同，右边是闭区间（stop号元素也能取到）。
+
+     
 
 - 内部编码：ziplist（压缩列表）、linkedlist（链表）
 
-- 应用场景：消息队列，文章列表。
+- 应用场景：栈（lpush+lpop）、消息队列（lpush+rpop）、阻塞队列（lpush+brpop）
 
+  公众号文章列表（或微博信息流）：分库分表分布式的db，order by 本来就很耗时，再聚合排序更耗时。
+  
+  利用redis全局一致的特性，对每个用户id，博主发布一条就 lpush msg:{用户id} 消息id，则顺序读list就是最新的消息。查看最新的5条消息列表用 lrange msg:{用户id} 0 5  
+  
   异步队列：将需要延后处理的任务结构体序列化为字符串，放入Redis列表，再用一个线程从列表中轮询处理。
-
-## Hash（哈希）
-
-- 简介：存储二级map，无序，第一级是 k - v 键值对，其中 v 本身又是一个 k-v 键值对
-- 简单使用举例：hset key field value 、hget key field
-- 内部编码：ziplist（压缩列表） 、hashtable（哈希表）
-- 应用场景：存对象（k为对象唯一id，v为map，恰好存放对象的所有属性）
 
 
 
 ## Set（集合）
 
 - 简介：k-v 键值对，其中v是字符串集合（元素不重复），无序
-- 简单使用举例：sadd key element [element ...]、smembers key
+
+- 简单使用举例：
+
+  1. **sadd** key member1 [member2 ...]：（key对应的，下文不再强调）集合添加一个（或多个）成员
+  2. **srem** key member1 [member2 ...]：集合删除一个或多个成员
+3. **sismember** key member：判断member是否在集合中，若在返回1；若不在或key不存在，返回0
+  4. **smembers** key：返回集合所有成员
+5. **scard** key：返回集合成员数量
+  6. **srandmember** key [count]：返回随机count个成员，不加count则默认一个
+7. **spop** key [count]：弹出随机count个成员，不加count则默认一个
+  8. **sdiff** key1 key2：求两个集合的差集
+9. **SINTER** key1 [key2 … ]：求两个及以上集合的交集
+  9. **SUNION** key1 [key2]：求几个集合并集
+
 - 内部编码：intset（整数集合）、hashtable（哈希表）
-- 应用场景：用户标签,生成随机数抽奖、社交需求
+
+- 应用场景：用户标签、社交需求
+
+  1. 生成随机数抽奖
+
+     添加抽奖人：sadd key {userID}；查看所有参与抽奖用户：smembers key；
+
+     抽取n名中奖者：srandmember key n 或者spop key n
+
+  2. 朋友圈点赞
+
+     点赞，把对某条朋友圈点赞的用户id存在一个集合里：sadd like:{消息id} {用户id}；
+
+     取消点赞：srem  like:{消息id} {用户id};
+
+     检查用户是否点过赞：sismember  like:{消息id} {用户id}；
+
+     获取点赞的用户列表：smembers  like:{消息id}；获取点赞用户数：scard  like:{消息id}；
+
+  3. 微博关注模型
+
+     a关注的人：aSet -> {w, x, y, z}
+
+     b关注的人：bSet -> {u, v, w, x}
+
+     求a和b的共同关注，用交集：sinter aSet bSet; 返回{w, x}
+
+     a和b是好友，则a可能认识的人，用差集：sdiff bSet aSet；返回{u, v}
+
+     判断a关注的人也关注x，看x是否在集合a：sismember aSet x
+
+     
 
 
 
 ## zset（有序集合）
 
-- 简介：k-v 键值对，v是**已排序**的字符串集合
-- 简单格式举例：zadd key score member [score member ...]，zrank key member
-- 底层内部编码：ziplist（压缩列表）、skiplist（跳跃表）
-- 应用场景：排行榜，社交需求（如用户点赞）。
+- 简介：k-v 键值对，v是**已排序**的字符串集合 
+
+- 简单格式举例：
+  1. **zadd** key score member [[score2 member2] ...]：有序集合中加入一个（或多个）带分值元素
+  1. **zrem** key member [member ...]：从有序集合中删除元素
+  2. **zrank** key member
+  
+- 底层内部编码：
+
+  1. ziplist（压缩列表）
+
+     <img src="images/Redis/image-20220419160219909.png" alt="image-20220419160219909" style="zoom:50%;" />
+
+  2. skiplist（跳跃表）
+
+     将有序链表改造为多层索引，查找效率接近二分（OlogN）
+
+     ![image-20220419112349770](images/Redis/image-20220419112349770.png)
+
+- 应用场景：热门排行榜，用户点赞排序。
+
+跳表
+
+
 
 
 
