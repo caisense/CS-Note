@@ -158,28 +158,56 @@ Redis本质都是**k - v键值对**，用一个唯一的字符串key来标识存
 
 ## zset（有序集合）
 
-- 简介：k-v 键值对，v是**已排序**的字符串集合 
+- 简介：k-v 键值对，v是**已排序**的字符串集合，排序依据是元素的score
+
+  **注意**：
+
+  - score相同时，redis对元素使用**字典排序**
+
+  - score 值可以是整数值或**双精度浮点数**。
 
 - 简单格式举例：
   1. **zadd** key score member [[score2 member2] ...]：有序集合中加入一个（或多个）带分值元素
-  1. **zrem** key member [member ...]：从有序集合中删除元素
-  2. **zrank** key member
+  
+  2. **zrem** key member [member ...]：从有序集合中删除元素
+  
+  3. **zscore** key member：返回member的分值
+  
+  3. **zincrby** key increment member：将member的分值加上increment，increment可以为负数；当key不存在 ，或member不再集合中，该命令等同于**zadd** key increment member
+  
+  4. **zrank** key member：返回member在集合中的排名
+  
+  5. **zrange** key start stop [withscores]：顺序返回排名在`[start, stop]`区间的元素；带withscores则带上分值，以value1,score1, ..., valueN,scoreN格式返回
+  
+     下标为负数则从最后排名开始，-1为倒数第一，以此类推
+  
+  5. **zrevrange** key start stop [withscores]：倒序
+  
+  2. **zrangebyscore** key min max [WITHSCORES] [LIMIT offset count] ：返回score介于`[min, max]`区间的元素，顺序根据分值排名（从小到大）。可选的 LIMIT 参数指定返回结果的数量及区间（就像 SQL 中的 SELECT LIMIT offset,  count )
   
 - 底层内部编码：
 
   1. ziplist（压缩列表）
 
+     类似数组，但本质上是链表，根据socre排序
+
      <img src="images/Redis/image-20220419160219909.png" alt="image-20220419160219909" style="zoom:50%;" />
 
   2. skiplist（跳跃表）
 
-     将有序链表改造为多层索引，查找效率接近二分（OlogN）
+     将有序链表改造为多层索引，元素较多时，查找效率接近二分（OlogN）
 
      ![image-20220419112349770](images/Redis/image-20220419112349770.png)
 
-- 应用场景：热门排行榜，用户点赞排序。
+- 应用场景：用户点赞排序。
 
-跳表
+  1. 热门排行榜
+
+     点击新闻：zincrby hotNews:20220419 1 总理记者会
+
+     展示当日排行前十：zrevrange hotNews:20220419 0 9 withscores
+
+
 
 
 
