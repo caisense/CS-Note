@@ -49,7 +49,21 @@ Bean的生命周期指的就是：在Spring中，Bean是如何生成的？
 5. 填充原始对象中的属性（依赖注入）
 6. 如果原始对象中的某个方法被AOP了，那么则需要根据原始对象生成一个代理对象
 7. 把最终生成的代理对象放入单例池（源码中叫做singletonObjects）中，下次getBean()时就直接
-从单例池拿即可
+  从单例池拿即可
+
+# SpringBoot是怎么启动的
+
+在Application类下 SpringApplication.run()
+
+SpringBootApplication有三个Annotation
+
+@EnableAutoConfiguration 通过@import将所有符合自动配置条件的bean定义都加载到IoC容器 搜索符合自动配置条件的功能需要借助于SpringFactoriesLoader提供的配置查找的功能 即根据 @EnableAutoConfiguration的完整类名作为查找的Key 获取对应的一组Configuration类
+
+@Configuration 和JavaConfig形式的Spring loc容器的配置类使用的@Configuration一样 是其定义成一个JavaConfig配置类
+
+ 
+
+@ComponentScan 对应XML配置中的元素 其功能就是自动扫描并加载符合条件的组件（比如@Component和@Repository等）或者bean定义，最终将这些bean定义加载到IoC容器
 
 ## 如何解决循环依赖
 
@@ -68,6 +82,12 @@ Spring使用三级缓存
 3. 三级缓存`singletonFactories ` ConcurrentHashMap<beanName, bean对象>：
 
    缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
+
+SingletonObjecs 完成初始化的单例对象的cache（一级缓存）
+
+EarlySingletonObjecs 完成实例化但没有初始化的 提前曝光的单例对象的Cache（二级缓存）
+
+SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级缓存）
 
 ![image-20220311095851373-16469639344001](D:\CS-Note\images\Spring常见问题\image-20220311095851373-16469639344001.png)
 

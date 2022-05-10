@@ -350,13 +350,13 @@ Java中线程的状态有以下几种：
 
 
 
-## 共享变量（volatile关键字）
+## volatile关键字（共享变量）
 
 volatile关键字解决的是可见性问题：当一个线程修改了某个共享变量的值，其他线程能够立刻看到修改后的值。但是volatile无法保证线程安全，因为不能保证原子性，例如两个线程同时写冲突
 
 在 Java 内存模型中，允许编译器和处理器对指令进行重排序，重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
 
-volatile 关键字通过添加内存屏障的方式来禁止指令重排，即重排序时不能把后面的指令放到内存屏障之前。
+volatile 关键字通过添加**内存屏障**的方式来禁止指令重排，即重排序时不能把后面的指令放到内存屏障之前。
 
 Java内存模型中定义的8种工作内存和主内存之间的原子操作
 
@@ -579,15 +579,36 @@ lock()方法和unlock()方法间的代码块即为加锁的代码块。Lock只�
 
 ## 线程池
 
-
+线程池内部维护了若干个线程，没有任务的时候，这些线程都处于等待状态。如果有新任务，就分配一个空闲线程执行。如果所有线程都处于忙碌状态，新任务要么放入队列等待，要么增加一个新线程进行处理。
 
 Java标准库提供了ExecutorService接口表示线程池，通过Executor类创建
 
-几个常用实现类有：
+几个常用实现类：
 
 1. `FixedThreadPool(int n)`：线程数**固定**的线程池；
 2. CachedThreadPool：线程数根据任务**动态调整**的线程池；
 3. SingleThreadExecutor：仅单线程执行的线程池，相当于大小为1的`FixedThreadPool`。
+4. ScheduledThreadPool：线程任务可以定期反复执行
+
+**线程池7个参数**
+
+1. corePoolSize： 核心线程数
+2. maximumPoolSize： 最大线程数
+3. keepAliveTime： 最大空闲时间
+4. TimeUnit unit： 时间单位
+5. BlockingQueue workQueue： 阻塞队列
+6. ThreadFactory threadFactory： 线程工厂
+7. RejectedExecutionHandler handler： 拒绝策略
+
+**执行流程**
+
+![在这里插入图片描述](D:\CS-Note\images\Java并发\watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5aW95aW9546pX3R5cmFudA==,size_16,color_FFFFFF,t_70,g_se,x_16.png)
+
+1、当我们有一个任务提交给线程池去执行的时候，线程池会先判断是否有空闲的核心线程，如果有，则让核心线程执行这个任务，如果没有，则会加入到阻塞队列当中
+
+2、当阻塞队列里面也放满了任务之后，会创建非核心线程去执行新增的任务（不是从阻塞队列里面取，而是新来的任务）
+
+3、如果核心线程与非核心线程的数量达到了最大线程数，也就是此时已经没有了任何空闲的线程，阻塞队列里面也放满的话，线程池就会执行拒绝策略，拒绝任务
 
 ## ThreadLocal
 
