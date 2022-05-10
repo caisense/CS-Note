@@ -195,7 +195,7 @@ public static boolean isBlank(String str) {
 }
 ```
 
-#### String s = new String("abc") 会创建几个对象
+#### Q：String s = new String("abc") 会创建几个对象？
 
 - 若String Pool 中不存在 “abc” 字符串对象：创建两个对象
 
@@ -547,7 +547,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 使用 ensureCapacityInternal() 方法来保证容量足够，如果不够时，需要使用 grow() 扩容
 
-新容量大小为1.5倍
+新容量大小为**1.5倍**
 
 ### 数组与ArrayList区别
 
@@ -600,7 +600,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
     **1.8中对hashCode计算还做了改进**
 
-    <img src="D:\CS-Note\images\Java基础\45205ec2.png" alt="img" style="zoom:50%;" />
+    <img src="images\Java基础\45205ec2.png" alt="img" style="zoom:50%;" />
 
     优化了高位运算的算法：hash**无符号右移**16位后与自身异或，目的是当桶长度较小时，也能保证高低位的bit都参与到hash计算中，同时不会有太大开销。
 
@@ -620,7 +620,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
      - 插入之后再判断是否扩容
    
 
-##### 链表转红黑树的阈值被设置为8的原因
+##### Q：链表转红黑树的阈值被设置为8的原因？
 
 1. 当选用的hash算法离散性很好时，数组中同一位置出现碰撞的概率很低，几乎不会出现达到阈值的情况；然而采用随机hash算法时，离散性可能会变差，理想情况下随机hash算法计算出的位置分布遵循**泊松分布**，根据概率统计，同一位置的元素达到8个概率只有大约1亿分之6，几乎是不可能事件。**若这种小概率事件都发生了，说明HashMap的元素个数相当多，有提高查找效率的必要。**
 2. 另一种解释是链表查找的平均查找次数是n/2，而红黑树的平均查找次数是log(n)，8/2=4而log(8)=3，3<4因此有必要转换，但这种说法存在问题，如果是这个理由那应该选择在节点数达到5时就转换，5/2同样大于log(5)。
@@ -645,7 +645,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 相关参数主要有3个：
 
-- capacity：Entry数组长度，初始为16，且始终保持capacity = 2 ^ n。
+- capacity：Entry数组长度，初始为**16**，且始终保持capacity = 2 ^ n。
 
 - size：键值对数量。
 
@@ -653,7 +653,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 扩容时机：由扩容临界值决定，Threshold = loadFactor * capacity。当HashMap中的元素个数超过该值时，就会进行Entry数组扩容（**翻倍**，capacity * 2）
 
-**capacity = 2^n 的原因**
+**Q：capacity = 2^n 的原因？**
 
 前面已经解释过，求元素放几号桶时用&运算代替取模，前提是要求capacity = 2^n 。
 
@@ -685,7 +685,7 @@ jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，�
 
 jdk1.8虽然用尾插法不会出现循环链表，但还是会有某个桶**覆盖问题**。例如线程1和2都争抢table位置A的空桶，线程1先插入，线程2认为此时A桶仍为空，覆盖了线程1插入的Entry
 
-#### 为什么重写equals()方法一定要重写hashCode()方法
+#### Q：为什么重写equals()方法一定要重写hashCode()方法？
 
 如果我们要使用自定义类的对象作为Entry的key，那么就有必要重写equals()方法，确定判断key相等的规则。
 
@@ -792,7 +792,7 @@ public final void wait() throws InterruptedException
 ### 等价与相等
 
 - 对于基本类型，== 判断两个值是否相等，基本类型没有 equals() 方法。
-- 对于引用类型，== 判断两个变量是否引用同一个对象（地址相同），而 equals() 判断引用的对象是否等价。
+- 对于引用类型，== 判断两个变量是否引用同一个对象（**地址相同**），而 equals() 判断引用的对象是否等价。
 
 ### equals()和Objects.equals()
 
@@ -848,7 +848,9 @@ public class Math {
 
 例如，执行main方法的主线程会在内存中开启一片区域，存放其私有的程序计数器、虚拟机栈、本地方法栈等，如图左边所示，框住只是为了说明其逻辑上的关系，物理上并不在一起。
 
-1. 虚拟机栈 VM Stack：又称栈 or 线程栈。创建一个线程就在虚拟机栈中分配一块私有的栈，每个线程中的方法**调用**又会在本栈中创建一个**栈帧**。存储局部变量、对象指针、操作栈、动态链接、方法出口。
+1. 虚拟机栈 VM Stack
+
+   又称栈 or 线程栈。创建一个线程就在虚拟机栈中分配一块私有的栈，每个线程中的方法**调用**又会在本栈中创建一个**栈帧**。存储局部变量、对象指针、操作数栈、动态链接、方法出口。
 
    - 局部变量表： 存放着方法中的局部变量，包括基本类型和引用类型。在编译期间就已确定空间大小，运行期间大小不变。
 
@@ -865,26 +867,34 @@ public class Math {
    - StackOverflowError：线程请求的栈深度大于虚拟机所允许的深度时抛出；
    - OutOfMemoryError：虚拟机栈无法申请到足够的内存时抛出。
 
-2. 本地方法栈Native Method Stack：为JVM使用的Native方法（C、C++代码）提供运行空间。功能上与虚拟机栈是类似。
+2. 本地方法栈Native Method Stack
+
+   为JVM使用的Native方法（C、C++代码）提供运行空间。功能上与虚拟机栈是类似。
 
    该区域JVM也规定了StackOverflowError和OutOfMemoryError异常。
 
-3. 程序计数器 Program Counter Register：当前线程所执行的**字节码的行号**指示器，指向下一条要执行的命令。方法执行完返回时必须要用到。
+3. 程序计数器 Program Counter Register
 
+   当前线程所执行的**字节码的行号**指示器，指向下一条要执行的命令。方法执行完返回时必须要用到。
+   
    该区域没有规定任何异常。
 
 图中黄色区域（堆、方法区）是**线程共享**的，虽然逻辑上分区，但物理上是**连续的区域**。
 
-1. 堆 Heap：存储所有对象实例。JVM的垃圾回收主要发生在该区域。（与栈具有数据结构FIFO特性不同，jvm的堆和数据结构的堆没有关系）
+1. 堆 Heap
 
-   从结构上，堆被划分为新生代和老年代；而新生代又分为Eden区、To Survivor区、From Survivor区，大小比例为8:1:1。
+   存储所有对象实例。JVM的垃圾回收主要发生在该区域。（与栈具有数据结构FIFO特性不同，jvm的堆和数据结构的堆没有关系）
+
+   从结构上，堆被划分为新生代和老年代；而新生代又分为Eden区、To Survivor区（s0）、From Survivor区（s1），大小比例为8:1:1。
 
    当堆中没有内存可供完成实例分配，且堆也无法再扩展时，将会抛出OutOfMemoryError异常。
 
-2. 方法区 Method Area：存储类的静态信息（.class）、常量、静态变量（指针，指向堆）、即时编译器（JIT）编译产生的代码
+2. 方法区 Method Area
+
+   存储类的静态信息（.class）、常量、静态变量（指针，指向堆）、即时编译器（JIT）编译产生的代码
 
    由于HotSpot虚拟机将GC算法拓展到了该区域，因此方法区有时也被称为**永久代**，1.8之后改称元空间metaspace。
-
+   
    当方法区无法满足内存分配需求时，将抛出OutOfMemoryError异常。
    
    **运行时常量池**
@@ -916,19 +926,19 @@ Java Memory Model（JMM）是一种规范，规定了以下两点：
 
 - 通信机制：
 
-  在共享内存的并发模型里，线程之间共享程序的公共状态，线程之间通过读-写内存中的公共状态来隐式进行通信。典型的共享内存通信方式就是通过**共享对象**进行通信。
+  共享内存的并发模型：线程之间共享程序的公共状态，线程之间通过读-写内存中的公共状态来隐式进行通信。典型的共享内存通信方式就是通过**共享对象**进行通信。
 
-  在消息传递的并发模型里，线程之间没有公共状态，线程之间必须通过明确的发送消息来显示进行通信，在Java中典型的消息传递方式就是` wait() `和` notify() `。
+  消息传递的并发模型：线程之间没有公共状态，线程之间必须通过明确的发送消息来显式进行通信，在Java中典型的消息传递方式就是` wait() `和` notify() `。
 
 - 同步机制：
 
   同步是指程序用于控制不同线程之间操作发生相对顺序的机制。
 
-  在共享内存的并发模型里，同步是显示进行的，必须显示指定某个方法或某段代码需要在线程之间互斥进行。
+  在共享内存的并发模型里，同步是显式进行的，必须显式指定某个方法或某段代码需要在线程之间互斥进行。
 
   在消息传递的并发模型里，由于消息的发送必须在消息的接受之前，因此同步是隐式进行的。
 
-Java的并发采用的是共享内存模型，Java线程之间的通信总是隐式进行的。
+Java的并发采用的是共享内存模型，Java线程之间的通信总是隐式进行的，而同步是显式。
 
 在JMM中，线程之间的共享变量存储在主内存（main memory）中，每个线程都有一个私有的本地内存（local memory），本地内存中存储了共享变量的副本。本地内存是JMM中的抽象概念，并不真实存在。
 
@@ -1087,7 +1097,7 @@ JVM将类的`.class `文件中的二进制数据读入到内存中，将其放�
 - 通过Class.forName()方法动态加载
 - 通过ClassLoader.loadClass()方法动态加载
 
-#### Class.forName()和ClassLoader.loadClass()的区别？
+#### Q：Class.forName()和ClassLoader.loadClass()的区别？
 
 - `Class.forName()`除了将类的.class文件加载到jvm中之外，还会对类进行解释，执行类中的static块；
 - `ClassLoader.loadClass()`只将.class文件加载到jvm中，不会执行static中的内容，只有在newInstance()创建实例时才会去执行static块。
@@ -1101,7 +1111,7 @@ JVM将类的`.class `文件中的二进制数据读入到内存中，将其放�
 
 该模型要求除了顶层的启动类加载器外，其它的类加载器都要有自己的父类加载器。这里的父子关系一般通过**组合**关系（Composition）来实现，而不是继承关系（Inheritance）。
 
-<img src="D:\CS-Note\images\Java基础\0dd2d40a-5b2b-4d45-b176-e75a4cd4bdbf.png" alt="img" style="zoom:50%;" />
+<img src="images\Java基础\0dd2d40a-5b2b-4d45-b176-e75a4cd4bdbf.png" alt="img" style="zoom:50%;" />
 
 双亲委派机制意义：
 
@@ -1126,7 +1136,7 @@ Object object = constructor.newInstance();
 method.invoke(object, 1);
 ```
 
-#### 静态代码块、构造代码块、构造函数以及Java类初始化顺序？
+#### Q：静态代码块、构造代码块、构造函数以及Java类初始化顺序？
 
 执行顺序：**静态块——main()——构造块——构造方法**。
 
@@ -1267,7 +1277,7 @@ HotSpot虚拟机中的GC可分为两种：Partial GC和Full GC。
 
 
 
-#### JVM如何判断对象存活？
+#### Q：JVM如何判断对象存活？
 
 1. 引用计数法
 
@@ -1286,7 +1296,7 @@ HotSpot虚拟机中的GC可分为两种：Partial GC和Full GC。
    - 方法区中常量引用的对象（常量）
    - 本地方法栈中JNI引用的对象（JNI指针）
 
-#### Minor GC如何避免全堆扫描
+#### Q：Minor GC如何避免全堆扫描？
 
 由于**老年代的对象可能引用新生代的对象**，在标记存活对象的时候，需要扫描老年代的对象，如果该对象拥有对新生代对象的引用，那么这个引用也会被作为 GC Roots。这相当于就做了**全堆扫描**。
 
@@ -1355,7 +1365,7 @@ JDK1.2之后，Java中存在4种引用类型，从强到弱包括：强、软、
 
    若finalize()方法中将this赋值给了某个引用，则该对象会重生，否则会被回收。
 
-#### 为什么年龄达15时放入老年代？
+#### Q：为什么年龄达15时放入老年代？
 
 因为对象markword中的分代年龄用4bit表示，最大15
 
@@ -1393,15 +1403,15 @@ markword结构（64位系统中是8B=64bit）
 
 1. 标记清除：缺点是不连续。只有CMS使用
 
-   <img src="D:\CS-Note\images\Java基础\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
+   <img src="images\Java基础\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
 
 2. 拷贝算法：优点是无碎片，缺点是浪费空间
 
-   <img src="D:\CS-Note\images\Java基础\b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
+   <img src="images\Java基础\b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
 
 3. 标记整理（标记压缩）：优点是无碎片，缺点是时间长
 
-   <img src="D:\CS-Note\images\Java基础\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
+   <img src="images\Java基础\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
    
    回收器主要使用2和3
 
