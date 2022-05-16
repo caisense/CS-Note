@@ -592,23 +592,67 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
 **线程池7个参数**
 
-1. corePoolSize： 核心线程数
-2. maximumPoolSize： 最大线程数
-3. keepAliveTime： 最大空闲时间
-4. TimeUnit unit： 时间单位
-5. BlockingQueue workQueue： 阻塞队列
-6. ThreadFactory threadFactory： 线程工厂
-7. RejectedExecutionHandler handler： 拒绝策略
+1. `int corePoolSize`： 核心线程数
+
+2. `int maximumPoolSize`： 最大线程数，一般要大于核心线程数
+
+3. `long keepAliveTime`： 最大空闲时间，表示线程没有任务执行时最多保持多久时间会终止（只有当线程池中的线程数大于 corePoolSize 时，keepAliveTime 才会起作用）
+
+4. `TimeUnit unit`： 时间单位
+
+5. `BlockingQueue workQueue`： 阻塞队列
+
+   以下这几种选择：ArrayBlockingQueue、LinkedBlockingQueue、SynchronousQueue。
+
+6. `ThreadFactory threadFactory`： 线程工厂，主要用来创建线程。
+
+7. `RejectedExecutionHandler handler`： 拒绝策略
+
+   有以下四种策略：
+
+   - ThreadPoolExecutor.AbortPolicy：丢弃任务并抛出 RejectedExecutionException 异常；
+
+   - ThreadPoolExecutor.DiscardPolicy：也是丢弃任务，但是不抛出异常；
+
+   - ThreadPoolExecutor.DiscardOldestPolicy：丢弃队列最前面的任务，然后重新尝试执行任务（重复此过程）；
+
+   - ThreadPoolExecutor.CallerRunsPolicy：由调用线程处理该任务。
 
 **执行流程**
 
-![在这里插入图片描述](D:\CS-Note\images\Java并发\watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5aW95aW9546pX3R5cmFudA==,size_16,color_FFFFFF,t_70,g_se,x_16.png)
+![img](images/Java并发/bVcO4HQ.png)
 
-1、当我们有一个任务提交给线程池去执行的时候，线程池会先判断是否有空闲的核心线程，如果有，则让核心线程执行这个任务，如果没有，则会加入到阻塞队列当中
+1. 线程池创建时，线程数为0，当有任务提交给线程池时，在核心池corePool创建一个线程执行，直到线程数达到corePoolSize 
+2. 当线程数达到corePoolSize 时，再有任务提交进来，就放到阻塞队列，当有线程执行完任务，就从队列中取任务执行（按先进先出顺序）
+3. 当阻塞队列也满了，corePool还是没有空闲，则新来任务就在maxPool创建线程
+4. 当maxPool也满了，则对新来任务执行拒绝策略
+5. 当线程数大于corePoolSize时，keepAliveTime参数起作用，关闭没有任务执行的线程，直到线程数不超过corePoolSize。线程池通过这个机制动态调节线程数。
 
-2、当阻塞队列里面也放满了任务之后，会创建非核心线程去执行新增的任务（不是从阻塞队列里面取，而是新来的任务）
 
-3、如果核心线程与非核心线程的数量达到了最大线程数，也就是此时已经没有了任何空闲的线程，阻塞队列里面也放满的话，线程池就会执行拒绝策略，拒绝任务
+
+### Q：为什么核心线程满后，先放阻塞队列，而不是创建非核心线程？
+
+因为创建线程消耗资源，因此先考虑将任务缓存起来等待执行。
+
+### Q：为什么一般不建议使用JDK提供的线程池？
+
+阿里规约，由于FixedThreadPool和SingleThreadPool里面的阻塞队列基本是没有上限的（默认队列长度Integer.MAX_VALUE=21亿），这就可能会导致任务过多，内存溢出（OOM），而CachedThreadPool和ScheduledThreadPool则可能会创建大量线程（< 21亿），也可能会导致内存溢出（OOM）
+
+### Q：线程数如何设置？
+
+最佳线程数目 =(( 线程等待时间 + 线程 CPU 时间 )/线程 CPU 时间 )* CPU 数目
+
+
+
+**线程池状态变化**
+
+![在这里插入图片描述](images/Java并发/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5aW95aW9546pX3R5cmFudA==,size_20,color_FFFFFF,t_70,g_se,x_16.png)
+
+1. RUNNING：正常运行，既接受新任务，也处理队列中任务
+2. SHUTDOWN：正常状态调用shutdown()方法，就进入SHUTDOWN状态，不再接受新任务，但会继续处理队列中任务
+3. STOP：正常状态调用shutdownNow()方法，就进入STOP状态，不接受新任务，也不处理队列中的任务，正在运行的线程也会中断
+4. TIDYING：过渡状态，表示线程池即将结束。由两种状态转变而来：1）SHUTDOWN状态处理完队列中的任务，且没有线程在运行；2）或者STOP状态的工作线程为空（必然为空，因为线程全中断）
+5. TERMINATED：终止状态，TIDYING状态调用terminated()方法，就进入TERMINATED状态。该方法是一个空方法，留给用户扩展。
 
 ## ThreadLocal
 
