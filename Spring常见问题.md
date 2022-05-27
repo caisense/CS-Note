@@ -175,7 +175,11 @@ Field sysUserApi in com.eshore.cmp.corp.service.service.base.CorpBaseService req
 @Order(1)
 @Service
 public class CustomerHandler extends BaseSyncCorpDataHandler implements ISyncCorpDataHandler {
-    ...
+	// 实现dealData方法
+    @Override
+    public CorpDataHandleResult dealData() {
+        ...
+    }
 }
 ```
 
@@ -183,7 +187,25 @@ public class CustomerHandler extends BaseSyncCorpDataHandler implements ISyncCor
 
 该注解等同于实现Ordered接口getOrder方法，并返回数字。
 
-注意：@Order不能决定Spring容器加载Bean的顺序，只能决定执行顺序
+配合@Autowired，就能在类中按顺序注入List
+
+```java
+public class SyncCorpDataServiceImpl extends CorpBaseService implements ISyncCorpDataService {
+	// 按Order的排序，扫描ISyncCorpDataHandler的所有实现类，依次注入到List中
+    @Autowired
+    List<ISyncCorpDataHandler> syncCorpDataHandlers;
+    
+    public String dealCorpDataFromIotReqInfo(SyncReqInfoBo svcCont) {
+        // 依次执行每个ISyncCorpDataHandler接口实现类的dealData
+        for (ISyncCorpDataHandler syncCorpDataHandler : syncCorpDataHandlers) {
+            syncCorpDataHandler.dealData();
+            ...
+        }
+    }
+}
+```
+
+注意：@Order不能决定Spring容器加载Bean的顺序，只能决定@Autowired注入List<>的顺序
 
 ## @PostConstruct
 
@@ -208,4 +230,80 @@ jdk1.6开始，用于修饰非静态的void方法，在当前类构造完成时�
         }
     }
 ```
+
+
+
+## @Autowired
+
+**作用**
+
+自动导入对象到类中，被注入进的类同样要被 Spring 容器管理比如：Service 类注入到 Controller 类中。
+
+默认 按类型装配（而不是变量名），默认情况下必须要求依赖对象必须存在，如果要允许null值，可以设置它的required属性为false
+
+@Bean 和 @Autowired 做了两件完全不同的事情：
+
+1. @Bean 告诉 Spring：“这是这个类的一个实例，请保留它，并在我请求时将它还给我”。
+2. @Autowired 说：“请给我一个这个类的实例，例如，一个我之前用@Bean注释创建的实例”。
+
+**前提**
+
+要注入的类加上@Component（或者@Service、@Controller等包含@Component的注解）。
+
+在类中的变量加@Autowired注解无法生效。
+
+因为如果一个类new对象生成的，那么这个类就不归spring容器管理，IOC等spring的功能也就无法使用了。
+
+
+
+**常规用法：单个注入**
+
+  
+
+```java
+@Autowired // 直接注入
+private  BeanInterface beaninterface; 
+```
+
+**注意**
+
+由于@Autowired根据类型装配，因此容器中有多个同类型Bean时，需要加@Qualifier指定要注入的Bean名称，否则会出错。
+
+```java
+//控制器 
+@RestController
+public class HelloController {
+    @Autowired
+    @Qualifier("Zhang")  //指定注入名为“Zhang"的组件
+    private User user;
+}
+// 配置类
+@Configuration(proxyBeanMethods = false)
+public class Myconfig {
+    @Bean("Zhang")
+    public User user01() {
+        return new User("zhangsan", 18);
+    }
+    @Bean("Li")
+    public User user03() {
+        return new User("lisi", 19);
+    }
+}
+```
+
+若想将多个同类型Bean都注入，参考下文注入Map<T>
+
+**注入集合**
+
+注入List<T>
+
+按类型搜寻相应的Bean并注入List，还可以使用@Order指定加载的顺序（也即是Bean在List中的顺序，spring根据加载顺序填入list。
+
+注入Set<T>
+
+也是按类型注入，但是没有顺序
+
+注入Map<T>
+
+ @Autowired 标注作用于 Map 类型时，如果 Map 的 key 为 String 类型，则 Spring 会将容器中所有**类型符合** Map 的 value 对应的类型的 Bean 增加进来，用 Bean 的 id 或 name 作为 Map 的 key。
 

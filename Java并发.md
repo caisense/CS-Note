@@ -766,7 +766,7 @@ synchronized关键字是Java内置的原子性锁，使用者看不到，是一�
 
 Monitor是线程私有的数据结构，也是一个对象，每一个被锁住的对象都会和一个monitor关联，每个线程都有一个可用monitor record列表，同时还有一个全局的可用列表。
 
-使用synchronized关键字会在编译后的同步代码块前后加上 **monitorenter** 和 **monitorexit** 字节码指令，依赖操作系统底层的互斥锁（Mutex Lock）实现。
+使用synchronized关键字会在编译后的同步代码块前后加上 **monitorenter** 和 **monitorexit** 字节码指令，依赖操作系统底层的互斥锁（Mutex Lock）实现。当一个线程执行到 monitorenter 指令时，就会获得对象所对应的 `monitor` 的所有权，也就获得到了对象的锁
 
 在jvm中，monitor对象由**ObjectMonitor**实现（C++），其跟同步相关的数据结构如下：
 
