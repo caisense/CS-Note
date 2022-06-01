@@ -16,4 +16,4 @@ redis锁原理、
 场景题：有接口1：查询关注的所有人  2批量查询用户的发文 如何设计首页信息流展示？  -- redis zset
 
 华为
-数据库连接池、feign、HTTPS、如何减少Fullgc
+数据库连接池、feign、HTTPS、如何减少Fullgc、redis主从复制、springboot哪些注解是单例，那些是对象

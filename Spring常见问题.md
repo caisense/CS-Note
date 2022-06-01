@@ -11,7 +11,7 @@
 - **传统的开发方式** ：往往是在类 A 中手动通过 new 关键字来 new 一个 B 的对象出来
 - **使用 IoC 思想的开发方式** ：不通过 new 关键字来创建对象，而是通过 IoC 容器(Spring 框架) 来帮助我们实例化对象。我们需要哪个对象，直接从 IoC 容器里面过去即可。
 
-![图片](D:\CS-Note\images\Spring常见问题\640.png)
+![图片](images\Spring常见问题\640.png)
 
 ### IoC 和 DI 
 
@@ -27,7 +27,7 @@ Aspect-Oriented Programming（面向切面编程）能够将那些与业务无�
 
 Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某个接口，那么 Spring AOP 会使用 **JDK Proxy**，去创建代理对象，而对于没有实现接口的对象，就无法使用 JDK Proxy 去进行代理了，这时候 Spring AOP 会使用 **Cglib** 生成一个被代理对象的子类来作为代理，如下图所示：
 
-![SpringAOPProcess](D:\CS-Note\images\Spring常见问题\926dfc549b06d280a37397f9fd49bf9d.jpg)
+![SpringAOPProcess](images\Spring常见问题\926dfc549b06d280a37397f9fd49bf9d.jpg)
 
 ### Spring AOP创建时机？
 
@@ -89,7 +89,7 @@ EarlySingletonObjecs 完成实例化但没有初始化的 提前曝光的单例�
 
 SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级缓存）
 
-![image-20220311095851373-16469639344001](D:\CS-Note\images\Spring常见问题\image-20220311095851373-16469639344001.png)
+![image-20220311095851373-16469639344001](images\Spring常见问题\image-20220311095851373-16469639344001.png)
 
 ## @Component 和 @Configuration + @Bean 同时存在，创建bean用拿个？
 
@@ -295,15 +295,112 @@ public class Myconfig {
 
 **注入集合**
 
-注入List<T>
+注入`List<T>`
 
 按类型搜寻相应的Bean并注入List，还可以使用@Order指定加载的顺序（也即是Bean在List中的顺序，spring根据加载顺序填入list。
 
-注入Set<T>
+注入`Set<T>`
 
 也是按类型注入，但是没有顺序
 
-注入Map<T>
+注入`Map<T>`
 
  @Autowired 标注作用于 Map 类型时，如果 Map 的 key 为 String 类型，则 Spring 会将容器中所有**类型符合** Map 的 value 对应的类型的 Bean 增加进来，用 Bean 的 id 或 name 作为 Map 的 key。
 
+
+
+## @ControllerAdvice
+
+全局Controller异常处理
+
+用法：在打上注解的类中，对每种要处理的异常类型，写一个处理方法，每个方法用@ExceptionHandler注解指定处理的异常类型，方法的参数一般也是要处理的异常类型
+
+优点：将 Controller 层的异常和数据校验的异常进行统一处理，减少模板代码，减少编码量，提升扩展性和可维护性。
+
+缺点：只能处理 Controller 层未捕获（往外抛）的异常，对于 Interceptor（拦截器）层的异常，Spring 框架层的异常，就无能为力了。
+
+```java
+// 全局Controller异常处理
+@ControllerAdvice
+public class GlobalExceptionAdvice {
+
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
+
+	// valid异常
+    @ResponseBody
+    // 指定处理异常类型
+    @ExceptionHandler(value = MethodArgumentNotValidException.class)
+    // 入参为要处理的异常类型
+    public NaResult<Object> methodArgumentNotValidHandler(MethodArgumentNotValidException e) {
+        if (e != null && CollectionHelper.isNotEmpty(e.getBindingResult().getFieldErrors())) {
+            FieldError error = CollectionHelper.getFirst(e.getBindingResult().getFieldErrors());
+            return new NaResult<>(NaConstant.FAIL_CODE, error.getDefaultMessage(), null);
+        }
+        return new NaResult<>(NaConstant.FAIL_CODE, ExceptionMsgs.CommonErrMsg.PARAM_ERROR, null);
+    }
+
+    // NA自定义异常
+    @ResponseBody
+    @ExceptionHandler(value = NaException.class)
+    public NaResult<Object> naExceptionHandler(NaException e) {
+        logger.error("GlobalExceptionAdvice-naExceptionHandler:{}", e.getMessage(), e);
+        return new NaResult<>(NaConstant.FAIL_CODE, e.getMessage(), null);
+    }
+
+    // 其他异常
+    @ResponseBody
+    @ExceptionHandler(value = Exception.class)
+    public NaResult<Object> exceptionHandler(Exception e) {
+        logger.error("GlobalExceptionAdvice-exceptionHandler:{}", e.getMessage(), e);
+        return new NaResult<>(NaConstant.FAIL_CODE, e.getMessage(), null);
+    }
+
+}
+```
+
+## 参数校验（validation框架）
+
+@Validated：用在方法入参上
+
+@Valid：用在属性上，配合@Validated嵌套验证
+
+例：数据结构是Item类包裹Prop类，最外层用@Validated校验Item，Item内用@Valid校验Prop，就能启用校验
+
+```java
+@PostMapping("/item/add")
+public void addItem(@RequestBody @Validated Item item) {
+    System.out.println("input:" + jsonMapper.toJson(item));
+}
+
+public class Item {
+    @NotNull(message = "id不能为空")
+    @Min(value = 1, message = "id必须为正整数")
+    private Long id;
+
+    @Valid
+    @NotNull(message = "props不能为空")
+    @Size(min = 1, message = "至少要有一个属性")
+    private List<Prop> props;
+    // get、set省略
+}
+
+public class Prop {
+    @NotNull(message = "pid不能为空")
+    @Min(value = 1, message = "pid必须为正整数")
+    private Long pid;
+
+    @NotBlank(message = "pidName不能为空")
+    private String pidName;
+    // get、set省略
+}
+```
+
+**常用校验注解**
+
+1. @NotNull：不能为null，但可以为empty（空字符串，空对象）
+2. @NotEmpty：不能为null，而且长度必须大于0
+3. @NotBlank：只能作用在String上，不能为null，而且调用trim()去除前后空格后，长度必须大于0
+4. @Max(value)：最大值，用于一个枚举值的数据范围控制
+5. @Min(value)：最小值，用于一个枚举值的数据范围控制
+6. @Size(min=a, max=b)：限制字符长度必须在min到max之间
+7. @Pattern(regexp = "正则")：正则表达式校验
