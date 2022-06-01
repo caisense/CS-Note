@@ -11,7 +11,7 @@
 - **传统的开发方式** ：往往是在类 A 中手动通过 new 关键字来 new 一个 B 的对象出来
 - **使用 IoC 思想的开发方式** ：不通过 new 关键字来创建对象，而是通过 IoC 容器(Spring 框架) 来帮助我们实例化对象。我们需要哪个对象，直接从 IoC 容器里面过去即可。
 
-![图片](images\Spring常见问题\640.png)
+![图片](images/Spring常见问题/640.png)
 
 ### IoC 和 DI 
 
@@ -27,7 +27,7 @@ Aspect-Oriented Programming（面向切面编程）能够将那些与业务无�
 
 Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某个接口，那么 Spring AOP 会使用 **JDK Proxy**，去创建代理对象，而对于没有实现接口的对象，就无法使用 JDK Proxy 去进行代理了，这时候 Spring AOP 会使用 **Cglib** 生成一个被代理对象的子类来作为代理，如下图所示：
 
-![SpringAOPProcess](images\Spring常见问题\926dfc549b06d280a37397f9fd49bf9d.jpg)
+![SpringAOPProcess](images/Spring常见问题/926dfc549b06d280a37397f9fd49bf9d.jpg)
 
 ### Spring AOP创建时机？
 
@@ -89,7 +89,7 @@ EarlySingletonObjecs 完成实例化但没有初始化的 提前曝光的单例�
 
 SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级缓存）
 
-![image-20220311095851373-16469639344001](images\Spring常见问题\image-20220311095851373-16469639344001.png)
+![image-20220311095851373-16469639344001](images/Spring常见问题/image-20220311095851373-16469639344001.png)
 
 ## @Component 和 @Configuration + @Bean 同时存在，创建bean用拿个？
 
