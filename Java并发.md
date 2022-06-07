@@ -2,7 +2,11 @@
 
 ## 创建线程
 
-实例化一个Thread实例，然后调用它的start()方法。但是这个线程启动后实际上什么也不做就立刻结束了。我们希望新线程能执行指定的代码，都需要重写run方法，有三种方法：
+实例化一个Thread实例，然后调用它的start()方法。但是这个线程启动后实际上什么也不做就立刻结束了。我们希望新线程能执行指定的代码，都需要重写run方法
+
+**注意：run()无参数，无返回值。**
+
+有三种方法：
 
 
 
@@ -115,6 +119,52 @@ Thread.setPriority(int n) //  1~10, 默认值5
 优先级高的线程被操作系统调度的优先级较高，操作系统对高优先级线程可能调度更频繁
 
 但不能保证高优先级的线程一定会先执行，低优先级也不一定后执行。
+
+## 线程作用域
+
+线程私有的只有两种：线程**非静态**的私有变量，以及线程函数内定义的局部变量。
+
+其余外部变量，或**线程类内定义的静态变量**，都是线程间共享的
+
+例：统计一个线程类创建过多少个线程，并为每个线程进行编号。 
+
+```java
+class MyThread extends Thread {
+    private static int sn = 0;    //线程数，MyThread类静态变量，线程间共享
+    private int x = 0;      //线程编号，线程私有
+
+    MyThread() {
+        x = sn++;
+    }
+
+    @Override
+    public void run() {
+        Thread t = Thread.currentThread();
+        System.out.println(t.getName() + "\t" + x);
+    }
+}
+public class ThreadVarTest {
+    public static void main(String[] args) {
+        // 每个线程创建时，其x值都已确定
+        Thread t1 = new MyThread();
+        Thread t2 = new MyThread();
+        Thread t3 = new MyThread();
+        Thread t4 = new MyThread();
+        // 只是输出的顺序不定
+        t1.start();
+        t2.start();
+        t3.start();
+        t4.start();
+    }
+}
+```
+
+输出：
+
+Thread-1	1
+Thread-3	3
+Thread-2	2
+Thread-0	0
 
 ## 线程的生命周期
 
@@ -384,12 +434,14 @@ Java内存模型中定义的8种工作内存和主内存之间的原子操作
        public static final Object lock = new Object();
        public static int count = 0;
    }
-   public void run() {
-       for (int i=0; i<10000; i++) {
-           synchronized(Counter.lock) {  // 对Counter类的静态实例lock加锁，进行互斥操作
-               Counter.count += 1;
-           }
-       }
+   class AddThread extends Thread {
+   	public void run() {
+       	for (int i=0; i<10000; i++) {
+           	synchronized(Counter.lock) {  // 对Counter类的静态实例lock加锁，进行互斥操作
+               	Counter.count += 1;
+           	}
+       	}
+   	}
    }
    ```
 

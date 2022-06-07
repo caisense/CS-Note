@@ -117,3 +117,81 @@ try (Connection conn = ds.getConnection()) {
 调用`conn.close()`时（try-with-resource语句隐式执行），不是真正“关闭”连接，而是释放到连接池中，以便下次获取连接时能直接返回。
 
 配置参数：维护的最小、最大活动连接数，指定一个连接在空闲一段时间后自动关闭等。
+
+# 日志
+
+## SLF4j
+
+Spring Boot默认用`SLF4J + Logback`来记录日志，并用`INFO`级别输出到控制台。
+
+依赖（spring默认集成slf4j，如果没有再单独引入）
+
+```xml
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-api</artifactId>
+    <version>1.7.5</version>
+</dependency>
+<dependency>
+    <groupId>org.slf4j</groupId>
+    <artifactId>slf4j-log4j12</artifactId>
+    <version>1.7.5</version>
+</dependency>
+```
+
+在src/main/resources/log4j.properties配置：
+
+```properties
+# 一、配置根Logger
+# 格式：log4j.rootLogger = [ level ] , appenderName1, appenderName2, ...
+
+###
+# 1. level（可选）: 设定日志记录的最低级别，从高到低分为OFF、FATAL、ERROR、WARN、INFO、DEBUG、ALL或者自定义的级别。
+# Log4j建议只使用四个级别，优先级从高到低分别是ERROR、WARN、INFO、DEBUG。
+# 通过在这里定义的级别，可以控制到应用程序中相应级别的日志信息的开关。
+# 比如在这里定义了INFO级别，则应用程序中所有DEBUG级别的日志信息将不被打印出来。
+# 2. appenderName:就是指定日志信息输出到哪个地方。您可以同时指定多个输出目的地。
+### 
+
+# 输出debug级别及以上的日志，输出到stdout、D、E三个地方
+log4j.rootLogger=debug,stdout,D,E
+
+# 二、分别配置三个输出目的地
+
+#输出信息到控制台
+log4j.appender.stdout=org.apache.log4j.ConsoleAppender
+log4j.appender.stdout.Target=System.out
+log4j.appender.stdout.layout=org.apache.log4j.PatternLayout
+log4j.appender.stdout.layout.ConversionPattern=[%-5p] %d{yyyy-MM-dd HH:mm:ss,SSS} method:%l%n%m%n
+
+# 输出DEBUG 级别以上的日志到=D://Environment/Java/logs/log.log
+log4j.appender.D=org.apache.log4j.DailyRollingFileAppender
+log4j.appender.D.File=D://Environment/Java/logs/log.log
+log4j.appender.D.Append=true
+log4j.appender.D.Threshold=DEBUG 
+log4j.appender.D.layout=org.apache.log4j.PatternLayout
+log4j.appender.D.layout.ConversionPattern=%-d{yyyy-MM-dd HH:mm:ss}  [ %t:%r ] - [ %p ]  %m%n
+
+#输出ERROR 级别以上的日志到D://Environment/Java/logs/error.log
+log4j.appender.E=org.apache.log4j.DailyRollingFileAppender
+log4j.appender.E.File=D://Environment/Java/logs/error.log 
+log4j.appender.E.Append=true
+log4j.appender.E.Threshold=ERROR 
+log4j.appender.E.layout=org.apache.log4j.PatternLayout
+log4j.appender.E.layout.ConversionPattern=%-d{yyyy-MM-dd HH:mm:ss}  [ %t:%r ] - [ %p ]  %m%n
+```
+
+使用
+
+```java
+public class Query {
+    private static final Logger logger = LoggerFactory.getLogger(Query.class);
+    public static void main(String[] args) {
+        // 四种级别日志
+        logger.debug("================114511415e");
+        logger.info("Start to process file: {}", entry.getKey());  // {}占位符，要传参数
+        logger.warn("==============END==============");
+        logger.error("解析{}异常：{}", "db-server.conf", e); // 有几个{}，就传几个参数
+        
+}
+```

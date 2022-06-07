@@ -1,4 +1,389 @@
-#  Spring常见问题
+# Servlet
+
+编写HTTP服务器很简单，但要编写完善的服务非常复杂。
+
+在JavaEE平台上，处理TCP连接，解析HTTP协议这些底层工作统统扔给现成的Web服务器去做，因此提供了Servlet API，我们使用这套API编写自己的Servlet来处理HTTP请求，Web服务器实现Servlet API接口，实现底层功能：
+
+```
+                 ┌───────────┐
+                 │My Servlet │
+                 ├───────────┤
+                 │Servlet API│
+┌───────┐  HTTP  ├───────────┤
+│Browser│<──────>│Web Server │
+└───────┘        └───────────┘
+```
+
+## servlet基础
+
+一个Servlet总是继承自`HttpServlet`，然后覆写`doGet()`或`doPost()`等方法。注意到`doGet()`方法传入了`HttpServletRequest`和`HttpServletResponse`两个对象，分别代表HTTP请求和响应。
+
+使用Servlet API时，并不直接与底层TCP交互，也不需要解析HTTP协议，因为`HttpServletRequest`和`HttpServletResponse`就已经封装好了请求和响应。以发送响应为例，我们只需要设置正确的响应类型，然后获取`PrintWriter`，写入响应即可。
+
+servlet简单实现：
+
+```java
+// WebServlet注解表示这是一个Servlet，并映射到地址“/”:
+@WebServlet(urlPatterns = "/")
+public class HelloServlet extends HttpServlet {
+    @Override
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 设置响应类型:
+        resp.setContentType("text/html");
+        // 获取输出流:
+        PrintWriter pw = resp.getWriter();
+        // 读取url传参
+        String name = req.getParameter("name");
+        if (name == null) {
+            name = "world";
+        }
+        // 写入响应:
+        pw.write("<h1>Hello, " + name + "!</h1>");
+        // 最后不要忘记flush强制输出:
+        pw.flush();
+    }
+}
+```
+
+Servlet API是一个jar包，需要通过Maven来引入
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+    <groupId>com.itranswarp.learnjava</groupId>
+    <artifactId>web-servlet-hello</artifactId>
+    <!-- 打包类型为war-->
+    <packaging>war</packaging>
+    <version>1.0-SNAPSHOT</version>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <java.version>11</java.version>
+    </properties>
+
+    <dependencies>
+         <!-- 引入Servlet API-->
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+            <version>4.0.0</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <finalName>hello</finalName>
+    </build>
+</project>
+```
+
+注意到这个`pom.xml`与前面我们讲到的普通Java程序有个区别，打包类型不是`jar`，而是`war`，表示Java Web Application Archive
+
+注意到`<scope>`指定为`provided`，表示编译时使用，但不会打包到`.war`文件中，因为运行期Web服务器本身已经提供了Servlet API相关的jar包。
+
+普通的Java程序是通过启动JVM，然后执行`main()`方法开始运行。但是Web应用程序有所不同，我们无法直接运行`war`文件，必须先启动Web服务器（常用如Tomcat），再由Web服务器加载我们编写的`HelloServlet`，这样就可以让`HelloServlet`处理浏览器发送的请求。
+
+要运行我们的`hello.war`，首先要[下载Tomcat服务器](https://tomcat.apache.org/download-90.cgi)，解压后，把`hello.war`复制到Tomcat的`webapps`目录下，然后切换到`bin`目录，执行`startup.sh`或`startup.bat`启动Tomcat服务器。
+
+## servlet开发
+
+上述方法在tomcat中运行war，如果想在IDE中断点调试，还需要打开Tomcat的远程调试端口并且连接上去。
+
+如何在IDE中启动并调试webapp？可以把Tomcat的jar包全部引入进来，然后自己编写一个`main()`方法，先启动Tomcat，然后让它加载我们的webapp就行。
+
+新建一个`web-servlet-embedded`工程，编写`pom.xml`，`<packaging>`类型仍然为`war`，引入依赖`tomcat-embed-core`和`tomcat-embed-jasper。不必引入Servlet API，因为引入Tomcat依赖后自动引入了Servlet API
+
+```xml
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>com.itranswarp.learnjava</groupId>
+    <artifactId>web-servlet-embedded</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>war</packaging>
+
+    <properties>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+        <maven.compiler.source>11</maven.compiler.source>
+        <maven.compiler.target>11</maven.compiler.target>
+        <java.version>11</java.version>
+        <tomcat.version>9.0.26</tomcat.version>
+    </properties>
+
+    <dependencies>
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-core</artifactId>
+            <version>${tomcat.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.tomcat.embed</groupId>
+            <artifactId>tomcat-embed-jasper</artifactId>
+            <version>${tomcat.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    </dependencies>
+</project>
+```
+
+编写一个`main()`方法，启动Tomcat服务器，可直接在浏览器访问`http://localhost:8080/`
+
+```java
+public class Main {
+    public static void main(String[] args) throws Exception {
+        // 启动Tomcat:
+        Tomcat tomcat = new Tomcat();
+        tomcat.setPort(Integer.getInteger("port", 8080));
+        tomcat.getConnector();
+        // 创建webapp:
+        // tomcat加载当前工程作为根webapp
+        Context ctx = tomcat.addWebapp("", new File("src/main/webapp").getAbsolutePath());
+        WebResourceRoot resources = new StandardRoot(ctx);
+        resources.addPreResources(
+                new DirResourceSet(resources, "/WEB-INF/classes", new File("target/classes").getAbsolutePath(), "/"));
+        ctx.setResources(resources);
+        tomcat.start();
+        tomcat.getServer().await();
+    }
+}
+```
+
+
+
+## servlet进阶
+
+前面基础的servlet只能处理get请求，如果要处理post请求，就需要覆写`doPost()`方法。如果没有覆写doPost，post请求就会返回405或400（get同理），参考源码：
+
+```java
+// javax.servlet.http.HttpServlet#doPost
+protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+    String protocol = req.getProtocol();
+    String msg = lStrings.getString("http.method_post_not_supported");
+    if (protocol.endsWith("1.1")) {
+        resp.sendError(405, msg);
+    } else {
+        resp.sendError(400, msg);
+    }
+}
+```
+
+一个Webapp完全可以有多个Servlet，分别映射不同的路径，浏览器发出的HTTP请求总是由Web Server先接收，然后根据Servlet配置的映射，不同的路径转发到不同的Servlet。这种根据路径转发的功能一般称为**Dispatch**。映射到`/`的`IndexServlet`比较特殊，它实际上会接收所有未匹配的路径，相当于`/*`，因为Dispatcher的逻辑可以用伪代码实现如下：
+
+```java
+String path = ...
+if (path.equals("/hello")) {
+    // 路径“/hello”转发到helloServlet处理
+    dispatchTo(helloServlet);
+} else if (path.equals("/signin")) {
+    // 路径“/signin”转发到signinServlet处理
+    dispatchTo(signinServlet);
+} else {
+    // 所有未匹配的路径均转发到"/"
+    dispatchTo(indexServlet);
+}
+```
+
+### HttpServletRequest
+
+封装了一个HTTP请求，它实际上是从`ServletRequest`继承而来。最早设计Servlet时，设计者希望Servlet不仅能处理HTTP，也能处理类似SMTP等其他协议，因此，单独抽出了`ServletRequest`接口，但实际上除了HTTP外，并没有其他协议会用Servlet处理，所以这是一个过度设计。
+
+常用的方法有：
+
+- getMethod()：返回请求方法，例如，`"GET"`，`"POST"`；
+- getRequestURI()：返回请求路径，但不包括请求参数，例如，`"/hello"`；
+- getQueryString()：返回请求参数，例如，`"name=Bob&a=1&b=2"`；
+- getParameter(name)：返回请求参数，GET请求从URL读取参数，POST请求从Body中读取参数；
+- getContentType()：获取请求Body的类型，例如，`"application/x-www-form-urlencoded"`；
+- getContextPath()：获取当前Webapp挂载的路径，对于ROOT来说，总是返回空字符串`""`；
+- getCookies()：返回请求携带的所有Cookie；
+- getHeader(name)：获取指定的Header，对Header名称不区分大小写；
+- getHeaderNames()：返回所有Header名称；
+- getInputStream()：如果该请求带有HTTP Body，该方法将打开一个输入流用于读取Body；
+- getReader()：和getInputStream()类似，但打开的是Reader；
+- getRemoteAddr()：返回客户端的IP地址；
+- getScheme()：返回协议类型，例如，`"http"`，`"https"`；
+
+还有两个方法：`setAttribute()`和`getAttribute()`，可以给当前`HttpServletRequest`对象附加多个Key-Value，相当于把`HttpServletRequest`当作一个`Map<String, Object>`使用。
+
+### HttpServletResponse
+
+封装了一个HTTP响应。由于HTTP响应必须先发送Header，再发送Body，所以，操作`HttpServletResponse`对象时，必须先调用设置Header的方法，最后调用发送Body的方法。
+
+常用的设置Header的方法有：
+
+- setStatus(sc)：设置响应代码，默认是`200`；
+- setContentType(type)：设置Body的类型，例如，`"text/html"`；
+- setCharacterEncoding(charset)：设置字符编码，例如，`"UTF-8"`；
+- setHeader(name, value)：设置一个Header的值；
+- addCookie(cookie)：给响应添加一个Cookie；
+- addHeader(name, value)：给响应添加一个Header，因为HTTP协议允许有多个相同的Header；
+
+**注意**
+
+写入完毕后调用`flush()`却是必须的，因为大部分Web服务器都基于HTTP/1.1协议，会复用TCP连接。如果没有调用`flush()`，将导致缓冲区的内容无法及时发送到客户端。此外，写入完毕后千万不要调用`close()`，原因同样是因为会复用TCP连接，如果关闭写入流，将关闭TCP连接，使得Web服务器无法复用此TCP连接。
+
+### Servlet多线程模型
+
+一个Servlet类在服务器中只有一个实例，但对于每个HTTP请求，Web服务器会使用多线程执行请求。因此，一个Servlet的`doGet()`、`doPost()`等处理请求的方法是多线程并发执行的。如果Servlet中定义了字段，要注意多线程并发访问的问题：
+
+```java
+public class HelloServlet extends HttpServlet {
+    private Map<String, String> map = new ConcurrentHashMap<>();
+
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 注意读写map字段是多线程并发的:
+        this.map.put(key, value);
+    }
+}
+```
+
+但是对于每个请求，Web服务器会创建唯一的`HttpServletRequest`和`HttpServletResponse`实例，因此，`HttpServletRequest`和`HttpServletResponse`实例只有在当前处理线程中有效，它们总是局部变量，不存在多线程共享的问题。
+
+### 重定向
+
+Redirect， 指当浏览器请求一个URL时，服务器返回一个重定向指令，告诉浏览器地址已经变了，麻烦使用新的URL再重新发送新请求。
+
+```java
+// 我们已经编写了一个能处理`/hello`的`HelloServlet`，如果收到的路径为`/hi`，希望能重定向到`/hello`，可以再编写一个RedirectServlet
+
+@WebServlet(urlPatterns = "/hi")
+public class RedirectServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        // 构造重定向的路径:
+        String name = req.getParameter("name");
+        String redirectToUrl = "/hello" + (name == null ? "" : "?name=" + name);
+        // 发送302重定向响应:
+        resp.sendRedirect(redirectToUrl);
+        
+        // 如果要发送301重定向，上面的代码要这么写
+        // resp.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY); 
+		// resp.setHeader("Location", "/hello");
+    }
+}
+```
+
+**过程**
+
+如果浏览器发送`GET /hi`请求，`RedirectServlet`将处理此请求。由于`RedirectServlet`在内部又发送了重定向响应，因此，浏览器会收到如下响应：
+
+```
+HTTP/1.1 302 Found
+Location: /hello
+```
+
+当浏览器收到302响应后，它会立刻根据`Location`的指示发送一个新的`GET /hello`请求。
+
+```ascii
+┌───────┐   GET /hi     ┌───────────────┐
+│Browser│ ────────────> │RedirectServlet│
+│       │ <──────────── │               │
+└───────┘   302         └───────────────┘
+
+
+┌───────┐  GET /hello   ┌───────────────┐
+│Browser│ ────────────> │ HelloServlet  │
+│       │ <──────────── │               │
+└───────┘   200 <html>  └───────────────┘
+```
+
+观察Chrome浏览器的网络请求，可以看到两次HTTP请求，并且浏览器的地址栏路径自动更新为`/hello`：
+
+<img src="images/Spring常见问题/l.jpeg" alt="redirect" style="zoom: 80%;" />
+
+
+
+重定向有两种：
+
+- 临时重定向：响应状态码302
+- 永久重定向：响应状态码301
+
+两者的区别：如果服务器发送301，浏览器会**缓存**`/hi`到`/hello`这个重定向的关联，下次请求`/hi`的时候，浏览器就直接发送`/hello`请求了。
+
+**作用**
+
+当Web应用升级后，如果请求路径发生了变化，可以将原来的路径重定向到新路径，从而避免浏览器请求原路径找不到资源。
+
+
+
+### 转发
+
+Forward，指内部转发。当一个Servlet处理请求的时候，它可以决定自己不继续处理，而是转发给另一个Servlet处理。
+
+```java
+// 我们已经编写了一个能处理`/hello`的`HelloServlet`，继续编写一个能处理`/morning`的`ForwardServlet`
+
+@WebServlet(urlPatterns = "/morning")
+public class ForwardServlet extends HttpServlet {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
+        req.getRequestDispatcher("/hello").forward(req, resp);
+    }
+}
+```
+
+`ForwardServlet`在收到请求后，它并不自己发送响应，而是把请求和响应都转发给路径为`/hello`的Servlet，后续请求的处理实际上是由`HelloServlet`完成的。这种处理方式称为转发（Forward），我们用流程图画出来如下：
+
+```ascii
+                          ┌────────────────────────┐
+                          │      ┌───────────────┐ │
+                          │ ────>│ForwardServlet │ │
+┌───────┐  GET /morning   │      └───────────────┘ │
+│Browser│ ──────────────> │              │         │
+│       │ <────────────── │              ▼         │
+└───────┘    200 <html>   │      ┌───────────────┐ │
+                          │ <────│ HelloServlet  │ │
+                          │      └───────────────┘ │
+                          │       Web Server       │
+                          └────────────────────────┘
+```
+
+**转发和重定向的区别**
+
+转发是在Web服务器内部完成的，对浏览器来说，它只发出了一个HTTP请求，浏览器的地址栏路径仍然是`/morning`，浏览器并不知道该请求在Web服务器内部实际上做了一次转发。
+
+## MVC
+
+```
+   HTTP Request    ┌─────────────────┐
+──────────────────>│DispatcherServlet│
+                   └─────────────────┘
+                            │
+               ┌────────────┼────────────┐
+               ▼            ▼            ▼
+         ┌───────────┐┌───────────┐┌───────────┐
+         │Controller1││Controller2││Controller3│
+         └───────────┘└───────────┘└───────────┘
+               │            │            │
+               └────────────┼────────────┘
+                            ▼
+   HTTP Response ┌────────────────────┐
+<────────────────│render(ModelAndView)│
+                 └────────────────────┘
+```
+
+
+
+
+
+## Q：jar包和war包的区别？
+
+jar包是java打的包，war包可以理解为javaweb打的包。
+
+jar包中只是用java来写的项目打包来的，里面只有编译后的class和一些部署文件。
+
+而war包里面的东西就全了，包括写的代码编译成的class文件，依赖的包，配置文件，所有的网站页面，包括html，jsp等等。一个war包可以理解为是一个web项目，里面是项目的所有东西。
+
+前后端分离的项目，后端war包存放空页面
+
+# Spring
 
 ## Spring IoC
 
@@ -96,6 +481,10 @@ SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级�
 `allowBeanDefinitionOverriding=true;`，默认是允许BeanDefinition覆盖
 
 因此若同时存在，默认情况下，容器加载的是@Configuration + @Bean 配置的bean
+
+
+
+
 
 # Spring常用注解
 
