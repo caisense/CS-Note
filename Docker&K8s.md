@@ -1,3 +1,5 @@
+# Docker
+
 一个容器进程本质上是一个运行在沙盒中的隔离进程，由Linux系统本身负责隔离，Docker只是提供了一系列工具，帮助我们设置好隔离环境后，启动这个进程。
 
 最基本的隔离就是进程之间看不到彼此，这是由Linux的**Cgroup**机制实现的。进程隔离的结果就是以隔离方式启动的进程看到的自身进程ID总是1，且看不到系统的其他进程。
@@ -56,3 +58,12 @@ docker run -p 2181:2181 zookeeper:latest
 必须连接到ZooKeeper的`IP:2181`或者宿主机的`IP:2181`。直接指定IP并不是一个好的方式，我们应该利用Docker Compose，把ZooKeeper和Kafka运行在同一个网络名字空间里，并通过`zookeeper:2181`来访问ZooKeeper端口，让Docker自动把zookeeper名字解析为动态分配的IP地址。`docker-compose.yml`参考配置如下：
 
 [docker-compose.yml](https://developer.confluent.io/quickstart/kafka-docker/)
+
+# Kubernetes
+
+## 弹性伸缩
+
+垂直伸缩与水平伸缩
+
+- 垂直(Vertical)伸缩：调整节点或服务的资源配额。
+- 水平(Horizontal)伸缩：调整节点或服务的数量。
