@@ -385,6 +385,56 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 
 # Spring
 
+### SpringBoot 引导配置
+
+**Spring Boot应用程序的入口点是使用@SpringBootApplication注释的类**
+
+
+
+```java
+@SpringBootApplication
+public class Application {
+    public static void main(String[] args) {
+        SpringApplication.run(Application.class, args);
+    }
+}
+```
+
+  默认情况下，`Spring Boot`使用嵌入式容器来运行应用程序。在这种情况下，`Spring Boot`使用`public static void main`入口点来启动嵌入式`Web`服务器。此外，它还负责将`Servlet`，`Filter`和`ServletContextInitializer bean`从应用程序上下文绑定到嵌入式`servlet`容器。
+ `Spring Boot`的另一个特性是它会自动扫描同一个包中的所有类或`Main`类的子包中的组件。
+
+`Spring Boot`提供了将其部署到外部容器的方式。我们只需要扩展`SpringBootServletInitializer`即可：
+
+
+
+```java
+/**
+ * War部署
+ *
+ * @author SanLi
+ * Created by 2689170096@qq.com on 2018/4/15
+ */
+public class ServletInitializer extends SpringBootServletInitializer {
+
+    @Override
+    protected SpringApplicationBuilder configure(SpringApplicationBuilder application) {
+        return application.sources(Application.class);
+    }
+
+    @Override
+    public void onStartup(ServletContext servletContext) throws ServletException {
+        super.onStartup(servletContext);
+        servletContext.addListener(new HttpSessionEventPublisher());
+    }
+}
+```
+
+  这里外部`servlet`容器查找在war包下的`META-INF`文件夹下MANIFEST.MF文件中定义的`Main-class`，`SpringBootServletInitializer`将负责绑定`Servlet`，`Filter`和`ServletContextInitializer`。
+
+
+
+
+
 ## Spring IoC
 
 **Inverse of Control（控制反转）**是一种设计思想，**控制**指的是对象创建（实例化、管理）的权力，**反转**是控制权交给外部环境（Spring 框架、IoC 容器）。
@@ -787,9 +837,51 @@ public class Prop {
 **常用校验注解**
 
 1. @NotNull：不能为null，但可以为empty（空字符串，空对象）
+
 2. @NotEmpty：不能为null，而且长度必须大于0
+
 3. @NotBlank：只能作用在String上，不能为null，而且调用trim()去除前后空格后，长度必须大于0
+
 4. @Max(value)：最大值，用于一个枚举值的数据范围控制
+
 5. @Min(value)：最小值，用于一个枚举值的数据范围控制
+
 6. @Size(min=a, max=b)：限制字符长度必须在min到max之间
+
 7. @Pattern(regexp = "正则")：正则表达式校验
+
+   
+
+## controller不能直接返回数字
+
+如下代码直接返回int
+
+```java
+@Controller
+@RequestMapping("/api/v1/authBillDetail")
+public class AuthBillDetailController extends CMPController {
+    @Autowired
+    private IAuthBillDetailService authBillDetailService;
+    
+    @ApiOperation(value = "xxx notes = "xxx")
+    @PostMapping("/insert")
+    //@ResponseBody
+    int insert(@RequestBody AuthBillDetail entity) {
+        int res = authBillDetailService.insert(entity);
+        return res;
+    }
+}
+```
+
+报错：
+
+```
+java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
+	at org.springframework.web.method.support.HandlerMethodReturnValueHandlerComposite.handleReturnValue(HandlerMethodReturnValueHandlerComposite.java:80)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:123)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:879)
+```
+
+若返回其他数字类型，如long等，也会报错。
+
+解决：加@ResponseBody，或者返回非整数类型，或用自定义泛型包裹数字类型

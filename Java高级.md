@@ -1,3 +1,71 @@
+# IO
+
+指Input/Output，即输入java内存和输出到外部：
+
+Input指从外部读入数据到内存
+
+Output指把数据从内存输出到外部
+
+主要可分为字节流和字符流：
+
+<img src="images/Java高级/1-16553085893123.png" alt="图片" style="zoom: 20%;" />
+
+## 一、字节流
+
+顾名思义以字节Byte为单位，主要有两种：
+
+- InputStream
+
+抽象类，所有输入字节流实现继承自它，**只能读不能写**
+
+- OutputStream
+
+抽象类，所有输出字节流实现继承自它，**只能写不能读**
+
+**注意**：写输入流会导致流关闭，同理读输出流也会导致关闭
+
+
+
+### 常用字节流
+
+### 文件数据流(FileOutputStream & FileInputStream)
+
+### 2. 过滤器数据流
+
+它的实现采用了 装饰设计模式（包装模式），有兴趣的话可以搜索看下，还是挺实用的。
+
+顾名思义，过滤器。 就是给 数据流 后面加个过滤器，然后再通过 过滤器 进行 输入/输出 操作。过滤器会在中间起到特殊处理作用。
+
+### 2.1 缓冲区数据流（BufferedInputStream & BufferedOutputStream）
+
+### 2.2 数据数据流
+
+这个数据流，并非像前面的一样，只能处理字节或字节数组。它允许通过数据流读写各种 Java 基本类型。
+
+创建方式也是经典 装饰设计模式。
+
+```
+DataInputStream dis = new DataInputStream(InputStream is);
+
+DataOutputStream dos = new DataOutputStream(OutputStream is);
+```
+
+
+
+## 二、字符流
+
+与字节流（byte为单位）的区别在于，字符流以char类型为单位
+
+主要也是两种：Reader和Writer
+
+| InputStream & OutputStream          | Reader & Writer                       |
+| :---------------------------------- | :------------------------------------ |
+| 字节流，以`byte`为单位              | 字符流，以`char`为单位                |
+| 读取字节（-1，0~255）：`int read()` | 读取字符（-1，0~65535）：`int read()` |
+| 读到字节数组：`int read(byte[] b)`  | 读到字符数组：`int read(char[] c)`    |
+
+### 常用字符流
+
 # JDBC
 
 ## 基本使用
