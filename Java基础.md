@@ -1519,6 +1519,113 @@ markword结构（64位系统中是8B=64bit）
 -XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump dump存放路径
 ```
 
+# 异常
+
+## Q：finally和return的执行顺序？
+
+已知先执行try/catch，然后必然执行finally
+
+1. 若try/catch中有return，先计算return值，然后进finally（finally中无法修改return值），最后return。
+2. 若finally中有return，则无论try/catch中return值如何，以finally中的return为最终返回。
+
+无论如何，甚至在try/catch结构以外都其他语法中，return都是**最后执行**
+
+（可以使用编译器的Debug功能查看详细过程。）
+
+**测试**
+
+1. try中return
+
+   ```java
+   public class tryDemo {
+       public static int show() {
+           try {
+               System.out.println("before return");
+               return 1;
+           } finally {
+               System.out.println("finally模块被执行");
+           }
+       }
+       public static void main(String args[]) {
+           System.out.println(show());
+       }
+   }
+   ```
+
+   输出：
+
+   before return
+
+   finally模块被执行
+
+   1
+
+2. catch中return
+
+   ```java
+   public static int show() {
+       try {
+           int a = 8/0;  // 执行到此处，然后抛异常进入catch
+           return 1;
+       } catch (Exception e) {
+           System.out.println("before return");
+           return 2;
+       } finally {
+           System.out.println("finally模块被执行");
+       }
+   }
+   ```
+
+   输出（可以看到return在finally后）：
+
+   before return
+
+   finally模块被执行
+
+   2
+
+3. final中return
+
+   ```java
+   public static int show() {
+       try {
+           int a = 8/0;
+           return 1;
+       } catch (Exception e) {
+           return 2;
+       } finally {
+           System.out.println("finally模块被执行");
+           return 0;  // 在此返回
+       }
+   }
+   ```
+
+   输出（可以看到当finally有返回值时，会直接返回。不会再去返回try或者catch中的返回值。）：
+
+   finally模块被执行
+
+   0
+
+4. finally中对于返回变量做的改变会影响最终的返回结果吗
+
+   ```java
+   public static int show() {
+       int result = 0;
+       try {
+           return result;  // 此时return值已经决定了，才走finally
+       } finally {
+           System.out.println("finally模块被执行");
+           result = 1;
+       }
+   }
+   ```
+
+   输出（可以看到result值一旦计算出来，finally中是无法改变的）：
+
+   finally模块被执行
+
+   0
+
 # 代理
 
 是一种常用的设计模式，其目的就是为其他对象提供一个代理以控制对某个对象的访问。代理类负责为委托类**预处理**、**后处理**等增强操作。
