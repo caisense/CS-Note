@@ -1132,7 +1132,7 @@ public static String concatString(String s1, String s2, String s3) {
 
 2. 第一个线程拿到对象的锁：升级为**偏向锁**。覆盖原来的markword，记录指向该线程指针JavaThread*，修改偏向锁位为1
 
-3. 线程间发生竞争时：升级为**轻量级锁（自旋锁）**。覆盖原markwork，记录指向**拿到锁的**线程的栈（线程独立内存区域）中LockRecord的指针，修改所标志位为01
+3. 线程间发生竞争时：升级为**轻量级锁（自旋锁）**。覆盖原markword，记录指向**拿到锁的**线程的栈（线程独立内存区域）中LockRecord的指针，修改所标志位为01
     - 自旋即线程进行CAS操作，不停尝试修改markword获取锁，设置为指向自己线程栈LockRecord的指针，操作成功的线程获得锁。（缺点：空转，消耗cpu，因此需要升级）
 
 
@@ -1143,3 +1143,16 @@ public static String concatString(String s1, String s2, String s3) {
 总而言之，开销从小到大：
 
 检测markword的偏向状态 < CAS < 操作系统互斥量mutex
+
+### 一致性哈希码
+
+一致性哈希码指对Object::hashCode()或者System::identityHashCode(Object)方法的调用，一般情况下是保持不变的，第一次计算后就存储在对象头markword中，因此：
+
+1.当一个对象已经计算过**一致性哈希码**后，它就再也无法进入偏向锁状态了
+
+- 因为偏向锁markword中没有地方存储hashcode，只能存在线程栈的LockRecord
+
+2.当一个对象当前正处于偏向锁状态，又收到需要计算其一致性哈希码请求时，它的偏向状态会被立即撤销，并且锁会膨胀为重量级锁。
+
+- 重量锁markword中也没有地方存储hashcode，只有指向ObjectMonitor的指针，ObjectMonitor的_header字段可记录非加锁状态下（标志位01）的markword，里面记录了hashcode
+
