@@ -755,6 +755,134 @@ JDK 1.7 使用分段锁机制来实现并发更新操作，核心类为 Segment�
 
 JDK1.8 使用CAS 操作支持更高并发度，CAS失败时使用内置锁 synchronized。底层与HashMap相同，链表长度大于8时转红黑树
 
+
+
+## 四、Stream
+
+是一种集合Stream<T> ，特点是无存储；适用于函数式编程；惰性执行。 
+
+- 无存储：Stream不是一种数据结构，它只是某种数据源的一个视图，数据源可以是一个数组，Java容器或I/O channel等。Stream只能被使用一次，一旦遍历过就会失效，就像容器的迭代器那样，想要再次遍历必须重新生成。
+- 函数式编程：对Stream的任何修改都不会修改背后的数据源，比如对Stream执行过滤操作并不会删除被过滤的元素，而是会产生一个不包含被过滤元素的新Stream。
+- 惰性执行：Stream上的操作并不会立即执行，只有遇到最终操作才会一并执行。
+
+可以将 Stream 流操作分为 3 种类型：
+
+- 创建
+- 中间处理
+- 最终操作
+
+![图片](images/Java基础/640.png)
+
+### 1.创建
+
+| API              | 功能                                                         |
+| ---------------- | ------------------------------------------------------------ |
+| stream()         | 调用集合（数组、List、Set、Map 等）的方法，创建一个新的stream**串行流**对象 |
+| parallelStream() | 调用集合的方法，创建一个新的stream**并行流**对象             |
+| Stream.of()      | 静态方法传入集合，创建一个新的stream串行流对象               |
+
+例：
+
+```java
+// 通过list创建
+List<String> strings = Arrays.asList("Hollis", "HollisChuang", "hollis", "Hello", "HelloWorld", "Hollis");
+Stream<String> stream = strings.stream();
+// 静态方法
+Stream<String> stream = Stream.of("Hollis", "HollisChuang", "hollis", "Hello", "HelloWorld", "Hollis");
+
+```
+
+### 2.中间操作
+
+| API      | 功能                               | 输入                     |
+| -------- | ---------------------------------- | ------------------------ |
+| filter   | 过滤出元素                         | 函数，用于判断是否过滤   |
+| map      | 映射每个元素到对应的结果（一对一） | 函数，用于对每个元素操作 |
+| flatMap  | 一对多映射                         | 函数                     |
+| limit    | 返回前 n 个元素                    | int                      |
+| skip     | 跳过前 n 个元素                    | skip                     |
+| sorted   | 用于对流进行排序                   | Comparator               |
+| distinct | 去重                               | 无                       |
+| concat   | 合并                               | stream                   |
+| peek     | 遍历                               |                          |
+|          |                                    |                          |
+
+中间操作可以组合使用，按链式顺序依次处理：
+
+```java
+List<String> ids = Arrays.asList("205","10","308","49","627","193","111", "193");
+// 使用流操作
+List<Dept> results = ids.stream()
+    .filter(s -> s.length() > 2)
+    .distinct()
+    .map(Integer::valueOf)
+    .sorted(Comparator.comparingInt(o -> o))
+    .limit(3)
+    .map(id -> new Dept(id))
+    .collect(Collectors.toList());
+System.out.println(results); 
+//输出：[Dept{id=111},  Dept{id=193},  Dept{id=205}]
+```
+
+上面的代码片段的处理逻辑很清晰：
+
+- 使用 filter 过滤掉不符合条件的数据
+- 通过 distinct 对存量元素进行去重操作
+- 通过 map 操作将字符串转成整数类型
+- 借助 sorted 指定按照数字大小正序排列
+- 使用 limit 截取排在前 3 位的元素
+- 又一次使用 map 将 id 转为 Dept 对象类型
+- 使用 collect 终止操作将最终处理后的数据收集到 list 中
+
+**sorted复杂用法**
+
+排序逻辑：以Record的time字段**倒序**排列
+
+```java
+List<Record> NewRecords = Records.stream()
+    .filter(dto -> prodInstId.equals(dto.getProdInstId()))
+    .sorted(Comparator.comparing(Record::getTime).reversed())
+    .collect(Collectors.toList());
+```
+
+
+
+### 3.最终操作
+
+Stream的中间操作得到的结果还是一个Stream，将一个Stream转换成我们需要的类型（如计算出流中元素的个数、将流转换成集合等），还需要最终操作。
+
+最终操作只能有一个，并且在最后。最终操作之后，Stream不能再进行任何操作。
+
+| API     | 功能                       | 输入                                 |
+| ------- | -------------------------- | ------------------------------------ |
+| forEach | 遍历，执行操作             | Consumer类型函数                     |
+| count   | 计数                       | 无                                   |
+| collect | 将stream元素转换为指定类型 | Collectors.toxxx()方法，常用toList() |
+| max     | 返回最大元素               |                                      |
+
+中间操作peek和最终操作forEach的区别：只有peek并不会执行遍历，还需要加最终操作；而forEach可以单独执行遍历
+
+
+
+**异常情况**
+
+- 集合为null：此时list.stream()会抛空指针异常。
+
+  应该在list创建流之前检查list != null
+
+- 元素有null：此时map操作抛空指针异常。
+
+  应该在中间操作map中，用`Objects::nonNull`保证元素非空：
+
+  ```java
+  List<String> roleCodes = sysRoles.stream().filter(Objects::nonNull).map(SysRole::getRoleCode).collect(Collectors.toList());
+  
+  ```
+
+  
+
+
+
 # 方法
 
 # 面向对象
