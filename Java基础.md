@@ -35,7 +35,7 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 
 **注意**：默认值只有基本类型才有，包装类默认为null
 
-表示的范围：
+**表示的范围**：
 
 | `类型`  | `占据空间`       | `表示整数范围`                                | `计算方式`     |
 | ------- | ---------------- | --------------------------------------------- | -------------- |
@@ -43,6 +43,19 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 | `short` | `2Byte  (16bit)` | `-32768  ~ 32767`                             | `-2^15~2^15-1` |
 | `int`   | `4Byte  (32bit)` | `-2147483648  ~ 2147483647`                   | `-2^31~2^31-1` |
 | `long`  | `8Byte  (64bit)` | `-9223372036854775808  ~ 9223372036854775807` | `-2^63~2^63-1` |
+
+整形超出范围，编译器直接报错
+
+浮点型超范，会自动截断。单精度最多7位小数，双精度最多15位
+
+```java
+double d = 1.111111111111111d; // 打印：1.111111111111111
+double d = 1.1111111111111111d;      // 1.1111111111111112
+float f = 1.1111111f;  // 1.111111
+float f = 1.11111111f; // 1.1111112
+```
+
+
 
 ### 1、整形
 
@@ -1235,6 +1248,10 @@ JVM将类的`.class `文件中的二进制数据读入到内存中，将其放�
 
 如果一个类加载器收到了类加载的请求，它首先不会自己去尝试加载这个类，而是**把请求委托给父加载器**去完成，依次向上，因此，所有的类加载请求最终都应该被传递到顶层的启动类加载器中，只有当父加载器在它的搜索范围中没有找到所需的类时，即无法完成该加载时，子加载器才会尝试自己去加载该类。
 
+每个类加载器对他加载过的类有缓存
+
+向上委托查找，向下委托加载
+
 **双亲委派模型（Parents Delegation Model）**
 
 该模型要求除了顶层的启动类加载器外，其它的类加载器都要有自己的父类加载器。这里的父子关系一般通过**组合**关系（Composition）来实现，而不是继承关系（Inheritance）。
@@ -1979,7 +1996,7 @@ System.out.println(String.class.getClass());  // class java.lang.Class
 - getDeclaredConstructor(Class...)：获取某个Constructor；
 - getDeclaredConstructors()：获取所有Constructor。
 
-## new、newnewInstance() 、Constructor.newInstance()区别
+## new、newnewInstance() 、Constructor.newInstance()区别？
 
 ### 1. new和newnewInstance()
 
@@ -1991,3 +2008,55 @@ System.out.println(String.class.getClass());  // class java.lang.Class
 
 Class.newInstance() 只能够调用 **无参** 且**public**的构造函数，即**默认构造函数**； 
 Constructor.newInstance() 调用 **任意**构造构造函数，甚至可以调用私有的。
+
+## 如何给`List<Integer>`里面加一个String？
+
+按理说静态代码中是不允许的，考察**泛型擦除**，在执行期中操作
+
+```java
+public class OrderDo {
+	private List<String> tags;
+   	// get set  省略
+}
+public class OrderDto {
+	private List<Integer> tags;
+    // get set  省略
+}
+public static void main() {
+    OrderDo orderDo = new OrderDo();
+    orderDo.setTags(Arrays.asList("tag1", "tag2"));
+    OrderDto orderDto = new OrderDto();
+    BeanUtils.copyProperties(orderDo, orderDto);  // spring提供的拷贝，使用反射机制
+    System.out.println(orderDto.getTags());
+    System.out.println(orderDto.getTags().get(0));  // tag1
+    System.out.println(orderDto.getTags().get(0).getClass());  // 运行时报错：java.lang.String cannot be cast to java.lang.Integer
+    List<Integer> tags = orderDto.getTags();
+    Integer integer = tags.get(0);  // 运行时报错：java.lang.String cannot be cast to java.lang.Integer
+    String str = tags.get(0); // 编译直接报错：java: 不兼容的类型: java.lang.Integer无法转换为java.lang.String
+    System.out.println(orderDto.getTags().get(0).equals(1)); // 运行时报错：java.lang.String cannot be cast to java.lang.Integer
+    Object obj = tags.get(0);
+    System.out.println(obj.getClass());  // class java.lang.String
+}
+```
+
+拷贝得到的List<T>实际上泛型还是String，getClass()获取类型就会报转换出错，编译器认为取出的元素类型应该是Integer，如16行；也不能比较，如20行，因为比较也涉及获取类型。
+
+取出元素用Integer接收将运行时报错，而用String接收会直接编译报错，如19行
+
+如果一定要打印元素类型，可以先用Object类型接收（或者Integer和String的其他共同父类），再getClass，如22行
+
+
+
+```java
+public static void main(String[] args) {
+    OrderDo orderDo = new OrderDo();
+    orderDo.setTags(Arrays.asList("tag1", "tag2"));
+    List<String> stringList = Arrays.asList("tag1", "tag2");
+    List<Integer> intList = new ArrayList<>();
+    BeanUtils.copyProperties(stringList, intList);
+    System.out.println(stringList);  // [tag1, tag2]
+    System.out.println(intList);  // []
+}
+```
+
+如果用BeanUtils.copyProperties()**对List直接操作**，则无法将元素复制出来，因为spring实现这个拷贝功能用的是反射，找到对应类的get、set方法，通过invoke调用来赋值。而List没有成对的get、set方法（常用的`get(Integer index)`并没有对应的set）

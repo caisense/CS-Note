@@ -10,7 +10,19 @@
 
 
 
-1. 继承Thread类
+1. 直接创建线程，在构造函数中用**箭头函数**实现run方法重写
+
+   ```java
+   public static void main(String[] args) {
+   
+       Thread t = new Thread(() -> {
+           // 方法逻辑
+       });
+       t.start();
+   }
+   ```
+
+2. 继承Thread类
 
    定义一个类继承Thread，重写其run()方法（因为Thread类实现了Runnable），然后new一个该类实例：
 
@@ -206,67 +218,67 @@ Java中线程的状态有以下几种：
 
 ## 线程方法
 
-1. `Thread.start()`
+### 1.`Thread.start()`
 
-   启动线程
+启动线程
 
-2. `Thread.sleep(long millis)`
+### 2. `Thread.sleep(long millis)`
 
-   当前线程放弃获取的CPU时间片，进入TIMED_WAITING状态，**但不释放对象锁**，millis毫秒后线程自动苏醒进入就绪状态。
+当前线程放弃获取的CPU时间片，进入TIMED_WAITING状态，**但不释放对象锁**，millis毫秒后线程自动苏醒进入就绪状态。
 
-   作用：给其它线程执行机会。
+作用：给其它线程执行机会。
 
-   
 
-3. `Thread.yield()`
 
-   由**当前线程**调用此方法，当前线程放弃获取的CPU时间片，**但不释放锁资源**，由运行状态变为**就绪状态**，让OS再次选择线程。 作用：让相同优先级的线程轮流执行，但并不保证一定会轮流执行。实际中无法保证yield()达到让步目的，因为让步的线程还有可能被线程调度程序再次选中。Thread.yield()**不会导致阻塞**。该方法与sleep()类似，只是不能由用户指定暂停多长时间。
+### 3. `Thread.yield()`
 
-   
+由**当前线程**调用此方法，当前线程放弃获取的CPU时间片，**但不释放锁资源**，由运行状态变为**就绪状态**，让OS再次选择线程。 作用：让相同优先级的线程轮流执行，但并不保证一定会轮流执行。实际中无法保证yield()达到让步目的，因为让步的线程还有可能被线程调度程序再次选中。Thread.yield()**不会导致阻塞**。该方法与sleep()类似，只是不能由用户指定暂停多长时间。
 
-4. `thread.join()/thread.join(long millis)`
 
-   在当前线程里调用其它线程T的join方法，会等待T执行结束。
 
-   当前线程进入**WAITING/TIMED_WAITING**状态，且**不会释放对象锁**。
+### 4. `thread.join()/thread.join(long millis)`
 
-   **线程T执行完毕，或millis时间到，当前线程一般情况下进入RUNNABLE状态，也有可能进入BLOCKED状态（因为join是基于wait实现的）。**
+在当前线程里调用其它线程T的join方法，会等待T执行结束。
 
-   要保证n个线程按顺序执行，可以在主线程中依次调用它们的join()方法，如：
+当前线程进入**WAITING/TIMED_WAITING**状态，且**不会释放对象锁**。
 
-   ```java
-   ...
-   Thread A = new Thread(...);
-   Thread B = new Thread(...);
-   Thread C = new Thread(...);
-   
-   A.start();
-   A.join();
-   
-   B.start();
-   B.join();
-   
-   C.start();
-   C.join();
-   ...
-   ```
+**线程T执行完毕，或millis时间到，当前线程一般情况下进入RUNNABLE状态，也有可能进入BLOCKED状态（因为join是基于wait实现的）。**
 
-   
+要保证n个线程按顺序执行，可以在主线程中依次调用它们的join()方法，如：
 
-4. `Object.wait() / wait(long timeout)`
+```java
+...
+Thread A = new Thread(...);
+Thread B = new Thread(...);
+Thread C = new Thread(...);
 
-   必须在synchronized块或方法中使用
+A.start();
+A.join();
 
-   当前线程调用对象的wait()方法，当前线程**释放对象锁**并进入WAITING/TIMED_WAITING状态，**当前线程**进入等待队列。依靠**同一个被锁的对象**调用notify() / notifyAll()唤醒，或timeout时间到自动唤醒。
+B.start();
+B.join();
 
-5. `Object.notify() / notifyAll()`
+C.start();
+C.join();
+...
+```
 
-   也必须在synchronized块或方法中使用
 
-   随机唤醒一个(notify)或所有(notifyAll)正在this锁等待的线程（就是在下文例1中getTask()中位于this.wait()的线程），从而使得等待线程从this.wait()方法返回。让等待的线程被重新唤醒
-   **注意**
 
-   wait和notify必须对同一个对象使用才有效
+### 5. `Object.wait() / wait(long timeout)`
+
+**必须在块或方法中使用**
+
+当前线程调用对象的wait()方法，当前线程**释放对象锁**并进入WAITING/TIMED_WAITING状态，**当前线程**进入等待队列。依靠**同一个被锁的对象**调用notify() / notifyAll()唤醒，或timeout时间到自动唤醒。
+
+### 6. `Object.notify() / notifyAll()`
+
+也必须在**synchronized**块或方法中使用
+
+随机唤醒一个(notify)或所有(notifyAll)正在object锁等待的线程（就是在下文例1中getTask()中位于this.wait()的线程），从而使得等待线程从this.wait()方法返回。让等待的线程被重新唤醒
+**注意**
+
+wait和notify必须对**同一个对象**使用才有效
 
   例1
 
@@ -375,7 +387,7 @@ Java中线程的状态有以下几种：
 
   这是因为可能有多个线程正在getTask()方法内部的wait()中等待，使用notifyAll()将一次性全部唤醒。通常来说，notifyAll()更安全。有些时候，如果我们的代码逻辑考虑不周，用notify()会导致只唤醒了一个线程，而其他线程可能永远等待下去醒不过来了。
 
-### 在多线程环境中，检查条件是否成立，应该用while而不是**if**
+### 注意：在多线程环境中，检查条件是否成立，应该用while而不是**if**
 
 上面例2，判断队列是否为空用while而不是if。notifyAll()唤醒所有线程后，只有一个线程能获取this锁，此时该线程执行queue.remove()就能获取任务。而此后其他线程执行queue.remove()就会报错。最终结果是第一次取得任务的线程继续执行完所有任务。
 
@@ -393,7 +405,7 @@ Java中线程的状态有以下几种：
 | :------- | ------------------------------------------------------------ | ------------------------------------------------------------ |
 | 所属的类 | Thread                                                       | Object                                                       |
 | 释放锁   | 不（不会失去对任何监视器（monitor）的所有权，也就是不会释放锁，仅仅会让出CPU的执行权） | 是（不仅会让出CPU的执行权，还会释放锁（即monitor的所有权），并且进入wait set） |
-| 使用方式 | 使用sleep()方法需要捕获InterruptedException异常              | 使用wait()方法则必须放在synchronized代码块里面，同样需要捕获InterruptedException异常，并且需要获取对象的锁。 |
+| 使用方式 | 使用sleep()方法需要捕获InterruptedException异常              | 使用wait()方法则必须放在**synchronized**代码块里面，同样需要捕获InterruptedException异常，并且需要获取对象的锁。 |
 | 使用场景 | 当前线程休眠，或者轮循暂停操作                               | 多线程之间的通信                                             |
 
 
@@ -616,7 +628,9 @@ ReentrantLock实现了Lock接口。可重入锁即表示可反复进入的锁，
 
 lock()方法和unlock()方法间的代码块即为加锁的代码块。Lock只有代码块加锁的方式，不能对方法加锁。
 
-### synchronized和ReentrantLock区别
+
+
+### Q：synchronized和ReentrantLock区别？
 
 |      | synchronized       | ReentrantLock                    |
 | ---- | ------------------ | -------------------------------- |
@@ -626,6 +640,48 @@ lock()方法和unlock()方法间的代码块即为加锁的代码块。Lock只�
 |      | 非公平锁           | 公平或非公平                     |
 |      | 锁信息保存在对象头 | 通过代码中int类型state标识锁状态 |
 |      | 有锁升级过程       |                                  |
+
+
+
+## 线程通信
+
+### 1. Object 的 wait/notify 方法
+
+见上一节**线程方法**的第5、6方法
+
+### 2. Condition 的 await/singal  方法
+
+线程方法的例1TaskQueue的wait/notify，把synchronized替换为ReentrantLock实现：
+
+```java
+class TaskQueue {
+    private final Lock lock = new ReentrantLock();
+    private final Condition condition = lock.newCondition();  // 获得一个绑定了Lock实例的Condition实例
+    private Queue<String> queue = new LinkedList<>();
+
+    public void addTask(String s) {
+        lock.lock();  // 如果加锁成功
+        try {
+            queue.add(s);
+            condition.signalAll();  // 唤醒所有等待线程
+        } finally {
+            lock.unlock();  // 无论如何都要释放锁
+        }
+    }
+
+    public String getTask() {
+        lock.lock(); // 如果加锁成功
+        try {
+            while (queue.isEmpty()) {  // 注意多线程环境用while语句判断
+                condition.await();  // 队列为空时等待
+            }
+            return queue.remove();
+        } finally {
+            lock.unlock(); // 无论如何都要释放锁
+        }
+    }
+}
+```
 
 
 
@@ -1156,3 +1212,223 @@ public static String concatString(String s1, String s2, String s3) {
 
 - 重量锁markword中也没有地方存储hashcode，只有指向ObjectMonitor的指针，ObjectMonitor的_header字段可记录非加锁状态下（标志位01）的markword，里面记录了hashcode
 
+## 题：如何实现三个线程交替打印ABC，共100次？
+
+方法一：
+
+思路：三个线程用同一个锁锁死，每个线程分别负责打印ABC，打印完全局count计数+1，具体轮到哪个线程打印由count % 3结果决定
+
+```java
+public class Test {
+    static Integer count = 0;  // 计数
+    static Object lock = new Object();  // 锁
+
+    public static void main(String[] args) {
+
+        Thread t0 = new Thread(() -> {
+            while (true) {
+                synchronized(lock) {
+                    if (count < 100 && count % 3 == 0) {
+                        System.out.println("A");
+                        count ++;
+                    }
+                }
+            }
+        });
+        Thread t1 = new Thread(() -> {
+            while (true) {
+                synchronized(lock) {
+                    if (count < 100 && count % 3 == 1) {
+                        System.out.println("B");
+                        count ++;
+                    }
+                }
+            }
+        });
+        Thread t2 = new Thread(() -> {
+            while (true) {
+                synchronized(lock) {
+                    if (count < 100 && count % 3 == 2) {
+                        System.out.println("C");
+                        count ++;
+                    }
+                }
+            }
+        });
+        t0.start();
+        t1.start();
+        t2.start();
+    }
+}
+```
+
+方法一变种：
+
+用Thread继承类，思路差不多。
+
+其实可以直接用Test.class作为锁对象，没必要额外用一个lock对象
+
+```java
+public class Test {
+    static Integer count = 0;
+
+    public static void main(String[] args) {
+        MyThread0 t0 = new MyThread0();
+        MyThread1 t1 = new MyThread1();
+        MyThread2 t2 = new MyThread2();
+        t0.start();
+        t1.start();
+        t2.start();
+    }
+}
+class MyThread0 extends Thread {
+    @Override
+    public void run() {
+        while (true) {
+            synchronized (Test.class) {
+                if (Test.count < 100 && Test.count % 3 == 0) {
+                    System.out.println("A");
+                    Test.count += 1;
+                }
+            }
+        }
+
+    }
+}
+// 另外两个实现略
+```
+
+方法二：
+
+如果线程不用while(true)一直轮询，就需要使用 wait / notify
+
+```java
+static Integer count = 0;
+static Object lock = new Object();
+public static void main(String[] args) {
+    Thread t0 = new Thread(() -> {
+        for (int i = 0; i < 100; i++) {
+            synchronized(lock) {
+                // 拿不到锁就wait
+                // 在多线程环境，判断条件注意用while而不是if
+                while (count < 100 && count % 3 != 0) {
+                    try {
+                        lock.wait();
+                    } catch (InterruptedException e) {
+                        throw new RuntimeException(e);
+                    }
+                }
+                // 拿到锁了，判断计数未到100才操作
+                if (count < 100) {
+                    System.out.println("A");
+                    count ++;
+                }
+                // 最后无论如何都notifyAll
+                lock.notifyAll();
+            }
+        }
+    });
+    // 另外两个线程实现略，只有打印不同
+    t0.start();
+    t1.start();
+    t2.start();
+    }
+}
+```
+
+方法三：用Condition控制
+
+```java
+public class ReentrantLockTest {
+    private static Integer count = 0;
+    private static final ReentrantLock reentrantLock = new ReentrantLock();
+
+    public static void main(String[] args) {
+        Condition printACond = reentrantLock.newCondition();
+        Condition printBCond = reentrantLock.newCondition();
+        Condition printCCond = reentrantLock.newCondition();
+        Thread t0 = new Thread(() -> {
+            while (true) {
+                reentrantLock.lock();
+                if (count < 100) {
+                    System.out.println("A");
+                    count++;
+                }
+                // 唤醒BCond
+                printBCond.signal();
+                // ACond等待
+                try {
+                    printACond.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                reentrantLock.unlock();
+            }
+        });
+        Thread t1 = new Thread(() -> {
+            while (true) {
+                reentrantLock.lock();
+                if (count < 100) {
+                    System.out.println("B");
+                    count++;
+                }
+                // 唤醒CCond
+                printCCond.signal();
+                // BCond等待
+                try {
+                    printBCond.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                reentrantLock.unlock();
+            }
+        });
+        Thread t2 = new Thread(() -> {
+            while (true) {
+                reentrantLock.lock();
+                if (count < 100) {
+                    System.out.println("C");
+                    count++;
+                }
+                // 唤醒ACond
+                printACond.signal();
+                // CCond等待
+                try {
+                    printCCond.await();
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                }
+                reentrantLock.unlock();
+            }
+        });
+        t0.start();
+        t1.start();
+        t2.start();
+    }
+}
+```
+
+问题：顺序不一定，可能会出现ABC或ACB或BAC等情况。原因是应该先等待，再解锁，这里顺序弄反了。改为如下即可
+
+```java
+Thread t0 = new Thread(() -> {
+    while (true) {
+        try {
+            reentrantLock.lock();
+            if (count % 3 != 0) {
+                printACond.await();
+            }
+            if (count < 100) {
+                System.out.println("A");
+                count++;
+            }
+            printBCond.signal();
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        } finally {
+            reentrantLock.unlock();
+        }
+    }
+});
+// 其余两个线程略
+```

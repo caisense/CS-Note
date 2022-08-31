@@ -797,6 +797,35 @@ public class GlobalExceptionAdvice {
 }
 ```
 
+
+
+## @RequestParam
+
+参数：
+
+- name（别名value）-- String类型
+
+  name不能重复（即使不同类型取同名也不行）
+
+- required -- 布尔类型
+
+  默认为true，设为false才需要显式：
+
+  ```java
+  @RequestParam(value = "xxx", required = false) double d //xxx为传入参数名
+  ```
+
+  required参数为true的误区：
+  required = true是在前端没有传参数（也就是null）的时候报错，并不能防止参数为空字符串""。
+
+请求传来的参数实际上都是String类型，由框架转为相应类型，若超出类型取值范围，会报转换异常：
+
+```
+org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Failed to convert value of type 'java.lang.String' to required type 'int'; nested exception is java.lang.NumberFormatException: For input string: "2147483648"
+```
+
+
+
 ## 参数校验（validation框架）
 
 @Validated：用在方法入参上
