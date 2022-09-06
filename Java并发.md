@@ -236,13 +236,15 @@ Java中线程的状态有以下几种：
 
 
 
-### 4. `thread.join()/thread.join(long millis)`
+### 4. `thread.join(long millis)`
 
-在当前线程里调用其它线程T的join方法，会等待T执行结束。
+（参数可选，表示等待时间）
+
+在当前线程里调用其它线程Thread的join方法，会等待Thread执行结束。
 
 当前线程进入**WAITING/TIMED_WAITING**状态，且**不会释放对象锁**。
 
-**线程T执行完毕，或millis时间到，当前线程一般情况下进入RUNNABLE状态，也有可能进入BLOCKED状态（因为join是基于wait实现的）。**
+**当线程Thread执行完毕，或millis时间到，则当前线程一般情况下进入RUNNABLE状态，也有可能进入BLOCKED状态（因为join是基于wait实现的）。**
 
 要保证n个线程按顺序执行，可以在主线程中依次调用它们的join()方法，如：
 
@@ -387,7 +389,7 @@ wait和notify必须对**同一个对象**使用才有效
 
   这是因为可能有多个线程正在getTask()方法内部的wait()中等待，使用notifyAll()将一次性全部唤醒。通常来说，notifyAll()更安全。有些时候，如果我们的代码逻辑考虑不周，用notify()会导致只唤醒了一个线程，而其他线程可能永远等待下去醒不过来了。
 
-### 注意：在多线程环境中，检查条件是否成立，应该用while而不是**if**
+### 注意：在多线程环境中，检查条件是否成立，应该用while而不是if
 
 上面例2，判断队列是否为空用while而不是if。notifyAll()唤醒所有线程后，只有一个线程能获取this锁，此时该线程执行queue.remove()就能获取任务。而此后其他线程执行queue.remove()就会报错。最终结果是第一次取得任务的线程继续执行完所有任务。
 
@@ -773,8 +775,23 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 解决方法：使用java标准库的`ThreadLocal<T>`，核心api有：
 
 1. `set(T t)`：存储
+
 2. `get()`：取
+
+   通俗理解，一个`ThreadLocal<T>`对象就是一个盒子，要存什么就往里set，要取的时候就直接get，但是只能存一个对象。
+
 3. `remove()`：清除
+
+4. `initialValue()`：初始化。
+
+   ```java
+   private static ThreadLocal<DateFormat> threadLocal = new ThreadLocal<>(){
+       @Override
+       protected DateFormat initialValue() { 
+           return new SimpleDateFormat("yyyy-MM-dd"); // 给ThreadLocal设初始值
+       }
+   };
+   ```
 
 实例总是以**静态字段**初始化如下：
 
@@ -839,8 +856,8 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 public class ConnContext implements AutoCloseable {
     // ThreadLocal初始化
     static final ThreadLocal<Connection> ctx = new ThreadLocal<>();
-    public UserContext() {
-        conn = ds.getConnection();
+    public ConnContext() {
+        conn = ds.getConnection();  // ds是数据库连接池，从连接池获取连接
         ctx.set(conn);
     }
     // 静态方法：获取conn
@@ -849,7 +866,7 @@ public class ConnContext implements AutoCloseable {
     }
         
     @Override
-    public void close() {
+    public void close() { // 重写close方法，显式remove
         ctx.remove();
     }
 }
@@ -860,9 +877,48 @@ try (var ctx = new UserContext()) {
 } 
 ```
 
-### 
+这样就在`ConnContext`中完全封装了`ThreadLocal`，外部代码在`try (resource) {...}`内部可以随时调用`ConnContext.currentConn()`获取当前线程绑定的数据库连接
 
+# 线程安全
 
+## Q：SimpleDateFormat类为何不是线程安全的？
+
+SimpleDateFormat是继承自DateFormat类，其中的Calendar对象被多线程共享，而Calendar对象本身不支持线程安全。
+
+**解决**
+
+1. 局部变量法
+
+   在**线程内部**定义SimpleDateFormat，则该对象是线程私有的，不会有线程安全问题
+
+2. 给SimpleDateFormat对象加锁
+
+   不推荐，效率低
+
+3. ThreadLocal（推荐）
+
+   使用ThreadLocal存储每个线程拥有的SimpleDateFormat对象的副本，各个线程在使用时互不干扰，性能较高
+
+   ```java
+   private static ThreadLocal<DateFormat> threadLocal = new ThreadLocal<>(){
+       @Override
+       protected DateFormat initialValue() {
+           return new SimpleDateFormat("yyyy-MM-dd");
+       }
+   };
+   // 在线程中
+   threadLocal.get().parse("2020-01-01");
+   ```
+
+4. DateTimeFormatter
+
+   Java8提供的新的日期时间API中的类，是线程安全的
+
+   ```
+    private static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+   ```
+
+   
 
 # Java锁机制
 
@@ -1214,7 +1270,9 @@ public static String concatString(String s1, String s2, String s3) {
 
 ## 题：如何实现三个线程交替打印ABC，共100次？
 
-方法一：
+一道题分别用synchronized锁、lock锁的wait/notify方法、lock锁的await/signal方法、countDownLatch解决
+
+### 方法一：synchronized锁
 
 思路：三个线程用同一个锁锁死，每个线程分别负责打印ABC，打印完全局count计数+1，具体轮到哪个线程打印由count % 3结果决定
 
@@ -1298,7 +1356,7 @@ class MyThread0 extends Thread {
 // 另外两个实现略
 ```
 
-方法二：
+### 方法二：lock锁+wait
 
 如果线程不用while(true)一直轮询，就需要使用 wait / notify
 
@@ -1336,7 +1394,7 @@ public static void main(String[] args) {
 }
 ```
 
-方法三：用Condition控制
+### 方法三：用Condition控制
 
 ```java
 public class ReentrantLockTest {
@@ -1432,3 +1490,336 @@ Thread t0 = new Thread(() -> {
 });
 // 其余两个线程略
 ```
+
+### 方法四、CountDownLatch
+
+一个线程只能唤醒另一个线程一次，因此三个线程无法循环打印ABC，要循环打印100次理论上需要创建100个线程
+
+```java
+// 只顺序打印一次ABC
+public static void main(String[] args) {
+    // 只需要两个CountDownLatch
+    CountDownLatch countDownLatchB = new CountDownLatch(1);
+    CountDownLatch countDownLatchC = new CountDownLatch(1);
+    Thread t0 = new Thread(() -> {
+        System.out.println("A");
+        countDownLatchB.countDown();  // 唤醒countDownLatchB
+    });
+    Thread t1 = new Thread(() -> {
+        try {
+            countDownLatchB.await();  // 等待countDownLatchB
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("B");
+        countDownLatchC.countDown(); // 唤醒countDownLatchC
+    });
+    Thread t2 = new Thread(() -> {
+        try {
+            countDownLatchC.await();    // 等待countDownLatchC
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        System.out.println("C");
+    });
+    t0.start();
+    t1.start();
+    t2.start();
+}
+```
+
+### 方法五.Thread的join()
+
+Thread.join()是等线程Thread结束，因此只用三个线程实际上只能打印一次ABC
+
+```java
+static Integer count = 0;
+public static void main(String[] args) {
+    Thread t0 = new Thread(() -> {
+        while (count < 100 && count % 3 == 0) {  // 其实用if结果一样，while只进入一次，线程就结束了
+            System.out.println("A");
+            count++;
+        }
+    });
+    Thread t1 = new Thread(() -> {
+        try {
+            t0.join();  // 等线程0结束
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        while (count < 100 && count % 3 == 1) {
+            System.out.println("B");
+            count++;
+        }
+    });
+    Thread t2 = new Thread(() -> {
+        try {
+            t1.join();  // 等线程1结束
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
+        while (count < 100 && count % 3 == 2) {
+            System.out.println("C");
+            count++;
+        }
+    });
+    t0.start();
+    t1.start();
+    t2.start();
+}
+```
+
+### 方法六、Semaphore
+
+用三个信号量ABC，分别控制三个线程的占用和释放
+
+```java
+public class SemaphoreExample {
+    static int count = 0;
+
+    public static void main(String[] args) throws InterruptedException {
+        Semaphore semaphoreA = new Semaphore(1); // 每个信号量最多一个占用
+        Semaphore semaphoreB = new Semaphore(1);
+        Semaphore semaphoreC = new Semaphore(1);
+        semaphoreB.acquire();  // 先把B、C信号量占用，保证线程t0最先执行
+        semaphoreC.acquire();
+        Thread t0 = new Thread(() -> {
+            while (count < 100) {
+                try {
+                    semaphoreA.acquire();  // 占用A
+                    // 改进：这里加判断
+                    System.out.println("A"+ count);
+                    count++;
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    semaphoreB.release();  // 无论如何都释放B
+                }
+            }
+        });
+        Thread t1 = new Thread(() -> {
+            while (count < 100) {
+                try {
+                    semaphoreB.acquire();
+                    System.out.println("B"+ count);
+                    count++;
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    semaphoreC.release();
+                }
+            }
+        });
+        Thread t2 = new Thread(() -> {
+            while (count < 100) {
+                try {
+                    semaphoreC.acquire();
+                    System.out.println("C" + count);
+                    count++;
+                } catch (InterruptedException e) {
+                    throw new RuntimeException(e);
+                } finally {
+                    semaphoreA.release();
+                }
+            }
+        });
+        t0.start();
+        t1.start();
+        t2.start();
+    }
+}
+```
+
+这样写还是会有问题，最后输出的次数为102次，即ABC循环输出34次，打印count可知超过的两次为：B100
+C101。原因是count=98时，t1线程已经进入while循环，来到26行的占用B；count=99时，t2线程已经进入while循环，来到39行的占用C。因此当t0线程释放B后，t1线程还能再打印一次B，同理t2多打印一次C
+
+改进方式是在占用信号量之后，打印和count++操作之前加一个判断`if (count < 100)` 。这样的话while循环条件也可以改成`while (true)`。
+
+# JUC（java.util.concurrent）
+
+## AQS
+
+java.util.concurrent（J.U.C）大大提高了并发性能，AQS 被认为是 J.U.C 的核心。
+
+### CountDownLatch
+
+用来控制一个或者多个线程等待多个线程。
+
+维护了一个计数器 cnt，每次调用 `countDown()` 方法会让计数器的值减 1，减到 0 的时候，那些因为调用 `await()` 方法而在等待的线程就会被唤醒。
+
+```java
+public class CountdownLatchExample {
+    public static void main(String[] args) throws InterruptedException {
+        final int totalThread = 10;
+        CountDownLatch countDownLatch = new CountDownLatch(totalThread);
+        // CountDownLatch countDownLatch = new CountDownLatch(totalThread+1);  // CDL创建为11个，则最后end不打印
+        // CountDownLatch countDownLatch = new CountDownLatch(totalThread-1);  // 如果CDL小于10，则有可能先打印end（因为CDL很快到0），再由其他线程打印run
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        for (int i = 0; i < totalThread; i++) {
+            executorService.execute(() -> {  // 给线程池提交一个任务，类似submit
+                System.out.print("run..");
+                countDownLatch.countDown();  // countDownLatch减一
+            });
+        }
+        countDownLatch.await();  // 主线程等待countDownLatch归零
+        System.out.println("end");
+        executorService.shutdown();
+    }
+}
+// run..run..run..run..run..run..run..run..run..run..end
+
+// 如果改成在线程中await，则所有线程都会等待countDownLatch归零
+executorService.execute(() -> {  
+    System.out.print("run..");
+    countDownLatch.countDown();  // countDownLatch减一
+    try {
+        countDownLatch.await();  // 等待
+    } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+    }
+    System.out.print("end");
+});
+// run..run..run..run..run..run..run..run..run..run..end.end.end.end.end.end.end.end.end.end.
+```
+
+### CyclicBarrier
+
+用来控制多个线程互相等待，只有当多个线程都到达时，这些线程才会继续执行。
+
+和 CountdownLatch 相似，都是通过维护计数器来实现的。线程执行 `await()` 方法之后计数器会减 1，并进行等待，直到计数器为 0，所有调用 await() 方法而在等待的线程才能继续执行。
+
+CyclicBarrier 和 CountdownLatch 的一个区别是，CyclicBarrier 的计数器通过调用 `reset()` 方法可以循环使用，所以它才叫做循环屏障。另外await()等于countDown() + await()的功能，如果在线程之外await，则无法起到线程间互相等待的作用
+
+CyclicBarrier 有两个构造函数，其中 parties 指示计数器的初始值，barrierAction 在所有线程都到达屏障的时候会执行一次。
+
+```java
+public class CyclicBarrierExample {
+    public static void main(String[] args) {
+        final int totalThread = 10;
+        CyclicBarrier cyclicBarrier = new CyclicBarrier(totalThread);
+        ExecutorService executorService = Executors.newCachedThreadPool();
+        for (int i = 0; i < totalThread; i++) {
+            executorService.execute(() -> {
+                System.out.print("before..");
+                try {
+                    cyclicBarrier.await();
+                } catch (InterruptedException | BrokenBarrierException e) {
+                    e.printStackTrace();
+                }
+                System.out.print("after..");
+            });
+        }
+        executorService.shutdown();
+    }
+}
+// before..before..before..before..before..before..before..before..before..before..after..after..after..after..after..after..after..after..after..after..
+```
+
+### Semaphore 
+
+类似于操作系统中的信号量，可以控制对互斥资源的访问线程数，acquire()为占用，release()为释放。
+
+以下代码模拟了对某个服务的并发请求，每次只能有 3 个客户端同时访问，请求总数为 10。
+
+```java
+public static void main(String[] args) {
+    Semaphore semaphore = new Semaphore(3);  // 最多有 3 个客户端同时访问
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    for (int i = 0; i < 10; i++) {  // 请求总数为 10
+        executorService.execute(()->{
+            try {
+                semaphore.acquire();
+                System.out.print(semaphore.availablePermits() + " ");  // 打印此时信号量的剩余
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } finally {
+                semaphore.release();
+            }
+        });
+    }
+    executorService.shutdown();
+}
+```
+
+## FutureTask
+
+在介绍 Callable 时我们知道它可以有返回值，返回值通过 `Future<V>` 进行封装。FutureTask 实现了 RunnableFuture 接口，该接口继承自 Runnable 和 `Future<V>` 接口，这使得 FutureTask 既可以当做一个任务执行，也可以有返回值。
+
+```java
+public class FutureTask<V> implements RunnableFuture<V>
+public interface RunnableFuture<V> extends Runnable, Future<V>
+```
+
+FutureTask 可用于**异步**获取执行结果或取消执行任务的场景（未来的任务）。当一个计算任务需要执行很长时间，那么就可以用 FutureTask 来封装这个任务，主线程在完成自己的任务之后再去获取结果。
+
+```java
+public static void main(String[] args) throws ExecutionException, InterruptedException {
+    // 创建FutureTask，传入Callable
+    FutureTask<Integer> futureTask = new FutureTask<Integer>(new Callable<Integer>() {
+        @Override
+        public Integer call() throws Exception {  // 重写call方法，执行具体逻辑
+            int result = 0;
+            for (int i = 0; i < 100; i++) {
+                Thread.sleep(10);
+                result += i;
+            }
+            return result;
+        }
+    });
+    // 创建线程执行futureTask
+    Thread computeThread = new Thread(futureTask);
+    computeThread.start();
+
+    Thread otherThread = new Thread(() -> {
+        System.out.println("other task is running...");
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    });
+    otherThread.start();
+    System.out.println(futureTask.get());  // 用get方法获取futureTask结果
+}
+// other task is running...
+// 4950
+```
+
+或者将FutureTask交给线程池处理
+
+```java
+// 查simcard的FutureTask队列
+List<FutureTask<SimCard>> qrySimcardFutureTasks = new ArrayList<>();
+
+for (QrySimCardCond condBean : noRepeatCondBeanList) {  // 每个condBean创建一个FutureTask
+    Callable callable = () -> {
+        List<SimCard> simCardList = new ArrayList<>();
+        try {
+            simCardList = corpQryService.getSimCard(condBean, null);
+        } catch (Exception e) {
+            logger.error("qryRealTimeLocation sim卡查询异常,入参{}，报错{}", JSONObject.toJSONString(condBean), e);
+        }
+        SimCard simCard = null;
+        // 卡存在则正常返回
+        if (simCardList.size() > 0) {
+            simCard = simCardList.get(0);
+        } else {
+            // 卡不存在则返回一个只有accnum属性的simcard
+            simCard = new SimCard();
+            simCard.setAccNum(condBean.getObjId());
+        }
+        return simCard;
+    };
+    FutureTask<SimCard> futureTask = new FutureTask<>(callable);
+    qrySimcardFutureTasks.add(futureTask);
+    executorService.submit(futureTask);  // 提交线程池
+}
+try {  // futureTask的 get操作需要try
+    for (FutureTask<SimCard> futureTask : qrySimcardFutureTasks) {
+        SimCard simCard = futureTask.get();
+    }
+}  catch (Exception e) {
+    logger.error("qrySimcardFutureTasks get 报错： {}", JSONObject.toJSONString(e));
+}
+```
+

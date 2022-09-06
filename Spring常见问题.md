@@ -526,6 +526,28 @@ SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级�
 
 ![image-20220311095851373-16469639344001](images/Spring常见问题/image-20220311095851373-16469639344001.png)
 
+
+
+## 循环依赖无法解决的场景
+
+```java
+// IA 、 IB是两个空接口，略
+@Repository
+public class A implements IA {
+    @Autowired
+    private IB ib;
+}
+@Repository
+public class B implements IB {
+    @Autowired
+    private IA ia;
+}
+```
+
+A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Repository，则spring无法启动，报错： Error creating bean with name 'a': Bean with name 'a' has been injected into other beans [b] in its raw version as part of a circular reference, but has eventually been wrapped. This means that said other beans do not use the final version of the bean. This is often the result of over-eager type matching - consider using 'getBeanNamesForType' with the 'allowEagerInit' flag turned off, for example.
+
+只有当其中一个不是@Repository，或两个都不是，比如用@Service、@Controller或@Component时，才不会报错
+
 ## @Component 和 @Configuration + @Bean 同时存在，创建bean用拿个？
 
 `allowBeanDefinitionOverriding=true;`，默认是允许BeanDefinition覆盖
