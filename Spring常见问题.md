@@ -265,8 +265,8 @@ public class RedirectServlet extends HttpServlet {
         resp.sendRedirect(redirectToUrl);
         
         // 如果要发送301重定向，上面的代码要这么写
-        // resp.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY); 
-		// resp.setHeader("Location", "/hello");
+        // resp.setStatus(HttpServletResponse.SC_MOVED_PERMANENTLY); // 301
+        // resp.setHeader("Location", "/hello");
     }
 }
 ```
@@ -936,3 +936,228 @@ java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
 若返回其他数字类型，如long等，也会报错。
 
 解决：加@ResponseBody，或者返回非整数类型，或用自定义泛型包裹数字类型
+
+## @Async
+
+标注在方法或者类上，从而可以方便的实现方法的异步调用。调用者在调用异步方法时将立即返回，方法的实际执行将提交给指定的线程池中的线程执行。
+
+编写Task组件：
+
+```java
+@Component
+public class Task {
+    public static Random random =new Random();
+	//@Async
+    public void doTaskOne() throws Exception {
+        System.out.println("开始做任务一");
+        long start = System.currentTimeMillis();
+        Thread.sleep(random.nextInt(10000));
+        long end = System.currentTimeMillis();
+        System.out.println("完成任务一，耗时：" + (end - start) + "毫秒");
+    }
+	//@Async
+    public void doTaskTwo() throws Exception {
+        System.out.println("开始做任务二");
+        long start = System.currentTimeMillis();
+        Thread.sleep(random.nextInt(10000));
+        long end = System.currentTimeMillis();
+        System.out.println("完成任务二，耗时：" + (end - start) + "毫秒");
+    }
+	//@Async
+    public void doTaskThree() throws Exception {
+        System.out.println("开始做任务三");
+        long start = System.currentTimeMillis();
+        Thread.sleep(random.nextInt(10000));
+        long end = System.currentTimeMillis();
+        System.out.println("完成任务三，耗时：" + (end - start) + "毫秒");
+    }
+}
+```
+
+编写单元测试：
+
+```java
+@RunWith(SpringJUnit4ClassRunner.class)
+@SpringBootTest(classes = LearnSpringApplication.class)  // 填启动类
+public class ApplicationTests {
+    @Autowired
+    private Task task;
+
+    @Test
+    public void test() throws Exception {
+        // 正常情况下是顺序执行
+        task.doTaskOne();
+        task.doTaskTwo();
+        task.doTaskThree();
+    }
+}
+/* 输出：
+开始做任务一
+完成任务一，耗时：3753毫秒
+开始做任务二
+完成任务二，耗时：528毫秒
+开始做任务三
+完成任务三，耗时：5775毫秒
+*/
+```
+
+改用异步：将Task中三个函数加上@Async 注解，在**启动类**加@EnableAsync，则三个函数异步执行，乱序输出：例如：开始做任务二，开始做任务三，开始做任务一……等。但都没有打印耗时，因为主程序不等待三个函数执行完成就结束了
+
+**异步回调**
+
+使用Future返回异步调用结果，do函数改造如下：
+
+```java
+@Async
+public Future<String> doTaskOne() throws Exception {
+    System.out.println("开始做任务一");
+    long start = System.currentTimeMillis();
+    Thread.sleep(random.nextInt(10000));
+    long end = System.currentTimeMillis();
+    System.out.println("完成任务一，耗时：" + (end - start) + "毫秒");
+    return new AsyncResult<>("任务一完成");
+}
+// doTaskTwo doTaskThree略
+```
+
+test改造
+
+```java
+@Test
+public void test() throws Exception {
+    long start = System.currentTimeMillis();
+
+    Future<String> task1 = task.doTaskOne();
+    Future<String> task2 = task.doTaskTwo();
+    Future<String> task3 = task.doTaskThree();
+
+    while(true) {
+        if(task1.isDone() && task2.isDone() && task3.isDone()) {
+            // 三个任务都调用完成，退出循环等待
+            break;
+        }
+        Thread.sleep(1000);
+    }
+    long end = System.currentTimeMillis();
+    System.out.println("任务全部完成，总耗时：" + (end - start) + "毫秒");
+}
+/* 输出：
+开始做任务一
+开始做任务三
+开始做任务二
+完成任务三，耗时：4362毫秒
+完成任务二，耗时：7272毫秒
+完成任务一，耗时：7555毫秒
+任务全部完成，总耗时：8015毫秒
+/*
+```
+
+**注意**
+
+- @Async标注在类上时，表示该类的所有方法都是异步方法。
+- @Async注解的方法一定要通过**依赖注入**调用（因为要通过**代理对象调用**，基于aop），不能直接通过this对象调用，否则不生效。
+- @Async注解的方法不能是static或final，同样因为是基于aop，静态方法无法被代理
+
+### 配置自定义线程池
+
+Spring首先会通过下面两种方式查找作为异步方法的默认线程池：
+
+1. 查找唯一的一个TaskExecutor类型的bean
+2. 或者是一个名称为“taskExecutor”的Executor类型的Bean。
+
+如果上面两种方式都没有查找到，则使用SimpleAsyncTaskExecutor作为异步方法的默认线程池
+
+如果要配置自定义线程池，有多种方式：
+
+1. 重新实现接口AsyncConfigurer，重写getAsyncExecutor方法
+2. 继承AsyncConfigurerSupport
+3. 自定义一个TaskExecutor类型的bean。
+4. 自定义一个名称为“taskExecutor”的Executor类型的Bean。
+
+方式1例：
+
+```java
+@Configuration
+@EnableAsync  // 注意在配置类加这个注解
+public class SpringAsyncConfig implements AsyncConfigurer {
+    @Override
+    public Executor getAsyncExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);//核心池大小
+        executor.setMaxPoolSize(6);//最大线程数
+        executor.setKeepAliveSeconds(60);//线程空闲时间
+        executor.setQueueCapacity(10);//队列程度
+        executor.setThreadNamePrefix("my-executor1-");//线程前缀名称
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());//配置拒绝策略
+        executor.setAllowCoreThreadTimeOut(true);// 允许销毁核心线程
+        executor.initialize();
+        return executor;
+    }
+}
+```
+
+这样所有@Async方法都由这个指定线程池执行
+
+如果不同方法需要配置**不同线程池**，在@Async()参数上指定线程池的名称
+
+```java
+// 配置类
+@Configuration
+public class ExecutorConfig {
+    @Bean("customExecutor-1")// 自定义线程池1
+    public Executor customExecutor1() {
+        ...
+    }
+
+    @Bean("customExecutor-2")// 自定义线程池2
+    public Executor customExecutor2() {
+        ...
+    }
+}
+
+// 方法
+@Async("customExecutor-1")  // 使用自定义线程池1
+public void method1(){}
+
+@Async("customExecutor-2") // 使用自定义线程池2
+public void method2(){}
+```
+
+### 异常处理
+
+当方法是带Future返回值的时候，Future.get()方法会抛出异常，所以异常捕获是没问题的。但是当方法是不带返回值的时候，那么此时主线程就不能捕获到异常，需要额外的配置来处理异常，可以有下面两种方式。
+
+1. 通过try-catch处理异常
+
+   直接在异步方法中使用try-catch来处理抛出的异常。这个方法也可以用于带Future返回值的异步方法。
+
+2. 通过重写`getAsyncUncaughtExceptionHandler`方法
+
+   ```java
+   @Configuration
+   @EnableAsync
+   public class SpringAsyncConfig implements AsyncConfigurer {
+       @Override
+       public Executor getAsyncExecutor() {
+           // 省略自定义线程池的代码
+       }
+   
+       // 自定义异常处理
+       @Override
+       public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+           return new AsyncUncaughtExceptionHandler() {
+               @Override
+               public void handleUncaughtException(Throwable throwable, Method method, Object... objects) {
+                   System.out.println(method.getName() + "发生异常！异常原因：" + throwable.getMessage() );
+               }
+           };
+       }
+   }
+   ```
+
+   
+
+
+
+
+

@@ -1823,3 +1823,109 @@ try {  // futureTask的 get操作需要try
 }
 ```
 
+## BlockingQueue
+
+java.util.concurrent.BlockingQueue 接口有以下阻塞队列的实现：
+
+- **FIFO 队列** ：LinkedBlockingQueue、ArrayBlockingQueue（固定长度）
+- **优先级队列** ：PriorityBlockingQueue
+
+提供了阻塞的 take() 和 put() 方法：如果队列为空 take() 将阻塞，直到队列中有内容；如果队列为满 put() 将阻塞，直到队列有空闲位置。
+
+**使用 BlockingQueue 实现生产者消费者问题**
+
+```java
+public class ProducerConsumer {
+    private static BlockingQueue<String> queue = new ArrayBlockingQueue<>(5); // 固定长度阻塞队列
+    private static class Producer extends Thread {  // 模拟生产者
+        @Override
+        public void run() {
+            try {
+                queue.put("product");  // 放入队列
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.print("produce..");
+        }
+    }
+
+    private static class Consumer extends Thread { // 模拟消费者
+        @Override
+        public void run() {
+            try {
+                String product = queue.take();  // 弹出队列
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            System.out.print("consume..");
+        }
+    }
+}
+public static void main(String[] args) {
+    for (int i = 0; i < 2; i++) {
+        Producer producer = new Producer();
+        producer.start();
+    }
+    for (int i = 0; i < 5; i++) {
+        Consumer consumer = new Consumer();
+        consumer.start();
+    }
+    for (int i = 0; i < 3; i++) {
+        Producer producer = new Producer();
+        producer.start();
+    }
+}// produce..produce..consume..consume..produce..consume..produce..consume..produce..consume..
+```
+
+##  ForkJoin
+
+主要用于并行计算中，和 MapReduce 原理类似，都是把大的计算任务拆分（fork方法）成多个小任务并行计算，再汇总结果（join方法）
+
+核心代码是ForkJoinExample，继承RecursiveTask，在`compute()`方法中，关键是如何拆分出子任务并且提交子任务。
+
+ForkJoin 使用 ForkJoinPool 来启动，它是一个特殊的线程池，线程数量取决于 CPU 核数。
+
+```java
+public class ForkJoinExample extends RecursiveTask<Integer> {
+    private final int threshold = 5;
+    private int first;
+    private int last;
+
+    public ForkJoinExample(int first, int last) {
+        this.first = first;
+        this.last = last;
+    }
+
+    @Override
+    protected Integer compute() {
+        int result = 0;
+        if (last - first <= threshold) {
+            // 任务足够小则直接计算
+            for (int i = first; i <= last; i++) {
+                result += i;
+            }
+        } else {
+            // 拆分成子任务
+            int middle = first + (last - first) / 2;  // 二分法
+            ForkJoinExample leftTask = new ForkJoinExample(first, middle);
+            ForkJoinExample rightTask = new ForkJoinExample(middle + 1, last);
+            // fork方法并行执行每个子任务
+            leftTask.fork();
+            rightTask.fork();
+            // 或者用invokeAll执行所有子任务
+            // invokeAll(leftTask, rightTask);
+            
+            // join方法汇总结果
+            result = leftTask.join() + rightTask.join();
+        }
+        return result;
+    }
+
+    public static void main(String[] args) throws ExecutionException, InterruptedException {
+        ForkJoinExample example = new ForkJoinExample(1, 10000); // 计算1到10000的累加
+        ForkJoinPool forkJoinPool = new ForkJoinPool();  // 创建特殊线程池
+        Future result = forkJoinPool.submit(example);  // 将任务提交给线程池
+        System.out.println(result.get());
+    }
+}
+```
