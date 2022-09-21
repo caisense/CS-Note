@@ -556,7 +556,249 @@ A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Rep
 
 
 
+## Filter过滤器
 
+过滤器可以拦截方法的 **请求和响应**`(ServletRequest request, ServletResponse response)`,并对请求响应做出过滤操作。
+
+过滤器 **依赖于servlet容器**，基于函数回调实现。随web应用的启动而启动，只初始化一次，随web应用的停止而销毁。
+
+1. 启动服务器时加载过滤器的实例，并调用init()方法来初始化实例
+2. 每一次请求时都只调用方法doFilter()进行处理；
+3. 停止服务器时（stop Spring应用）调用destroy()方法，销毁实例。
+
+使用
+
+1. 实现Filter接口（引入 javax.servlet.*），重写init、doFilter和destroy方法
+2. a)实现类加上@Component注解
+
+```java
+@Component
+public class TimeFilter implements Filter {
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        System.out.println("=======================time filter init======================");
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        System.out.println("======================time filter start======================");
+        long startTime =  System.currentTimeMillis();
+
+        chain.doFilter(request, response);  // 在重写的doFilter中调用FilterChain实例的doFilter方法
+
+        long endTime = System.currentTimeMillis();
+        System.out.println("time filter 消耗"+ (endTime - startTime) + "ms");
+        System.out.println("======================time filter end ======================");
+    }
+
+    @Override
+    public void destroy() {
+        System.out.println("======================time filter destroy======================");
+    }
+}
+```
+
+b)或用配置类注册Filter
+
+```java
+@Configuration
+public class FilterConfiguration {
+    // 返回一个用于注册filter的bean
+    @Bean
+    public FilterRegistrationBean<TimeFilter> timeFilter() {
+        FilterRegistrationBean<TimeFilter> registrationBean = new FilterRegistrationBean<>();
+        TimeFilter timeFilter = new TimeFilter();
+        registrationBean.setFilter(timeFilter);   // 设置Filter
+        List<String> urls = new ArrayList<>();
+        urls.add("/*");
+        registrationBean.setUrlPatterns(urls);  // 设置要过滤的url
+        // 注意一定要设置过滤的url，否则会将静态资源也过滤进来
+        // 从而报转换错误：java.lang.ClassCastException:
+        //        org.springframework.web.servlet.resource.ResourceHttpRequestHandler cannot be cast to
+        //        org.springframework.web.method.HandlerMethod
+        return registrationBean;
+    }
+}
+```
+
+从doFilter方法的参数可知，filter里面是能够获取到**请求**的参数和**响应**的数据；但此方法是无法知道是哪一个Controller类中的哪个方法被执行。
+
+**注意**
+
+Filter中是没法使用注入的bean的，也就是无法使用@Autowired
+
+```java
+@Component
+public class TimeFilter implements Filter {
+    // 注入的值为null
+    @Autowired
+    private UserService userService;
+}
+```
+
+Spring中，web应用启动的顺序是：listener->filter->servlet，先初始化listener，然后再来就filter的初始化，再接着才到我们的dispathServlet的初始化，因此，当我们需要在filter里注入一个注解的bean时，就会注入失败，因为filter初始化时，注解的bean还没初始化，没法注入。
+
+## Interceptor拦截器
+
+依赖于springMVC框架，基于反射实现（aop机制）
+
+**使用**
+
+1. 引入import org.springframework.web.servlet.HandlerInterceptor;
+
+2. 实现`HandlerInterceptor`接口
+
+   主要实现三个方法
+
+   - `preHandle(request, response, handler)`：方法**执行前**触发。可以获取到方法的请求、响应和Controller对象（就是入参的handler）
+
+   - `postHandle(request, response, handler)`：方法**执行后**触发。参数和`preHandle()`相同。注意当controller内部**有异常时不执行**
+
+   - `afterCompletion(request, response, handler, exception)`：不管controller内部是否有异常，**都会执行**此方法；此方法还会有个Exception ex这个参数；如果有异常，ex会有异常值；没有异常则ex为null
+   
+     注意：如果controller内部有异常，但异常被@ControllerAdvice 统一捕获的话，ex也会为null
+
+```java
+@Component
+public class TimeInterceptor implements HandlerInterceptor {
+    @Override
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception{
+        System.out.println("================preHandle================");
+        // 强转为HandlerMethod后，获取类名
+        System.out.println("获取类名：" + ((HandlerMethod)handler).getBean().getClass().getName());
+        // 强转为HandlerMethod后，获取方法名
+        System.out.println("获取方法名" + ((HandlerMethod)handler).getMethod().getName());
+        request.setAttribute("startTime", System.currentTimeMillis());
+        return true;
+    }
+
+    @Override
+    public void postHandle(HttpServletRequest request, HttpServletResponse response, Object handler, ModelAndView modelAndView) throws Exception {
+        System.out.println("================postHandle================");
+        Long startTime = (Long) request.getAttribute("startTime");
+        System.out.println("time interceptor postHandle 耗时" + (System.currentTimeMillis() - startTime));
+    }
+
+    @Override
+    public void afterCompletion(HttpServletRequest request, HttpServletResponse response, Object handler, Exception ex) throws  Exception {
+        System.out.println("================afterCompletion================");
+        Long startTime = (Long) request.getAttribute("startTime");
+        System.out.println("time interceptor postHandle 耗时" + (System.currentTimeMillis() - startTime));
+        System.out.println("Exception is： "+ex);
+    }
+}
+```
+
+
+
+3. 实现WebMvcConfigurer类，重写其`addInterceptors`方法，将2中实现的接口注册到登记类中
+
+```java
+@Configuration
+public class WebConfigurer implements WebMvcConfigurer {
+    @Autowired
+    private TimeInterceptor timeInterceptor;  // 注入自定义拦截器
+
+    //这个方法用来注册拦截器，我们自己写好的拦截器需要通过这里添加注册才能生效
+    @Override
+    public void addInterceptors(InterceptorRegistry registry) {
+        // 拦截所有请求
+        registry.addInterceptor(timeInterceptor).addPathPatterns("/**");
+    }
+}
+```
+
+**总结**
+
+虽然拦截器可以获取Controller和方法，但却获取不到方法参数。因为在DispatcherServlet类的doDispatch方法中，拦截器的preHandler方法实际上由applyPreHandle方法执行，HandlerMethod没有从request中获取请求参数，来组装方法参数，而是在ha.handle这个方法的时候，才会组装参数
+
+## Aspect切面
+
+AOP操作可以对操作进行横向的拦截。最大的优势在于他可以**获取执行方法的参数**，对方法进行统一的处理。常见使用日志、事务、请求参数校验等
+
+增加依赖：
+
+```xml
+<dependency>
+    <groupId>org.springframework.boot</groupId>
+    <artifactId>spring-boot-starter-aop</artifactId>
+    <scope>test</scope>
+</dependency>
+<dependency>
+    <groupId>org.aspectj</groupId>
+    <artifactId>aspectjweaver</artifactId>
+</dependency>
+```
+
+实现切面：
+
+```java
+@Component
+@Aspect
+public class TimeAspect {
+    @Around(" execution(* com.tywl.schedule.controller.UserController.*(..))")  // 指定要切的方法，此处为UserController中的全部
+    public Object handlerControllerMethod(ProceedingJoinPoint pjp) throws Throwable {
+        System.out.println("============time aspect begin============");
+
+        Object[] args = pjp.getArgs();
+        for (Object arg : args) {
+            System.out.println("arg is:" + arg);
+        }
+
+        long start = new Date().getTime();
+        Object object = pjp.proceed();
+        System.out.println("time aspect 耗时：" + ((new Date().getTime()) - start));
+        System.out.println("============time aspect end============");
+        return object;
+    }
+}
+```
+
+## 三者总结
+
+|      | Filter                                                       | Interceptor                                                  | Aspect                                   |
+| ---- | ------------------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------- |
+| 参数 | HttpServletRequest request, HttpServletResponse response     | HttpServletRequest request, HttpServletResponse response, Object handler | ProceedingJoinPoint pjp                  |
+| 特性 | 可以拿到原始的HTTP请求和响应，但无法获取请求Controller，以及Controller中的方法 | 可以拿到HTTP请求和响应和Controller和方法，但拿不到方法的参数 | 可以拿到方法参数，但拿不到HTTP请求和响应 |
+
+同时采用，发起请求的输出顺序：
+
+```
+2022-09-22 01:22:18.302  INFO 24116 --- [           main] o.s.web.context.ContextLoader            : Root WebApplicationContext: initialization completed in 703 ms
+=======================time filter init======================
+2022-09-22 01:22:18.372  INFO 24116 --- [           main] c.u.j.r.DefaultLazyPropertyResolver      : Property Resolver custom Bean not found with name 'encryptablePropertyResolver'. Initializing Default Property Resolver
+2022-09-22 01:22:18.373  INFO 24116 --- [           main] c.u.j.d.DefaultLazyPropertyDetector      : Property Detector custom Bean not found with name 'encryptablePropertyDetector'. Initializing Default Property Detector
+2022-09-22 01:22:18.568  INFO 24116 --- [           main] o.s.s.c.ThreadPoolTaskScheduler          : Initializing ExecutorService 'taskScheduler'
+2022-09-22 01:22:18.653  INFO 24116 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+2022-09-22 01:22:18.715  WARN 24116 --- [           main] ion$DefaultTemplateResolverConfiguration : Cannot find template location: classpath:/templates/ (please add some templates or check your Thymeleaf configuration)
+2022-09-22 01:22:18.834  INFO 24116 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8085 (http) with context path ''
+2022-09-22 01:22:18.836  INFO 24116 --- [           main] com.tywl.schedule.ScheduleApplication    : Started ScheduleApplication in 1.479 seconds (JVM running for 6.791)
+2022-09-22 01:22:26.060  INFO 24116 --- [nio-8085-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2022-09-22 01:22:26.060  INFO 24116 --- [nio-8085-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2022-09-22 01:22:26.064  INFO 24116 --- [nio-8085-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 4 ms
+======================time filter start======================
+================preHandle================
+获取类名：com.tywl.schedule.controller.UserController$$EnhancerBySpringCGLIB$$5f87e173
+获取方法名test
+============time aspect begin============
+==============执行test方法====================
+time aspect 耗时：1
+============time aspect end============
+================postHandle================
+time interceptor postHandle 耗时28
+================afterCompletion================
+time interceptor postHandle 耗时28
+Exception is： null
+time filter 消耗32ms
+======================time filter end ======================
+2022-09-22 01:22:32.334  INFO 24116 --- [extShutdownHook] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+2022-09-22 01:22:32.335  INFO 24116 --- [extShutdownHook] o.s.s.c.ThreadPoolTaskScheduler          : Shutting down ExecutorService 'taskScheduler'
+======================time filter destroy======================
+```
+
+示意图：
+
+<img src="images/Spring常见问题/8701b36673e94fc887f403f35783f06dnoop.image_iz=58558&from=article.png" alt="img" style="zoom: 25%;" />
 
 # Spring常用注解
 
