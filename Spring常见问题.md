@@ -369,9 +369,158 @@ public class ForwardServlet extends HttpServlet {
                  └────────────────────┘
 ```
 
+## Filter过滤器
+
+过滤器是Servlet规范的组件，对 **请求和响应**`(ServletRequest request, ServletResponse response)`进行预处理。
+
+过滤器 **依赖于servlet容器**，基于函数回调实现。随web应用的启动而启动，只初始化一次，随web应用的停止而销毁。
+
+1. 启动服务器时加载过滤器的实例，并调用init()方法来初始化实例
+2. 每一次请求时都只调用方法doFilter()进行处理；
+3. 停止服务器时（stop Spring应用）调用destroy()方法，销毁实例。
+
+**使用**
+
+1. 实现Filter接口（引入 javax.servlet.*），重写init、doFilter和destroy方法
+2. a)实现类加上@Component注解
+
+```java
+@Component
+public class TimeFilter implements Filter {
+    @Override
+    public void init(FilterConfig filterConfig) throws ServletException {
+        System.out.println("=======================time filter init======================");
+    }
+
+    @Override
+    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
+        System.out.println("======================time filter start======================");
+        long startTime =  System.currentTimeMillis();
+
+        chain.doFilter(request, response);  // 在重写的doFilter中调用FilterChain实例的doFilter方法
+
+        long endTime = System.currentTimeMillis();
+        System.out.println("time filter 消耗"+ (endTime - startTime) + "ms");
+        System.out.println("======================time filter end ======================");
+    }
+
+    @Override
+    public void destroy() {
+        System.out.println("======================time filter destroy======================");
+    }
+}
+```
+
+b)若要指定过滤的url，在过滤器实现类加`@WebFilter()`，启动类加`@ServletComponentScan`
+
+```java
+@WebFilter("/user/*")  // 参数填要过滤的url
+public class TimeFilter implements Filter {
+	...
+}
+```
+
+c)或用配置类注册Filter，也可设置过滤的url
+
+```java
+@Configuration
+public class FilterConfiguration {
+    // 返回一个用于注册filter的bean
+    @Bean
+    public FilterRegistrationBean<TimeFilter> timeFilter() {
+        FilterRegistrationBean<TimeFilter> registrationBean = new FilterRegistrationBean<>();
+        TimeFilter timeFilter = new TimeFilter();
+        registrationBean.setFilter(timeFilter);   // 设置Filter
+        List<String> urls = new ArrayList<>();
+        urls.add("/*");
+        registrationBean.setUrlPatterns(urls);  // 设置要过滤的url
+        // 注意一定要设置过滤的url，否则会将静态资源也过滤进来
+        // 从而报转换错误：java.lang.ClassCastException:
+        //        org.springframework.web.servlet.resource.ResourceHttpRequestHandler cannot be cast to
+        //        org.springframework.web.method.HandlerMethod
+        return registrationBean;
+    }
+}
+```
+
+从doFilter方法的参数可知，filter里面是能够获取到**请求**的参数和**响应**的数据；但此方法是无法知道是哪一个Controller类中的哪个方法被执行。
+
+**注意**
+
+Filter中是没法使用注入的bean的，也就是无法使用@Autowired
+
+```java
+@Component
+public class TimeFilter implements Filter {
+    // 注入的值为null
+    @Autowired
+    private UserService userService;
+}
+```
+
+Spring中，web应用启动的顺序是：listener->filter->servlet，先初始化listener，然后再来就filter的初始化，再接着才到我们的dispathServlet的初始化，因此，当我们需要在filter里注入一个注解的bean时，就会注入失败，因为filter初始化时，注解的bean还没初始化，没法注入。
+
+此外对请求和响应进行预处理时，注意不要影响原始的请求和响应，用**代理**模式”复制“一份再处理，参考：
+
+[修改请求](https://www.liaoxuefeng.com/wiki/1252599548343744/1328976435871777)
+
+[修改响应](https://www.liaoxuefeng.com/wiki/1252599548343744/1328976456843298)
 
 
 
+## Listener监听器
+
+与Filter一样也是Servlet规范的组件，一般来说Listener启动在Filter之前，销毁在其后。
+
+其中最常用的是`ServletContextListener`,它会在整个Web应用程序初始化完成后，以及Web应用程序关闭后获得回调通知。一个Web服务器可以运行一个或多个WebApp，对于每个WebApp，Web服务器都会为其创建一个全局唯一的`ServletContext`实例
+
+```java
+@WebListener  // 务必加这个注解，同时在启动类加@ServletComponentScan
+public class AppListener implements ServletContextListener {
+    // 在此初始化WebApp,例如打开数据库连接池等:
+    public void contextInitialized(ServletContextEvent sce) {
+        System.out.println("WebApp initialized: ServletContext = " + sce.getServletContext());
+    }
+
+    // 在此清理WebApp,例如关闭数据库连接池等:
+    public void contextDestroyed(ServletContextEvent sce) {
+        System.out.println("WebApp destroyed.");
+    }
+}
+```
+
+除了`ServletContextListener`外，还有几种Listener：
+
+- HttpSessionListener：监听HttpSession的创建和销毁事件；
+- ServletRequestListener：监听ServletRequest请求的创建和销毁事件；
+- ServletRequestAttributeListener：监听ServletRequest请求的属性变化事件（即调用`ServletRequest.setAttribute()`方法）；
+- ServletContextAttributeListener：监听ServletContext的属性变化事件（即调用`ServletContext.setAttribute()`方法）；
+
+用于监听请求的ServletRequestListener用法：
+
+```java
+@WebListener
+public class MyServletRequestListener implements ServletRequestListener {
+    @Override
+    public void requestInitialized(ServletRequestEvent sre) {  // 监听请求建立
+        System.out.println("requestInitialized" + "," + new Date());
+        Object count = sre.getServletContext().getAttribute("count");  // 从请求中获取ServletContext实例，并取count属性，作为访问次数统计
+        Integer cInteger = 0;
+        if (count != null) {
+            cInteger = Integer.valueOf(count.toString());
+        }
+        System.out.println("历史访问次数：" + count);
+        cInteger++;
+        sre.getServletContext().setAttribute("count", cInteger);
+    }
+    
+    @Override
+    public void requestDestroyed(ServletRequestEvent sre) {  // 监听请求销毁
+        System.out.println("requestDestroyed" + "," + new Date());
+        System.out.println("当前访问次数：" + sre.getServletContext().getAttribute("count"));
+    }
+}
+```
 
 ## Q：jar包和war包的区别？
 
@@ -548,7 +697,7 @@ A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Rep
 
 只有当其中一个不是@Repository，或两个都不是，比如用@Service、@Controller或@Component时，才不会报错
 
-## @Component 和 @Configuration + @Bean 同时存在，创建bean用拿个？
+## @Component 和 @Configuration + @Bean 同时存在，创建bean用哪个？
 
 `allowBeanDefinitionOverriding=true;`，默认是允许BeanDefinition覆盖
 
@@ -556,87 +705,7 @@ A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Rep
 
 
 
-## Filter过滤器
 
-过滤器可以拦截方法的 **请求和响应**`(ServletRequest request, ServletResponse response)`,并对请求响应做出过滤操作。
-
-过滤器 **依赖于servlet容器**，基于函数回调实现。随web应用的启动而启动，只初始化一次，随web应用的停止而销毁。
-
-1. 启动服务器时加载过滤器的实例，并调用init()方法来初始化实例
-2. 每一次请求时都只调用方法doFilter()进行处理；
-3. 停止服务器时（stop Spring应用）调用destroy()方法，销毁实例。
-
-使用
-
-1. 实现Filter接口（引入 javax.servlet.*），重写init、doFilter和destroy方法
-2. a)实现类加上@Component注解
-
-```java
-@Component
-public class TimeFilter implements Filter {
-    @Override
-    public void init(FilterConfig filterConfig) throws ServletException {
-        System.out.println("=======================time filter init======================");
-    }
-
-    @Override
-    public void doFilter(ServletRequest request, ServletResponse response, FilterChain chain) throws IOException, ServletException {
-        System.out.println("======================time filter start======================");
-        long startTime =  System.currentTimeMillis();
-
-        chain.doFilter(request, response);  // 在重写的doFilter中调用FilterChain实例的doFilter方法
-
-        long endTime = System.currentTimeMillis();
-        System.out.println("time filter 消耗"+ (endTime - startTime) + "ms");
-        System.out.println("======================time filter end ======================");
-    }
-
-    @Override
-    public void destroy() {
-        System.out.println("======================time filter destroy======================");
-    }
-}
-```
-
-b)或用配置类注册Filter
-
-```java
-@Configuration
-public class FilterConfiguration {
-    // 返回一个用于注册filter的bean
-    @Bean
-    public FilterRegistrationBean<TimeFilter> timeFilter() {
-        FilterRegistrationBean<TimeFilter> registrationBean = new FilterRegistrationBean<>();
-        TimeFilter timeFilter = new TimeFilter();
-        registrationBean.setFilter(timeFilter);   // 设置Filter
-        List<String> urls = new ArrayList<>();
-        urls.add("/*");
-        registrationBean.setUrlPatterns(urls);  // 设置要过滤的url
-        // 注意一定要设置过滤的url，否则会将静态资源也过滤进来
-        // 从而报转换错误：java.lang.ClassCastException:
-        //        org.springframework.web.servlet.resource.ResourceHttpRequestHandler cannot be cast to
-        //        org.springframework.web.method.HandlerMethod
-        return registrationBean;
-    }
-}
-```
-
-从doFilter方法的参数可知，filter里面是能够获取到**请求**的参数和**响应**的数据；但此方法是无法知道是哪一个Controller类中的哪个方法被执行。
-
-**注意**
-
-Filter中是没法使用注入的bean的，也就是无法使用@Autowired
-
-```java
-@Component
-public class TimeFilter implements Filter {
-    // 注入的值为null
-    @Autowired
-    private UserService userService;
-}
-```
-
-Spring中，web应用启动的顺序是：listener->filter->servlet，先初始化listener，然后再来就filter的初始化，再接着才到我们的dispathServlet的初始化，因此，当我们需要在filter里注入一个注解的bean时，就会注入失败，因为filter初始化时，注解的bean还没初始化，没法注入。
 
 ## Interceptor拦截器
 
@@ -754,46 +823,79 @@ public class TimeAspect {
 }
 ```
 
-## 三者总结
+## Listener、Filter、Interceptor、Aspect总结
 
-|      | Filter                                                       | Interceptor                                                  | Aspect                                   |
-| ---- | ------------------------------------------------------------ | ------------------------------------------------------------ | ---------------------------------------- |
-| 参数 | HttpServletRequest request, HttpServletResponse response     | HttpServletRequest request, HttpServletResponse response, Object handler | ProceedingJoinPoint pjp                  |
-| 特性 | 可以拿到原始的HTTP请求和响应，但无法获取请求Controller，以及Controller中的方法 | 可以拿到HTTP请求和响应和Controller和方法，但拿不到方法的参数 | 可以拿到方法参数，但拿不到HTTP请求和响应 |
+|      | Filter                                                       | Interceptor                                                  | Aspect                                 |
+| ---- | ------------------------------------------------------------ | ------------------------------------------------------------ | -------------------------------------- |
+| 参数 | HttpServletRequest request, HttpServletResponse response     | HttpServletRequest request, HttpServletResponse response, Object handler | ProceedingJoinPoint pjp                |
+| 特性 | 可以拿到原始的HTTP请求和响应，但无法获取请求Controller，以及Controller中的方法 | 可以拿到HTTP请求和响应和Controller和方法，但拿不到方法的参数 | 可以拿到方法参数，但拿不到HTTP请求和响 |
+| 体系 | Servlet                                                      | Spring                                                       | Spring                                 |
 
-同时采用，发起请求的输出顺序：
+同时采用这几种组件，处理请求的顺序：
+
+Listener ->  Filter  -> Interceptor  ->  Aspect
+
+控制台输出：
+
+可以看到ServletContextListener最先执行，然后是Filter.init()，再到ServletRequestListener，再到TimeFilter.init()，到Filter.start()，再到HandlerInterceptor，再到Aspect，才到方法。
+
+即Listener与Filter可能是交织执行，并没有确定的顺序，具体要看是哪种Listener
 
 ```
-2022-09-22 01:22:18.302  INFO 24116 --- [           main] o.s.web.context.ContextLoader            : Root WebApplicationContext: initialization completed in 703 ms
+WebApp initialized: ServletContext = org.apache.catalina.core.StandardContext$NoPluggabilityServletContext@4a6c18ad
 =======================time filter init======================
-2022-09-22 01:22:18.372  INFO 24116 --- [           main] c.u.j.r.DefaultLazyPropertyResolver      : Property Resolver custom Bean not found with name 'encryptablePropertyResolver'. Initializing Default Property Resolver
-2022-09-22 01:22:18.373  INFO 24116 --- [           main] c.u.j.d.DefaultLazyPropertyDetector      : Property Detector custom Bean not found with name 'encryptablePropertyDetector'. Initializing Default Property Detector
-2022-09-22 01:22:18.568  INFO 24116 --- [           main] o.s.s.c.ThreadPoolTaskScheduler          : Initializing ExecutorService 'taskScheduler'
-2022-09-22 01:22:18.653  INFO 24116 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
-2022-09-22 01:22:18.715  WARN 24116 --- [           main] ion$DefaultTemplateResolverConfiguration : Cannot find template location: classpath:/templates/ (please add some templates or check your Thymeleaf configuration)
-2022-09-22 01:22:18.834  INFO 24116 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8085 (http) with context path ''
-2022-09-22 01:22:18.836  INFO 24116 --- [           main] com.tywl.schedule.ScheduleApplication    : Started ScheduleApplication in 1.479 seconds (JVM running for 6.791)
-2022-09-22 01:22:26.060  INFO 24116 --- [nio-8085-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
-2022-09-22 01:22:26.060  INFO 24116 --- [nio-8085-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
-2022-09-22 01:22:26.064  INFO 24116 --- [nio-8085-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 4 ms
+2022-09-22 16:05:24.461  INFO 39956 --- [           main] c.u.j.r.DefaultLazyPropertyResolver      : Property Resolver custom Bean not found with name 'encryptablePropertyResolver'. Initializing Default Property Resolver
+2022-09-22 16:05:24.462  INFO 39956 --- [           main] c.u.j.d.DefaultLazyPropertyDetector      : Property Detector custom Bean not found with name 'encryptablePropertyDetector'. Initializing Default Property Detector
+2022-09-22 16:05:24.630  INFO 39956 --- [           main] o.s.s.c.ThreadPoolTaskScheduler          : Initializing ExecutorService 'taskScheduler'
+2022-09-22 16:05:24.710  INFO 39956 --- [           main] o.s.s.concurrent.ThreadPoolTaskExecutor  : Initializing ExecutorService 'applicationTaskExecutor'
+2022-09-22 16:05:24.768  WARN 39956 --- [           main] ion$DefaultTemplateResolverConfiguration : Cannot find template location: classpath:/templates/ (please add some templates or check your Thymeleaf configuration)
+2022-09-22 16:05:24.868  INFO 39956 --- [           main] o.s.b.w.embedded.tomcat.TomcatWebServer  : Tomcat started on port(s): 8085 (http) with context path ''
+2022-09-22 16:05:24.870  INFO 39956 --- [           main] com.tywl.schedule.ScheduleApplication    : Started ScheduleApplication in 1.344 seconds (JVM running for 6.622)
+requestInitialized,Thu Sep 22 16:05:28 CST 2022
+历史访问次数：：null
+2022-09-22 16:05:28.243  INFO 39956 --- [nio-8085-exec-1] o.a.c.c.C.[Tomcat].[localhost].[/]       : Initializing Spring DispatcherServlet 'dispatcherServlet'
+2022-09-22 16:05:28.243  INFO 39956 --- [nio-8085-exec-1] o.s.web.servlet.DispatcherServlet        : Initializing Servlet 'dispatcherServlet'
+2022-09-22 16:05:28.247  INFO 39956 --- [nio-8085-exec-1] o.s.web.servlet.DispatcherServlet        : Completed initialization in 4 ms
 ======================time filter start======================
 ================preHandle================
-获取类名：com.tywl.schedule.controller.UserController$$EnhancerBySpringCGLIB$$5f87e173
+获取类名：com.tywl.schedule.controller.UserController$$EnhancerBySpringCGLIB$$e9f080f2
 获取方法名test
 ============time aspect begin============
 ==============执行test方法====================
 time aspect 耗时：1
 ============time aspect end============
 ================postHandle================
-time interceptor postHandle 耗时28
+time interceptor postHandle 耗时27
 ================afterCompletion================
-time interceptor postHandle 耗时28
+time interceptor postHandle 耗时27
 Exception is： null
-time filter 消耗32ms
+time filter 消耗31ms
 ======================time filter end ======================
-2022-09-22 01:22:32.334  INFO 24116 --- [extShutdownHook] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
-2022-09-22 01:22:32.335  INFO 24116 --- [extShutdownHook] o.s.s.c.ThreadPoolTaskScheduler          : Shutting down ExecutorService 'taskScheduler'
+requestDestroyed,Thu Sep 22 16:05:28 CST 2022
+当前访问次数：1
+requestInitialized,Thu Sep 22 16:05:34 CST 2022
+历史访问次数：：1
+======================time filter start======================
+================preHandle================
+获取类名：com.tywl.schedule.controller.UserController$$EnhancerBySpringCGLIB$$e9f080f2
+获取方法名test
+============time aspect begin============
+==============执行test方法====================
+time aspect 耗时：0
+============time aspect end============
+================postHandle================
+time interceptor postHandle 耗时2
+================afterCompletion================
+time interceptor postHandle 耗时2
+Exception is： null
+time filter 消耗2ms
+======================time filter end ======================
+requestDestroyed,Thu Sep 22 16:05:34 CST 2022
+当前访问次数：2
+2022-09-22 16:31:00.148  INFO 39956 --- [extShutdownHook] o.s.s.concurrent.ThreadPoolTaskExecutor  : Shutting down ExecutorService 'applicationTaskExecutor'
+2022-09-22 16:31:00.149  INFO 39956 --- [extShutdownHook] o.s.s.c.ThreadPoolTaskScheduler          : Shutting down ExecutorService 'taskScheduler'
 ======================time filter destroy======================
+WebApp destroyed.
 ```
 
 示意图：

@@ -74,13 +74,13 @@ long l = 9000000000000000000L;  // long型的结尾需要加L
 
 ### 2、浮点型
 
-对于float类型，需要加上`f`后缀。
+对于float类型，需要加上`f`后缀。对于double类型，后缀`d`可加可不加
 
 ```java
 float f1 = 3.14f;
 float f2 = 3.14e38f; // 科学计数法表示的3.14x10^38
 double d = 1.79e308;
-double d2 = -1.79e308;
+double d2 = -1.79e308d;  // double的
 double d3 = 4.9e-324; // 科学计数法表示的4.9x10^-324
 ```
 
@@ -121,6 +121,28 @@ BigInteger sum = i1.add(i2); // 12345678902469135780
 不可变，范围无限，精度无限，所以没有损失
 
 比较要用`compareTo()`
+
+注意直接用float和double创建BigDecimal会有精度误差，应该传入String类型创建
+
+```java
+public static void main(String[] args) {
+    BigDecimal bigDecimalD1  =  new BigDecimal(6.6);
+    System.out.println(bigDecimalD1);  // 6.5999999999999996447286321199499070644378662109375
+
+    BigDecimal bigDecimalF1  =  new BigDecimal(6.6f);
+    System.out.println(bigDecimalF1);  // 6.599999904632568359375
+
+    // 下面才是正确用法
+    BigDecimal bigDecimalD2  =  new BigDecimal(Double.toString(6.6));
+    System.out.println(bigDecimalD2); // 6.6
+
+    BigDecimal bigDecimalF2  =  new BigDecimal(Float.toString(6.6f));
+    System.out.println(bigDecimalF2); // 6.6
+    
+    BigDecimal bigDecimal  =  new BigDecimal("6.637456238568374657");
+    System.out.println(bigDecimal);  // 6.637456238568374657"
+}
+```
 
 ### 类型间转换
 
