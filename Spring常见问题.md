@@ -621,6 +621,291 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 
 SpringBoot内置Tomcat，在默认设置中，Tomcat的最大线程数是200，**最大连接数（并发量）是10000**。
 
+## BeanDefinition 
+
+表示Bean定义，BeanDefinition中存在很多属性用来描述一个Bean的特点。比如：
+
+- class，表示Bean类型 
+- scope，表示Bean作用域，单例或原型等 
+- lazyInit：表示Bean是否是懒加载 
+- initMethodName：表示Bean初始化时要执行的方法
+- destroyMethodName：表示Bean销毁时要执行的方法
+
+Bean定义有两种方式：声明式和定义式
+
+**声明式**
+
+1. xml格式 `<bean/>`  
+2. @Bean
+3. @Component、@Service、@Controller等
+
+**定义式**
+
+```java
+AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+// 生成一个BeanDefinition对象
+// 下面代码等同于@Component，如果用注解就由框架生成
+AbstractBeanDefinition beanDefinition =
+        BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
+// 设置beanClass等信息
+beanDefinition.setBeanClass(UserService.class);
+beanDefinition.setScope("prototype");
+// 注册到ApplicationContext中
+context.registerBeanDefinition("userService", beanDefinition);
+// 定义之后才能从容器中获取bean
+System.out.println(context.getBean("userService"));
+```
+
+
+
+## BeanDefinitionReader
+
+这些BeanDefinitionReader在我们使用Spring时用得少，但在Spring源码中用得多，相当于Spring源码的基础设施。
+
+**AnnotatedBeanDefinitionReader**
+
+可以直接把某个类转换为BeanDefinition，并且会解析该类上的**注解**。
+
+注意：它能解析的注解是：@Conditional，@Scope、@Lazy、@Primary、@DependsOn、@Role、@Description
+
+```java
+AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+AnnotatedBeanDefinitionReader annotatedBeanDefinitionReader = new
+        AnnotatedBeanDefinitionReader(context);
+// 调用register注册方法，将UserService.class解析为BeanDefinition
+annotatedBeanDefinitionReader.register(UserService.class);
+System.out.println(context.getBean("userService"));
+```
+
+AppConfig类：
+
+```java
+@ComponentScan("com.css.service")
+public class AppConfig {
+
+    @Bean
+    public UserService userService () {
+        return new UserService();
+    }
+}
+```
+
+**XmlBeanDefinitionReader**
+可以解析`<bean/>`标签
+
+**ClassPathBeanDefinitionScanner**
+虽然是扫描器，但是它的作用和`BeanDefinitionReader`类似，它可以扫描某个包路径，解析其中的类。例如：扫描到的类上如果存在@Component注解，那么就会把这个类解析为一个BeanDefinition
+
+```java
+// AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+// 以下三行等同上面一行操作
+// 如果用默认构造方法，则必须要先注册再刷新
+AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+context.register(AppConfig.class);
+context.refresh();
+ClassPathBeanDefinitionScanner scanner = new ClassPathBeanDefinitionScanner(context);
+scanner.scan("com.css");  // 扫描
+System.out.println(context.getBean("userService"));
+```
+
+## BeanFactory
+
+表示Bean工厂，负责创建Bean，并且提供获取Bean的API。 
+
+**“Spring容器”**就可以理解为BeanFactory
+
+BeanFactory接口存在一个非常重要的实现类是DefaultListableBeanFactory：
+
+```java
+DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
+// 创建beanDefinition
+AbstractBeanDefinition beanDefinition =
+        BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
+beanDefinition.setBeanClass(UserService.class);
+// 将beanDefinition注册到工厂
+beanFactory.registerBeanDefinition("userService", beanDefinition);
+System.out.println(beanFactory.getBean("userService"));
+```
+
+
+
+DefaultListableBeanFactory是非常强大的，支持很多功能，可以通过查看
+DefaultListableBeanFactory的类继承实现结构来看
+
+![微信截图_20221018112456](images/Spring常见问题/微信截图_20221018112456.png)
+
+## ApplicationContext
+
+是个接口，实际上继承自BeanFactory，不过比BeanFactory更加强大，在Spring源码的定义： 
+
+```java
+public interface ApplicationContext extends EnvironmentCapable, ListableBeanFactory, HierarchicalBeanFactory,   MessageSource, ApplicationEventPublisher, ResourcePatternResolver {
+    ... 
+} 
+```
+
+1. HierarchicalBeanFactory：拥有获取父BeanFactory的功能
+
+2. ListableBeanFactory：拥有获取beanNames的功能
+
+3. ResourcePatternResolver：资源加载器，可以一次性获取多个资源（文件资源等等）
+
+4. EnvironmentCapable：可以获取运行时环境（没有设置运行时环境功能）
+
+5. ApplicationEventPublisher：拥有广播事件的功能（没有添加事件监听器的功能）
+
+6. MessageSource：拥有国际化功能
+
+两个比较重要的实现类：
+
+- AnnotationConfigApplicationContext
+- ClassPathXmlApplicationContext
+
+### 资源加载
+
+是ApplicationContext继承自ResourcePatternResolver接口的功能，可以直接利用ApplicationContext获取某个文件，或访问URL
+
+```java
+public static void main(String[] args) throws IOException {
+    AnnotationConfigApplicationContext context = new
+            AnnotationConfigApplicationContext(AppConfig.class);
+    Resource resource = context.getResource("file://D:\\笔记\\CS-Note\\Spring常见问题.md");  // 绝对路径读取
+    // 获取长度
+    System.out.println(resource.contentLength());  // 69579
+    System.out.println(resource.getFilename());  // Spring常见问题.md
+    // resource.getFile();  // 也可以获取文件本身
+
+    Resource resource1 = context.getResource("classpath:application.properties");  // 读取classpath路径下
+    System.out.println(resource1.contentLength());  // 223
+
+    Resource resource2 = context.getResource("https://www.baidu.com");  // 读取URL
+    System.out.println(resource2.getURL()); // https://www.baidu.com
+    
+    Resource[] resources = context.getResources("classpath:com/css/*.class");// 用*表达式读取多个资源
+    for (Resource res : resources) {
+        System.out.println(res.getFilename());
+    }
+}
+```
+
+### 获取运行时环境
+
+是ApplicationContext继承自EnvironmentCapable接口的功能
+
+```java
+public static void main(String[] args) throws IOException {
+    AnnotationConfigApplicationContext context = new
+            AnnotationConfigApplicationContext(AppConfig.class);
+    Map<String, Object> systemEnvironment = context.getEnvironment().getSystemEnvironment(); // 获取系统环境信息
+    System.out.println(systemEnvironment);
+    System.out.println("=======");
+    Map<String, Object> systemProperties = context.getEnvironment().getSystemProperties();  // 获取java -d 传入的命令参数
+    System.out.println(systemProperties);
+    System.out.println("=======");
+     // 包含上面两个，以及properties文件的配置
+    MutablePropertySources propertySources = context.getEnvironment().getPropertySources();
+    System.out.println(propertySources);
+    System.out.println("=======");
+    System.out.println(context.getEnvironment().getProperty("NO_PROXY"));
+    System.out.println(context.getEnvironment().getProperty("sun.jnu.encoding"));
+    System.out.println(context.getEnvironment().getProperty("css"));
+}
+```
+
+### 事件发布
+
+先定义一个事件监听器
+
+```java
+@Bean
+public ApplicationListener applicationListener() {
+    return new ApplicationListener() {
+        @Override
+        public void onApplicationEvent(ApplicationEvent event) {
+            System.out.println("接收到了一个事件:" + event.getSource());
+            // 接收到了一个事件:org.springframework.context.annotation.AnnotationConfigApplicationContext@5d22bbb7, started on Fri Oct 21 16:19:18 CST 2022
+        }
+    };
+}
+```
+
+发布事件
+
+```java
+@Component("userService")
+@Scope("prototype")
+ //  实现这个接口，重写其setApplicationContext方法，获取spring容器ApplicationContext
+public class UserService implements ApplicationContextAware {
+	// spring容器
+    private ApplicationContext applicationContext;
+    
+    @Override
+    public void setApplicationContext(ApplicationContext applicationContext) throws BeansException {
+        this.applicationContext = applicationContext;
+    }
+    public void test() {
+        // 发布事件123
+        applicationContext.publishEvent("123");
+    }
+}
+```
+
+## 类型转换
+
+JDK中提供的类型转化工具类 
+
+```java
+public class StringToUserPropertyEditor extends PropertyEditorSupport implements PropertyEditor {
+    // 重写setAsText方法
+    @Override
+    public void setAsText(String text) throws IllegalArgumentException {
+        User user = new User();
+        user.setName(text);
+        this.setValue(user);
+    }
+}
+```
+
+```java
+@Component("userService")
+public class UserService  {
+
+    @Value("css123")
+    // 给User对象赋值“css123”，最终效果会给user的name属性赋值
+    private User user;
+
+    public void test() {
+        System.out.println(user.getName());  // 输出user的name属性
+    }
+}
+```
+
+如何向Spring中注册PropertyEditor：
+
+```java
+@Bean
+public CustomEditorConfigurer customEditorConfigurer() {
+    CustomEditorConfigurer customEditorConfigurer = new CustomEditorConfigurer();
+    Map<Class<?>, Class<? extends PropertyEditor>> propertyEditorMap = new HashMap<>();
+	// 表示StringToUserPropertyEditor可以将String转化成User类型
+    // 设置 map<目标类型， 使用的转换器>
+    propertyEditorMap.put(User.class, StringToUserPropertyEditor.class);
+    customEditorConfigurer.setCustomEditors(propertyEditorMap);
+    return customEditorConfigurer;
+}
+```
+
+测试
+
+```java
+public static void main(String[] args) throws IOException {
+    AnnotationConfigApplicationContext context = new
+            AnnotationConfigApplicationContext(AppConfig.class);
+    UserService userService = (UserService)context.getBean("userService");
+    userService.test(); //css123
+}
+```
+
 # Bean的生命周期
 
 Bean的生命周期指的就是：在Spring中，Bean是如何生成的？
@@ -634,6 +919,8 @@ Bean的生命周期指的就是：在Spring中，Bean是如何生成的？
 6. 如果原始对象中的某个方法被AOP了，那么则需要根据原始对象生成一个代理对象
 7. 把最终生成的代理对象放入单例池（源码中叫做singletonObjects）中，下次getBean()时就直接
     从单例池拿即可
+
+
 
 # SpringBoot是怎么启动的
 
@@ -693,7 +980,7 @@ public class B implements IB {
 }
 ```
 
-A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Repository，则spring无法启动，报错： Error creating bean with name 'a': Bean with name 'a' has been injected into other beans [b] in its raw version as part of a circular reference, but has eventually been wrapped. This means that said other beans do not use the final version of the bean. This is often the result of over-eager type matching - consider using 'getBeanNamesForType' with the 'allowEagerInit' flag turned off, for example.
+A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Repository，则spring无法启动，报错： Error creating bean with name 'a': Bean with name 'a' has been injected into other beans [b] in its raw version as part of a circular reference, but has eventually been wrapped. This means that said other beans do not use the final version of the bean. This is often the result of over-eager type matchin                                   
 
 只有当其中一个不是@Repository，或两个都不是，比如用@Service、@Controller或@Component时，才不会报错
 
@@ -923,7 +1210,61 @@ Field sysUserApi in com.eshore.cmp.corp.service.service.base.CorpBaseService req
 - @Repository注解可以标记在任何的类上，用来表明该类是用来执行与数据库相关的操作（即dao对象），并支持自动处理数据库操作产生的异常
 - @Service修饰服务（接口实现类）。如果你不知道要在项目的业务层采用@Service还是@Component注解。那么，@Service是一个更好的选择。
 
+## @ComponentScan
 
+扫描含有@Component的类，注入spring容器。包含@Component的注解也算，如：@Controller，@Service和@Repository
+
+**原理**
+
+org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#registerDefaultFilters
+
+方法中给includeFilters添加了@Component过滤器，因此默认扫描带@Component的类：
+
+```java
+this.includeFilters.add(new AnnotationTypeFilter(Component.class));
+```
+
+**value**
+
+指定扫描路径，默认扫描该注解修饰的当前类所在目录
+
+**ExcludeFilter 和 IncludeFilter**
+
+1.ExcludeFilter表示**排除过滤器**。
+
+比如以下配置，表示扫描com.zhouyu这个包下面的所有类，但是排除UserService类，也就是就算它上面有@Component注解也不会成为Bean。
+
+```java
+@ComponentScan(value = "com.css.service",
+        excludeFilters = {@ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = UserService.class)})
+public class AppConfig {
+}
+```
+
+2.IncludeFilter表示**包含过滤器**
+
+以下配置，即使UserService类没加@Component也能注入spring容器。
+
+```java
+@ComponentScan(value = "com.css.service",
+        includeFilters = {@ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = UserService.class)})
+public class AppConfig {
+}
+```
+
+FilterType分为：
+
+1. ANNOTATION：通过注解过滤
+2. ASSIGNABLE_TYPE：通过Class类型过滤
+3. ASPECTJ：Aspectj表达式过滤
+4. REGEX：正则表达式过滤
+5. CUSTOM：自定义 过滤 
+
+在Spring的扫描逻辑中，默认会添加一个**Annotation**类型的FilterType给includeFilters，表示默认情况下Spring会认为类上有@Component注解的就是Bean。  
 
 ## @Configuration
 
