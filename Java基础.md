@@ -792,6 +792,53 @@ JDK1.8 使用CAS 操作支持更高并发度，CAS失败时使用内置锁 synch
 
 
 
+### 5. LinkedHashMap
+
+继承自 HashMap，因此具有和 HashMap 一样的快速查找特性。
+
+  `public  class LinkedHashMap<K,V> extends HashMap<K,V> implements  Map<K,V>`  
+
+**与hashmap的不同**
+
+所有Entry用双向链表串起来
+
+ 
+
+#### 实现
+
+内部维护一个双向链表，用来维护插入顺序或LRU顺序
+
+```
+// 双向链表头是最久未使用的  
+transient  LinkedHashMap.Entry<K,V> head;    
+
+// 双向链表尾是最近刚使用的  
+transient  LinkedHashMap.Entry<K,V> tail;  
+```
+
+  
+
+accessOrder 决定了顺序，默认为 false，此时维护的是插入顺序。为true是LRU顺序
+
+```
+final  boolean accessOrder;
+//最重要的是以下用于维护顺序的函数，它们会在 put、get 等方法中调用。
+```
+
+#### 1、afterNodeAccess()
+
+
+get之后调用，如果 accessOrder 为 true，则会将该节点移到链表尾部（LRU顺序，最近使用的是尾，最久未使用是头）
+
+
+#### 2、afterNodeInsertion()
+
+put之后调用，如果removeEldestEntry() 返回true，则移除链表头
+removeEldestEntry() 默认为 false，若要返回true需要继承LinkedHashMap 并重写该方法
+
+
+
+
 ## 四、Stream
 
 是一种集合Stream<T> ，特点是无存储；适用于函数式编程；惰性执行。 

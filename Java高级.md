@@ -66,7 +66,19 @@ DataOutputStream dos = new DataOutputStream(OutputStream is);
 
 ### 常用字符流
 
-# JDBC
+# 序列化
+
+## 序列化和反序列化
+
+- 对象序列化，将对象以二进制的形式保存在硬盘上
+- 反序列化；将二进制的文件转化为对象读取
+- 实现serializable接口，不想让字段放在硬盘上就加transient
+
+## serialVersionUID
+
+如果用户没有自己声明一个serialVersionUID,接口会默认生成一个serialVersionUID
+但是强烈建议用户自定义一个serialVersionUID,因为默认的serialVersinUID对于class的细节非常敏感，反序列化时可能会导致InvalidClassException这个异常。
+（比如说先进行序列化，然后在反序列化之前修改了类，那么就会报错。因为修改了类，对应的SerialversionUID也变化了，而序列化和反序列化就是通过对比其SerialversionUID来进行的，一旦SerialversionUID不匹配，反序列化就无法成功。
 
 ## 基本使用
 

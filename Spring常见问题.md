@@ -734,6 +734,47 @@ DefaultListableBeanFactory的类继承实现结构来看
 
 ![微信截图_20221018112456](images/Spring常见问题/微信截图_20221018112456.png)
 
+
+
+**FactoryBean**
+
+我们可以通过BeanPostPorcessor来干涉Spring创建Bean的过程，但是如果我们想一个
+Bean完完全全由我们来创造，也是可以的，比如通过FactoryBean 
+
+```java
+@Component("userService")
+public class CssFactoryBean implements FactoryBean {
+
+    @Override
+    public Object getObject() throws Exception {
+        UserService userService = new UserService();
+        return userService;
+    }
+
+    @Override
+    public Class<?> getObjectType() {
+        return UserService.class;
+    }
+}
+//测试：
+public static void main(String[] args) throws IOException {
+        AnnotationConfigApplicationContext context = new
+                AnnotationConfigApplicationContext(AppConfig.class);
+        System.out.println(context.getBean("cssFactoryBean")); // com.css.service.UserService@548a102f
+        System.out.println(context.getBean("&&&cssFactoryBean")); // com.css.service.CssFactoryBean@5762806e
+}
+```
+
+ CssFactoryBean这个类实现了FactoryBean之后，从容器中getBean拿到的实际上是CssFactoryBean重写了getObject和getObjectType方法返回的bean。要获得CssFactoryBean这个bean本身，getBean传的名字要在前面加“&”。
+
+单例池singletonObjects中存的始终只有cssFactoryBean，而没有userService。factoryBeanObjectCache中存的key虽然为cssFactoryBean，指向却是userService实例
+
+### FactoryBean与@Bean区别？
+
+虽然都是创建bean，效果基本上一样，但@Bean会经过BeanPostPorcessor的初始化前和初始化后处理，而FactoryBean只会执行初始化后
+
+
+
 ## ApplicationContext
 
 是个接口，实际上继承自BeanFactory，不过比BeanFactory更加强大，在Spring源码的定义： 
@@ -1120,7 +1161,7 @@ public class TimeAspect {
 
 同时采用这几种组件，处理请求的顺序：
 
-Listener ->  Filter  -> Interceptor  ->  Aspect
+Listener ->  Filter  -> Interceptor  -> ControllerAdvice ->  Aspect。最后才到Controller层
 
 控制台输出：
 
@@ -1209,6 +1250,33 @@ Field sysUserApi in com.eshore.cmp.corp.service.service.base.CorpBaseService req
 
 - @Repository注解可以标记在任何的类上，用来表明该类是用来执行与数据库相关的操作（即dao对象），并支持自动处理数据库操作产生的异常
 - @Service修饰服务（接口实现类）。如果你不知道要在项目的业务层采用@Service还是@Component注解。那么，@Service是一个更好的选择。
+
+## @Scope
+
+只有一个参数：value，别名scopeName
+
+用法：
+
+- `singleton`：单例（默认），每次getBean都只返回同一个bean
+- `prototype`：原型，每次getBean返回一个新的bean
+- `request`: 表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP request内有效
+- `session`：表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP session内有效
+
+**多例失效场景**
+
+controller是默认的单例，对其Autowired注入的service层指定是多例时，多例失效。原因是多例service被单例controller依赖，而单例controller初始化时，多例的service注入，创建bean；单例controller调用service时，由于注入只有一次，因此调的还是注入时的service，即多例service没有起效
+
+解决：
+
+- 方法1: 不使用`@Autowired` ,每次调用多例的时候,直接调用bean
+
+- 方法2:spring的解决方法:设置`proxyMode`,每次请求的时候实例化
+
+  > `@Scope`注解添加了一个proxyMode的属性，有两个值`ScopedProxyMode.INTERFACES`和`ScopedProxyMode.TARGET_CLASS`，前一个表示表示Service是一个接口，后一个表示Service是一个类。
+
+```java
+@Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE, proxyMode = ScopedProxyMode.TARGET_CLASS)
+```
 
 ## @ComponentScan
 
@@ -1312,6 +1380,41 @@ FilterType分为：
        return user1;
    }
    ```
+
+## @Conditional
+
+参数：条件类。根据条件类返回的布尔值决定是否加载该类
+
+使用：
+
+```java
+@Component
+@Conditional(CssCondition.class)
+public class UserService {
+
+   public void test(){
+      System.out.println("test ");
+   }
+}
+```
+
+再写一个条件类，实现Condition接口
+
+```java
+public class CssCondition implements Condition {
+   @Override
+   public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+      try {
+         context.getClassLoader().loadClass("com.zhouyu.service.user");
+         return true;
+      } catch (ClassNotFoundException e) {
+         return false;
+      }
+   }
+}
+```
+
+spring容器就会根据CssCondition的返回布尔值决定是否加载UserService
 
 ## @Order
 
