@@ -103,11 +103,7 @@ git commit -m "init"
 git checkout -- <文件名>
 ```
 
-两种情况：
-
-文件在工作区
-
-1119
+注意：若文件已提交到分支，即commit，用checkout也无法撤销
 
 # 推送
 
@@ -117,7 +113,11 @@ git checkout -- <文件名>
 git push
 ```
 
+默认将当前分支推到origin，完整写法：
 
+```bash
+git push origin <分支名>
+```
 
 
 
@@ -179,6 +179,31 @@ git revert HEAD
 | HEAD | 往后回滚     | 继续向前移动，只是新的commit内容与之前正好相反 |
 |      |              |                                                |
 
+# 查看记录
+
+```bash
+git log
+```
+
+带参数，展示分支合并图
+
+```bash
+git log --graph --pretty=oneline --abbrev-commit
+*   cf810e4 (HEAD -> master) conflict fixed
+|\  
+| * 14096d0 (feature1) AND simple
+* | 5dc6824 & simple
+|/  
+* b17d20e branch test
+* d46f35e (origin/master) remove test.txt
+* b84166e add test.txt
+* 519219b git tracks changes
+* e43a48b understand how stage works
+* 1094adb append GPL
+* e475afc add distributed
+* eaadf4e wrote a readme file
+```
+
 # 分支
 
 分支之间的跳转，需要保证该分支下工作区、暂存区与分支提交相同，无修改：即git diff HEAD 无差异；否则在分支跳转时会出现报错情况，无法跳转
@@ -229,6 +254,8 @@ git branch -d <分支名>
 
 # 合并
 
+有两种方式：merge和rebase
+
 ## git merge
 
 合并指定分支到**当前**分支
@@ -267,7 +294,90 @@ git push origin master
 
 加上`--no-ff`参数就可以用普通模式合并，合并后的历史有分支，能看出来曾经做过合并，而`fast forward`合并就看不出来曾经做过合并。
 
+## git rebase
 
+中文翻译变基，主要作用是把本地未push的分叉提交历史整理成**直线**，使查看历史提交的变化时更容易。
+
+rebase：
+
+![img](images/Git/webp.webp)
+
+merge：
+
+<img src="images/Git/webp-1668793029095-3.webp" alt="img" style="zoom: 50%;" />
+
+**举例**
+
+在和远程分支同步后，我们对`hello.py`这个文件做了两次提交。用`git log`命令看看：
+
+```bash
+$ git log --graph --pretty=oneline --abbrev-commit
+* 582d922 (HEAD -> master) add author
+* 8875536 add comment
+* d1be385 (origin/master) init hello
+*   e5e69f1 Merge branch 'dev'
+|\  
+| *   57c53ab (origin/dev, dev) fix env conflict
+| |\  
+| | * 7a5e5dd add env
+| * | 7bd91f1 add new env
+...
+```
+
+注意到Git用`(HEAD -> master)`和`(origin/master)`标识出当前分支的HEAD和远程origin的位置分别是`582d922 add author`和`d1be385 init hello`，本地分支比远程分支快两个提交。
+
+尝试推送本地分支到远端：`git push origin master`。报失败
+
+原因是别人先于我们推送分支到远端。应该先pull一下，再用`git status`看看状态：
+
+```bash
+$ git status
+On branch master
+Your branch is ahead of 'origin/master' by 3 commits.
+  (use "git push" to publish your local commits)
+
+nothing to commit, working tree clean
+```
+
+加上刚才合并的提交，现在我们本地分支比远程分支超前3个提交。git log查看：
+
+```bash
+$ git log --graph --pretty=oneline --abbrev-commit
+*   e0ea545 (HEAD -> master) Merge branch 'master' of github.com:michaelliao/learngit
+|\  
+| * f005ed4 (origin/master) set exit=1
+* | 582d922 add author
+* | 8875536 add comment
+|/  
+* d1be385 init hello
+...
+```
+
+可以看到从"init hello"开始，有人和我们同时进行了提交，我们提了"author"和"comment"两个，对方提了"set exit=1"，发生分叉。
+
+此时如果先用git rebase进行合并，再git log查看
+
+```bash
+$ git log --graph --pretty=oneline --abbrev-commit
+* 7e61ed4 (HEAD -> master) add author
+* 3611cfe add comment
+* f005ed4 (origin/master) set exit=1
+* d1be385 init hello
+...
+```
+
+发现原本分叉的提交变成一条直线，我们的修改不再基于"init hello"，而是基于对方提交的"set exit=1"。
+
+现在就能成功push，再查看git log：
+
+```bash
+$ git log --graph --pretty=oneline --abbrev-commit
+* 7e61ed4 (HEAD -> master, origin/master) add author
+* 3611cfe add comment
+* f005ed4 set exit=1
+* d1be385 init hello
+...
+```
 
 # 比较
 
