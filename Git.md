@@ -4,15 +4,72 @@
 
 ![img](images/Git/0-1668705229763-2.jpg)
 
-工作区：包括新建文件、对已存在文件的修改
+## 工作区
+
+包括新建文件、对已存在文件的修改
 
 新建文件是Untracked files，对已存在文件的修改是Changes not staged for commit
 
-使用`git add`将工作区内容添加到暂存区（stage）
+用`git status`可以查看：
+
+```bash
+$ git status
+On branch master
+Changes not staged for commit:
+  (use "git add <file>..." to update what will be committed)
+  (use "git checkout -- <file>..." to discard changes in working directory)
+
+	modified:   readme.txt
+
+Untracked files:
+  (use "git add <file>..." to include in what will be committed)
+
+	LICENSE
+
+no changes added to commit (use "git add" and/or "git commit -a")
+```
+
+## 暂存区
+
+使用`git add`将工作区内容添加到**暂存区**（stage），状态变为Changes to be committed
+
+```bash
+$ git status
+On branch master
+Changes to be committed:
+  (use "git reset HEAD <file>..." to unstage)
+
+	new file:   LICENSE
+	modified:   readme.txt
+```
+
+注意：所有的修改都要经过git add才会进入暂存区，git add之后的修改不会进入暂存区
 
 再通过`git commit`就可以一次性把暂存区的所有修改提交到分支
 
+# 拉取
+
+```bash
+git pull
+```
+
+
+
+# 查看状态
+
+```bash
+git status
+```
+
+
+
 # 添加
+
+添加指定文件：
+
+```bash
+git add <文件路径>
+```
 
 将当前路径下所有文件添加到git跟踪记录（track）：
 
@@ -38,9 +95,29 @@ git rm <文件路径>
 git commit -m "init"
 ```
 
+# 撤销修改
 
+将文件从工作区或暂存区撤回
+
+```bash
+git checkout -- <文件名>
+```
+
+两种情况：
+
+文件在工作区
 
 # 推送
+
+把本地提交推送到远端
+
+```bash
+git push
+```
+
+
+
+
 
 # 撤回
 
@@ -64,7 +141,7 @@ git commit -m "init"
 
 3. mixed(默认)：默认的时候，只有暂存区变化
 
-   ```
+   ```bash
    git reset
    ```
 
@@ -100,37 +177,105 @@ git revert HEAD
 | HEAD | 往后回滚     | 继续向前移动，只是新的commit内容与之前正好相反 |
 |      |              |                                                |
 
+# 分支
+
+分支之间的跳转，需要保证该分支下工作区、暂存区与分支提交相同，无修改：即git diff HEAD 无差异；否则在分支跳转时会出现报错情况，无法跳转
+
+分支跳转完成后后，工作区目录会恢复到当前分支最近一次提交下的目录情况，即不同分支底下的目录内容即便存在差异，也不会互相干扰泾渭分明。
+
+## 查看分支
+
+查看当前所有分支：
+
+```bash
+git branch
+```
+
+
+
+## 创建分支
+
+```bash
+git branch <分支名>
+```
+
+## 切换分支
+
+最新版本git提供**switch**命令，不用再和checkout混淆
+
+```bash
+git switch <分支名>
+```
+
+## 创建+切换分支
+
+创建`dev`分支，然后切换到`dev`分支：
+
+```bash
+git switch -c dev
+```
+
+
+
+## 删除分支
+
+```bash
+git branch -d <分支名>
+```
+
+
+
 # 合并
 
 ## git merge
 
-最简洁用法
+合并指定分支到**当前**分支
 
-一、开发分支（dev）上的代码达到上线的标准后，要合并到 master 分支
+```bash
+git merge <分支名>
+```
 
-git checkout dev
+例如当前在master分支，要将dev分支合并到master：
 
-git pull
+```bash
+$ git merge dev
+Updating d46f35e..b17d20e
+Fast-forward
+ readme.txt | 1 +
+ 1 file changed, 1 insertion(+)
+```
 
+注意`Fast-forward`信息，Git告诉我们，这次合并是“快进模式”，也就是直接把`master`指向`dev`的当前提交，所以合并速度非常快。不是每次合并都能`Fast-forward`
+
+**常用合并方式**
+
+```bash
+#先切到开发分支，并拉到最新
+git checkout develop
+git pull origin develop
+#再切回主分支，并拉到最新
 git checkout master
+git pull origin master
+#使用--no-ff命令合并，并填写信息
+git merge develop --no-ff -m "merge dev to master"
+#提交
+git commit -m "develop merge to master"
+git push origin master
+```
 
-git merge dev
+加上`--no-ff`参数就可以用普通模式合并，合并后的历史有分支，能看出来曾经做过合并，而`fast forward`合并就看不出来曾经做过合并。
 
-git push -u origin master
 
- 
 
-二、当master代码改动了，需要更新开发分支（dev）上的代码
+# 比较
 
-git checkout master 
+查看工作区的某文件和最新版本的区别
 
-git pull 
+```bash
+git diff HEAD -- <文件名>
+```
 
-git checkout dev
 
-git merge master 
-
-git push -u origin dev
 
 # .gitignore
 
