@@ -961,6 +961,10 @@ Bean的生命周期指的就是：在Spring中，Bean是如何生成的？
 7. 把最终生成的代理对象放入单例池（源码中叫做singletonObjects）中，下次getBean()时就直接
     从单例池拿即可
 
+## getBean()
+
+可以用beanName获取容器的bean。可以用别名或多重别名（最终肯定能找到对应bean），存在aliasMap中，是一个map：<别名, 真实名>
+
 
 
 # SpringBoot是怎么启动的
@@ -1351,7 +1355,7 @@ FilterType分为：
 
 组件name必须是唯一的，否则会冲突。
 
-1. 方法无参
+1. 方法无参，则容器中注入的bean名称为方法名
 
    ```java
    // 配置类
@@ -1371,7 +1375,7 @@ FilterType分为：
 
 2. 方法带参
 
-   @Bean修饰的方法若带参数，则根据**形参类型**寻找容器组件
+   @Bean修饰的方法若带参数，则根据**形参类型**寻找容器组件。容器中注入的bean名称为传入参数
 
    ```java
    @Bean
@@ -1380,6 +1384,17 @@ FilterType分为：
        return user1;
    }
    ```
+   
+   带多个参数，其他参数是别名
+   
+   ```java
+   @Bean({"user", "user1", "user2"})			// 名字是user，有两个别名user1和user2
+   public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
+       return user1;
+   }
+   ```
+   
+   
 
 ## @Conditional
 
