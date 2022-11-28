@@ -967,6 +967,53 @@ Stream的中间操作得到的结果还是一个Stream，将一个Stream转换�
 
 # 方法
 
+## 形参
+
+**值传递**：传基本类型，不影响方法外部的变量
+
+**引用传递**：传引用类型（地址），有可能影响方法外部的变量
+
+此外引用传递还有两种情况：
+
+1. 直接对引用对象赋值
+
+   这样丝毫不会影响引用对象
+
+2. 调用引用对象的方法
+
+   会影响引用对象
+
+```java
+public class Exam {
+    String str = new String("good");
+    char[] ch = {'a','b','c'};
+
+    public static  void change(String str, char[] ch) {
+        str = "test ok";  // 情况1
+        ch[0] = 'g';  // 情况2（对数组某个元素赋值，相当于调用数组的方法)
+        ch = new char[]{'c', 'd', 'e'};  // 情况1
+    }
+    public static void setValue(StringBuilder str){
+        str = new StringBuilder("sss");  // 情况1
+    }
+    public static void setValue2(StringBuilder str){
+        str.append("sss");  // 情况2
+    }
+    public static void main(String[] args) {
+        Exam ex=  new Exam();
+        ex.change(ex.str, ex.ch);
+        System.out.println(ex.str);  // good
+        System.out.println(ex.ch); // gbc 
+        
+        StringBuilder str = new StringBuilder();
+        setValue(str);
+        System.out.println(str.toString()); //输出空字符串
+        setValue2(str);
+        System.out.println(str.toString()); //sss
+    }
+}
+```
+
 # 面向对象
 
 ## Object
