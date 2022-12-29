@@ -533,6 +533,101 @@ var sb = new StringBuilder();
 
 
 
+### 日期和时间
+
+#### Date
+
+`java.util.Date`是表示日期和时间的类，注意与`java.sql.Date`区分（后者用在数据库）。
+
+实际上存储了一个long类型的以**毫秒**表示的**时间戳**：
+
+```java
+public class Date implements Serializable, Cloneable, Comparable<Date> {
+    private transient long fastTime;
+    ...
+}
+```
+
+**Date与String的转换**
+
+用SimpleDateFormat类
+
+字符串解析为Date：
+
+```java
+// dateStr:待解析字符串
+// dateFormat：日期格式
+public static Date str2Date(String dateStr, String dateFormat) {
+    if (StringHelper.isEmpty(dateStr)) {
+        return null;
+    } else {
+        SimpleDateFormat df = new SimpleDateFormat(dateFormat);
+        try {
+            return df.parse(dateStr);  // 解析
+        } catch (Exception var4) {
+            return null;
+        }
+    }
+}
+```
+
+
+
+Date转字符串：
+
+```java
+//date：待转换日期
+// dateFormat：日期格式
+public static String date2Str(Date date, String dateFormat) {   
+    if (date == null) {
+        return null;
+    } else {
+        SimpleDateFormat df = new SimpleDateFormat(dateFormat); 
+        return df.format(date);  // 转换
+    }
+}
+```
+
+
+
+#### Calendar
+
+用于获取并设置年、月、日、时、分、秒，它和`Date`比，主要多了一个**日期和时间运算**的功能
+
+例如求前一天，直接用Calendar来加减，**不用额外考虑跨月跨年**
+
+```java
+public static String getLastDay() {
+    Calendar calendar = Calendar.getInstance();
+    // 设置日期格式
+    DateFormat df = new SimpleDateFormat(DateUtil.YYYYMMDD);
+    // 日期减一
+    calendar.set(Calendar.DATE, calendar.get(Calendar.DATE) -1);
+    return df.format(calendar.getTime());
+}
+```
+
+#### 计时
+
+都要用到System包的函数
+
+currentTimeMillis()返回的是系统当前时间和1970-01-01之前间隔时间的**毫秒数**
+
+```
+long start = System.currentTimeMillis();
+```
+
+nanoTime()的返回值本身则没有什么意义，因为它基于的时间点是随机的，甚至可能是一个未来的时间，所以返回值可能为负数。但是其精确度为**纳秒**，相对高了不少，一般用于计时器：
+
+```
+long start = System.nanoTime();
+Thread.currentThread().sleep(1000);            
+long end = System.nanoTime();            
+System.out.println(end-start);
+```
+
+
+
 ## 三、集合
 
 ### 1.数组 `[]`

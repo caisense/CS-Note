@@ -74,11 +74,43 @@ DataOutputStream dos = new DataOutputStream(OutputStream is);
 - 反序列化；将二进制的文件转化为对象读取
 - 实现serializable接口，不想让字段放在硬盘上就加transient
 
+序列化和反序列化需要遵循相同的协议，如阿里的 fastjson，谷歌的 ProtocolBuf，JDK 原生的序列化等
+
+手写序列化，利用jdk实现
+
+```java
+public class DefaultMessageProtocol implements MessageProtocol {
+    @Override
+    public RpcRequest unmarshallingReqMessage(byte[] data) throws Exception {
+        ObjectInputStream in = new ObjectInputStream(new ByteArrayInputStream(data));
+        return (RpcRequest) in.readObject();
+    }
+
+    @Override
+    public byte[] marshallingRespMessage(RpcResponse response) throws Exception {
+        return serialize(response);
+    }
+  
+   private byte[] serialize(Object obj) throws Exception {
+        ByteArrayOutputStream baos = new ByteArrayOutputStream();
+        ObjectOutputStream out = new ObjectOutputStream(baos);
+        out.writeObject(obj);
+        return baos.toByteArray();
+    }
+}
+```
+
+
+
 ## serialVersionUID
 
 如果用户没有自己声明一个serialVersionUID,接口会默认生成一个serialVersionUID
 但是强烈建议用户自定义一个serialVersionUID,因为默认的serialVersinUID对于class的细节非常敏感，反序列化时可能会导致InvalidClassException这个异常。
 （比如说先进行序列化，然后在反序列化之前修改了类，那么就会报错。因为修改了类，对应的SerialversionUID也变化了，而序列化和反序列化就是通过对比其SerialversionUID来进行的，一旦SerialversionUID不匹配，反序列化就无法成功。
+
+
+
+# JDBC
 
 ## 基本使用
 
@@ -774,7 +806,7 @@ markword结构（64位系统中是8B=64bit）
 
 实线连接表示配合使用
 
-发展路线：内存越来越大，**STW**（stop the world，停止所有用户线程）时间越来越短。从分代到不分代。
+发展路线：内存越来越大，**STW**时间越来越短。从分代到不分代。
 
 |                   | 管理内存 | STW时间 |
 | ----------------- | -------- | ------- |
@@ -786,9 +818,73 @@ markword结构（64位系统中是8B=64bit）
 
 
 
-#### 为什么要STW机制？
+#### Q：为什么要STW机制？
 
-如果不暂停线程，让其继续执行，会破坏GC Root的依赖关系，导致某些对象被回收，增加gc的复杂性
+如果不暂停线程，让其继续执行，会破坏GC Root的依赖关系，导致某些对象被回收，增加gc的复杂性。
+
+**STW**
+
+stop the world的简写，停止所有用户线程，所有线程进入**SafePoint**等待。
+
+**Safepoint** 
+
+可以理解成是在**代码执行过程中的一些特殊位置**，当线程执行到这些位置的时候，**线程可以暂停**。
+
+在 SafePoint 保存了其他位置没有的**一些当前线程的运行信息，供其他线程读取**。这些信息包括：线程上下文的任何信息，例如对象或者非对象的内部指针等等。信息的使用场景：
+
+1. 当需要 GC 时，需要知道哪些对象还被使用，或者已经不被使用可以回收了，这样就需要每个线程的对象使用情况。
+2. 对于偏向锁（Biased Lock），在高并发时想要解除偏置，需要线程状态还有获取锁的线程的精确信息。
+3. 对方法进行即时编译优化（OSR栈上替换），或者反优化（bailout栈上反优化），这需要线程究竟运行到方法的哪里的信息。
+
+线程只有运行到了 SafePoint 的位置，他的**一切状态信息才是确定的**
+
+**Safepoint 如何实现**
+
+SafePoint 可以插入到代码的某些位置，每个线程运行到 SafePoint 代码时，主动去检查是否需要进入 SafePoint，称为 **Polling**
+
+理论上，可以在每条 Java 编译后的字节码的边界，都放一个检查 Safepoint 的机器命令。线程执行到这里的时候，会执行 **Polling** 询问 JVM 是否需要进入 SafePoint，这个询问是会有性能损耗的，所以 JIT 会优化尽量减少 SafePoint。
+
+经过 **JIT 编译优化**的代码，会在下列放置一个 SafePoint：
+
+1. 所有方法的返回之前
+
+2. 所有非counted loop的循环（即：无界循环）回跳之前（即循环体末尾）
+
+   **注意**：对于明确有界的int循环，不会放置 SafePoint，如：
+
+   ```java
+   for (int i = 0; i < 100000000; i++) {
+       ...
+   }
+   ```
+
+   但是int换成**long**就还是会放置 SafePoint
+
+目的：防止发生 GC 需要 Stop the world 时，该线程一直不能暂停
+
+**STW时线程状态的变化**
+
+当线程处于下列5种状态：
+
+1. 运行字节码
+
+   运行字节码时，解释器会看线程是否被标记为 **poll armed**，如果是，VM 线程调用 `SafepointSynchronize::block(JavaThread *thread)`进行 block。
+
+2. 运行 native 代码
+
+   当运行 native 代码时，VM 线程略过这个线程，但是给这个线程设置 **poll armed**，让它在执行完 native 代码之后，它会检查是否 poll armed，如果还需要停在 SafePoint，则直接 block。
+
+3. 运行 JIT 编译好的代码
+
+   由于运行的是编译好的机器码，直接查看本地 local polling page 是否为脏，如果为脏则需要 block。这个特性是在 Java 10 引入的 [JEP 312: Thread-Local Handshakes](https://openjdk.java.net/jeps/312) 之后，才是只用检查本地 local polling page 是否为脏就可以了。
+
+4. 处于 BLOCK 状态
+
+   在需要所有线程需要进入 SafePoint 的操作完成之前，不许离开 BLOCK 状态
+
+5. 处于线程切换状态或者处于 VM 运行状态
+
+   会一直轮询线程状态直到线程处于阻塞状态（线程肯定会变成上面说的那四种状态，变成哪个都会 block 住）。
 
 #### 垃圾回收算法
 
