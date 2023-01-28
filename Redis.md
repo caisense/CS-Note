@@ -407,6 +407,12 @@ Redis集群系统满足**CAP理论中的CP**，cp系统还有zookeeper
 
 每个Redis节点负责处理一部分槽位，加入你有三个master节点 ABC，每个节点负责的槽位如下：节点A：0-5000，节点B：5001-10000，节点C：10001-16383
 
+## 集群脑裂
+
+因为网络问题，导致 Redis master 节点跟 slave 节点和 sentinel 集群处于不同的网络分区，因为 sentinel 集群无法感知到 master 的存在，所以将 slave 节点提升为 master 节点，此时存在**两个**不同的 master 节点。Redis Cluster 集群部署方式同理。
+
+<img src="images/Redis/redis-lock-08.png" alt="img" style="zoom: 67%;" />
+
 # 淘汰策略
 
 由前面我们知道redis放内存，然而内存是有限的，**内存满**时就会执行淘汰（回收）

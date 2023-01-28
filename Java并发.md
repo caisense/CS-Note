@@ -814,11 +814,22 @@ static ThreadLocal<User> ctx = new ThreadLocal<>();
 
 **好处**
 
-ThreadLocal相当于给**每个线程**都开辟了一个独立的存储空间，同一个线程共享同一个ThreadLocal，各个线程的ThreadLocal关联的实例互不干扰。
+ThreadLocal相当于给**每个线程**都开辟了一个独立的 存储空间，同一个线程共享同一个ThreadLocal，各个线程的ThreadLocal关联的实例互不干扰。
 
 普通的方法之间调用一定是**同一个线程**执行的（详情见jvm栈部分），因此一定能访问同一个ThreadLocal，实现共享变量，从而避免方法参数传递带来的代码耦合
 
 ### 内部结构
+
+Thread类内部保存着类型为ThreadLocalMap 的两个变量
+
+```java
+public class Thread implements Runnable {
+	/***********省略N行代码*************/
+	ThreadLocal.ThreadLocalMap threadLocals = null;
+	ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+	/***********省略N行代码*************/
+}
+```
 
 ThreadLocalMap 是 ThreadLocal 的 **内部类**，没有实现 Map 接口，用独立的方式实现了 Map 的功能，其内部的 Entry 也是独立实现。
 
@@ -826,37 +837,37 @@ ThreadLocalMap 是 ThreadLocal 的 **内部类**，没有实现 Map 接口，用
 
 Entry 中的 key 只能是 **ThreadLocal 对象**，value可以是任意类型。设计目的是只能通过 ThreadLocal 索引存储的数据。
 
-key使用**弱引用**WeakReference，目的是将ThreadLocal 对象的生命周期和线程的生命周期解绑
+Entry 使用**弱引用**WeakReference，目的是将ThreadLocal 对象的生命周期和线程的生命周期解绑
 
 ```java
 static class Entry extends WeakReference<ThreadLocal<?>> {
-    object value;
-    Entry(ThreadLocal<?> k, object v){
+    Object value;
+    Entry(ThreadLocal<?> k, Object v){
     	super(k);
     	value = v;
 	}
 }
 ```
 
-**使用弱引用就一定能避免内存泄漏吗**？
+**Q：使用弱引用就一定能避免内存泄漏吗？**
 
 <img src="https://mmbiz.qpic.cn/mmbiz_png/emOFDDdibbjJS9CaEEQta2bLHwCCT5OAhuaRokLu3DE9nMoYibYjN28icaNZoJ9LOEAT7N2uJliarDCVh6EqIrNicgg/640?wx_fmt=png&wxfrom=5&wx_lazy=1&wx_co=1" alt="图片" style="zoom:50%;" />
 
-如图，由于 ThreadLocalMap 只持有 ThreadLocal 的弱引用，没有任何强引用指向 threadlocal 实例，所以**threadlocal** 就可以顺利被 gc 回收，此时 Entry 中的 key=null 。
+不一定。如图，由于 ThreadLocalMap 只持有 ThreadLocal 的弱引用，没有任何强引用指向 threadlocal 实例，所以**threadlocal** 就可以顺利被 gc 回收，此时 Entry 中的 key=null 。
 
-但是在没有手动删除这个 Entry 以及 CurrentThread 依然运行的前提下，也存在有强引用链 CurrentThreadRef->CurrentThread -> threadLocalMap -> Entry -> value，因此**value** 不会被回收，只是由于key为null，这块 value 永远不会被访问到了，导致 value 内存泄漏。
+但是在没有手动删除这个 Entry 以及 CurrentThread 依然运行的前提下，考虑情况：CurrentThread 也使用了这个threadlocal ，因此也存在有强引用链 CurrentThreadRef->CurrentThread -> threadLocalMap -> Entry -> value，因此**value** 不会被回收，只是由于key为null，这块 value 永远不会被访问到了，导致 value 内存泄漏。
 
 
 
-#### 什么情况会造成内存泄露？
+#### Q：什么情况会造成内存泄露？
 
-在线程池中使用ThreadLocal。因为当ThreadLocal对象使用完后，应把设置的<key, value>回收，即回收Entry。
+在**线程池**中使用ThreadLocal。因为当ThreadLocal对象使用完后，应把设置的<key, value>回收，即回收Entry。
 
-但线程池中的线程不会回收，而线程对象通过强引用指向ThreadLocalMap，Map也是通过强引用指向Entry，因此Entry对象也不会回收，从而导致内存泄露。还有可能当线程再次启用执行其他代码时，将上一次的状态带入。
+但线程池中的线程不会回收，而线程对象通过强引用指向ThreadLocalMap，Map也是通过强引用指向Entry，因此Entry对象也不会回收，从而导致内存泄露。还有可能当线程被复用执行其他代码时，将上一次执行中存储的ThreadLocal带入。
 
 因此ThreadLocal一般搭配**try...finally**语句，保证最后一定执行remove
 
-**解决方法**
+**上面两种问题的解决方法**
 
 手动调用remove。优化：通过AutoCloseable接口配合try-with-resource语句，见下面例子
 
@@ -865,6 +876,7 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 为了保证能释放ThreadLocal关联的实例，我们可以通过AutoCloseable接口配合try-with-resource语句结构，让编译器自动为我们关闭
 
 ```java
+// 创建工具类
 public class ConnContext implements AutoCloseable {
     // ThreadLocal初始化
     static final ThreadLocal<Connection> ctx = new ThreadLocal<>();
@@ -883,6 +895,11 @@ public class ConnContext implements AutoCloseable {
     }
 }
 
+```
+
+在其他类中使用：
+
+```java
 // 实际使用时，安全获取连接，无需手动释放
 try (var ctx = new UserContext()) {
     Connection conn = ConnContext.currentConn();
