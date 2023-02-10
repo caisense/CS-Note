@@ -579,41 +579,70 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 5. 观察者模式：定义对象键一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的
 对象都会得到通知被制动更新，如Spring中listener的实现–ApplicationListener。
 
-## Bean生命周期
+# Bean生命周期
+
+# 一、Bean生成过程
+
+生成时机：
+
+流程：
 
 ![image-20221201010853186](images/Spring常见问题/image-20221201010853186.png)
 
-### 1.生成BeanDefinition  
+## 1.生成BeanDefinition  
 
    扫描流程
 
    ![Spring扫描底层流程](images/Spring常见问题/Spring扫描底层流程.png)
 
+实现：org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#scanCandidateComponents
 
+1. 首先，通过ResourcePatternResolver获得指定包路径（默认是classpath）下的所有 .class 文件，保存为**Resource**对象。
 
-1. 首先，通过ResourcePatternResolver获得指定包路径下的所有 .class 文件（Spring源码中将
-   此文件包装成了Resource对象）
+2. 遍历每个Resource，解析Resource对象得到**MetadataReader**（具体实现类为SimpleMetadataReader）
 
-2. 遍历每个Resource对象
+   利用MetadataReaderFactory，实现类为CachingMetadataReaderFactory  
 
-3. 利用MetadataReaderFactory解析Resource对象得到MetadataReader（在Spring源码中
-    MetadataReaderFactory具体的实现类为CachingMetadataReaderFactory，
-    MetadataReader的具体实现类为SimpleMetadataReader）
+3. 过滤：
 
-4. 利用MetadataReader进行excludeFilters和includeFilters，以及条件注解@Conditional的筛选
-    （条件注解并不能理解：某个类上是否存在@Conditional注解，如果存在则调用注解中所指定
-    的类的match方法进行匹配，匹配成功则通过筛选，匹配失败则pass掉。）
+   1.  利用MetadataReader进行@Component注解的**excludeFilters**和**includeFilters**判断，进行第一次过滤
+   2.  过滤后再进行条件注解**@Conditional**的筛选（条件注解并不能理解：某个类上是否存在@Conditional注解，如果存在则调用注解中所指定的类的match方法进行匹配，匹配成功则通过筛选，匹配失败则pass掉。）
 
-5. 筛选通过后，基于metadataReader生成ScannedGenericBeanDefinition
+4. 筛选通过后，基于MetadataReader生成**ScannedGenericBeanDefinition**
 
-6. 再基于metadataReader判断是不是对应的类是不是接口或抽象类
+5. 再基于MetadataReader判断：
 
-7. 如果筛选通过，那么就表示扫描到了一个Bean，将ScannedGenericBeanDefinition加入结果集
+   1. 必须是**独立类**（可以不依赖外部类来构造，即不能是内部类，但可以是静态内部类 ）
+   2. 不能是接口或抽象类
+
+6. 如果筛选通过，那么就表示扫描到了一个Bean，将ScannedGenericBeanDefinition加入结果集。最后得到候选BeanDefinition集合
+
+7. 遍历候选BeanDefinition集合
+
+   1. 读scope注解
+
+   2. 根据类名生成bean名字（规则：**首字母大写，直接转小写；多个大写字母开头，不转，直接用类名**）
+
+   3. 设置BeanDefinition的默认值（不使用lazy等）
+
+   4. 解析@Lazy、@Primary、@DependsOn等注解（实际上都是开关），为BeanDefinition设置开关
+
+   5. 检查**BeanDefinitionMap**中是否存在同名BeanDefinition。如果存在，再看是否兼容；兼容则跳过该bean，不兼容则抛错。
+
+      > 兼容指的是该BeanDefinition与已存在的等价，或者源自同一个类
+      >
+      > 两次扫描扫到相同bean就是兼容的，但同一次扫描扫到相同的bean就是不兼容的
+
+   6. 注册到BeanDefinitionMap
+
+      先生成BeanDefinitionHolder（其实就是BeanDefinitionMap + beanName）。如果有别名，beanName添加到**别名map**。最后写入DefaultListableBeanFactory的beanDefinitionMap<String, BeanDefinition>（ConcurrentHashMap类型）
+
+8. 
 
    
 
 MetadataReader表示类的元数据读取器，主要包含了一个AnnotationMetadata，功能有
-1. 获取类的名字、
+1. 获取类的名字
 2. 获取父类的名字
 3. 获取所实现的所有接口名
 4. 获取所有内部类的名字
@@ -625,123 +654,162 @@ MetadataReader表示类的元数据读取器，主要包含了一个AnnotationMe
 10. 获取类上添加的所有注解类型集合
 合
 
-值得注意的是，CachingMetadataReaderFactory解析某个.class文件得到MetadataReader对象是
-利用的ASM技术，并没有加载这个类到JVM。并且，最终得到的ScannedGenericBeanDefinition对
-象，beanClass属性存储的是当前类的名字，而不是class对象。（beanClass属性的类型是Object，
-它即可以存储类的名字，也可以存储class对象）
+值得注意的是，CachingMetadataReaderFactory解析某个.class文件得到MetadataReader对象是利用的ASM技术，并没有加载这个类到JVM。并且，最终得到的ScannedGenericBeanDefinition对象，beanClass属性存储的是当前类的**名字**，而不是class对象。（beanClass属性的类型是Object，它即可以存储类的名字，也可以存储class对象）
 
-最后，上面是说的通过扫描得到BeanDefinition对象，我们还可以通过直接定义BeanDefinition，或
-解析spring.xml文件的<bean/>，或者@Bean注解得到BeanDefinition对象。（后续课程会分析
-@Bean注解是怎么生成BeanDefinition的）。
+最后，上面是说的通过扫描得到BeanDefinition对象，我们还可以通过直接定义BeanDefinition，或解析spring.xml文件的<bean/>，或者@Bean注解得到BeanDefinition对象。（后续课程会分析@Bean注解是怎么生成BeanDefinition的）。
 
-### 2.合并BeanDefinition  
+## 2.合并BeanDefinition  
 
-   父子BeanDefinition实际用的比较少，使用是这样的，比如：
+实现：org.springframework.beans.factory.support.DefaultListableBeanFactory#preInstantiateSingletons
 
-   1. ```xml
-      <bean id="parent" **class**="com.zhouyu.service.Parent" scope="prototype"/>
-      <bean id="child" **class**="com.zhouyu.service.Child"/>
-      ```
+遍历DefaultListableBeanFactory的beanDefinitionNames，是bean名的列表
 
-   这么定义的情况下，child是单例Bean。
+1. 获取【合并后】的BeanDefinition
+
+   先从AbstractBeanFactory的 **mergedBeanDefinitions**（ConcurrentHashMap <String, RootBeanDefinition>）中取RootBeanDefinition
+
+   如果取不到，递归找父BeanDefinition合并，最后用子BeanDefinition属性覆盖父BeanDefinition属性
+
+2. 如果【非**抽象Bean** && 单例 && 非懒加载】，才处理
+
+3. `isFactoryBean()`判断是否为FactoryBean：先从**单例池**找；找不到再去找BeanDefinition，再递归找父的BeanFactory。
+
+   1. 如果是，要特殊处理：安全判断（如果系统有设置安全管理器），再看是否实现SmartFactoryBean接口（继承FactoryBean接口），有则getBean()创建bean对象（最终调用该类覆写的**getObject()**方法创建）
+   2. 如果不是，getBean()创建bean对象
+
+   所以FactoryBean很特殊，实现这个接口的bean类，可通过重写getObject()向spring容器注册自定义的bean（一般类注册的都是class为类自身的bean）
+
+4. 
+
+**抽象Bean**
+
+父子BeanDefinition实际用的比较少。例如，这么定义的情况下，child是单例Bean：
+
+```xml
+<bean id="parent" class="com.zhouyu.service.Parent" scope="prototype"/>
+<bean id="child" class="com.zhouyu.service.Child"/>
+```
+
+但是这么定义的情况下，child就是原型Bean了 ：
 
    ```xml
-   <bean id="parent" **class**="com.zhouyu.service.Parent" scope="prototype"/>
-   <bean id="child" **class**="com.zhouyu.service.Child" parent="parent"/>
+   <bean id="parent" class="com.zhouyu.service.Parent" scope="prototype"/>
+   <bean id="child" class="com.zhouyu.service.Child" parent="parent"/>
    ```
 
-   但是这么定义的情况下，child就是原型Bean了。  
+因为child的父BeanDefinition是parent，所以会继承parent上所定义的scope属性。
+而在根据child来生成Bean对象之前，需要进行BeanDefinition的合并，得到完整的child的
+BeanDefinition  。 
 
+抽象Bean  并不是指抽象类，而是抽象的xml bean。其唯一作用在于继承
 
-
-### 3.加载类
-
-BeanDefinition合并之后，就可以去创建Bean对象了，而创建Bean就必须实例化对象，而实例化就
-必须先加载当前BeanDefinition所对应的class，在AbstractAutowireCapableBeanFactory类的
-createBean()方法中，一开始就会调用：  
-
+```xml
+<bean id="parent" class="com.zhouyu.service.Parent" abstract="true"/>
+<bean id="child" class="com.zhouyu.service.Child"/>
 ```
+
+
+
+## getBean方法
+
+前期扫描是准备工作，这里真正开始创建bean
+
+AbstractBeanFactory 类的 `getBean(String name)`：返回一个bean，若容器没有就创建。
+
+具体逻辑在类内
+
+```java
+protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullable Object[] args, boolean typeCheckOnly)
+```
+
+
+
+1. 用bean名找BeanDefinition，如果没有就去父bean工厂找。
+
+2. 检查@DependsOn。遍历依赖该bean的所有bean，只用名字检查，依赖关系存入dependentBeanMap中。先创建该bean依赖的bean
+
+3. 开始创建，看@Scope。
+
+   1. 是单例，getSingleton()——传入一个lambda表达式（用于回调），先锁单例池，然后看池里是否有，没有就创建后加入池。
+   2. 是原型，创建一个对象
+   3. 是其他：request或session
+
+   三种情况都调**createBean()**（下文3.加载类详述）
+
+   最后都调getObjectForBeanInstance()：如果是&开头，检查是否FactoryBean，不满足抛错。
+
+4. 检查前几步通过name生成的beanInstance类型是否是requiredType
+
+
+
+## 3.加载类
+
+BeanDefinition合并之后，就可以去创建Bean对象了。
+
+创建Bean就必须实例化对象，实例化就必须先加载当前BeanDefinition所对应的class，AbstractAutowireCapableBeanFactory类的createBean()方法中，一开始就会调用这行代码就是去加载类：  
+
+```java
 Class<?> resolvedClass = resolveBeanClass(mbd, beanName);  
 ```
 
-这行代码就是去加载类，该方法是这么实现的：  
+如果beanClass被加载了（Object beanClass属性的类型变为Class），就直接返回。否则**根据bean名**加载对应类
+（doResolveBeanClass方法）
+默认使用**ClassUtils.getDefaultClassLoader()**所返回的类加载器，如果BeanFactory有指定就用指定的类加载器。  
 
-```java
-if (mbd.hasBeanClass()) {
-	return mbd.getBeanClass();
-} 
-if (System.getSecurityManager() != null) {
-	return AccessController.doPrivileged((PrivilegedExceptionAction<Class<?>>) () ‐> doResolveBeanClass(mbd, typesToMatch), getAccessControlContext());
-} else {
-	return doResolveBeanClass(mbd, typesToMatch);
-}
-
-public boolean hasBeanClass() {
-	return (this.beanClass instanceof Class);
-}
-```
-
-如果beanClass属性的类型是Class，那么就直接返回，如果不是，则会根据类名进行加载
-（doResolveBeanClass方法所做的事情）
-会利用BeanFactory所设置的类加载器来加载类，如果没有设置，则默认使用
-**ClassUtils.getDefaultClassLoader()**所返回的类加载器来加载。  
-
-**ClassUtils.getDefaultClassLoader()**：
-
-1. 优先返回当前线程中的ClassLoader
-2. 线程中类加载器为null的情况下，返回ClassUtils类的类加载器
-3. 如果ClassUtils类的类加载器为空，那么则表示是Bootstrap类加载器加载的ClassUtils类，那么
-   则返回系统类加载器  
+> ClassUtils.getDefaultClassLoader()：
+>
+> 1. 优先返回当前线程中的ClassLoader
+> 2. 线程中类加载器为null的情况下，返回ClassUtils类的类加载器
+> 3. 如果ClassUtils类的类加载器为空，那么则表示是Bootstrap类加载器加载的ClassUtils类，那么
+>    则返回系统类加载器  
+>
 
 ### 4.实例化前
 
-当前BeanDefinition对应的类成功加载后，就可以实例化对象了，但是...
-​
+当前BeanDefinition对应的类成功加载后，就可以实例化对象了。
 
-在Spring中，实例化对象之前，Spring提供了一个扩展点，允许用户来控制是否在某个或某些Bean实例化之前做一些启动动作。这个扩展点叫**InstantiationAwareBeanPostProcessor.postProcessBeforeInstantiation()**。比如：
-​
+但是Spring在实例化对象之前，提供了一个扩展点**InstantiationAwareBeanPostProcessor.postProcessBeforeInstantiation()**，允许用户来控制是否在某些Bean实例化之前做一些启动动作。比如下面代码会导致，在userService这个Bean实例化前打印：
 
 ```java
 @Component
 public class ZhouyuBeanPostProcessor implements InstantiationAwareBeanPostProcessor {
-
- @Override
- public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
-  if ("userService".equals(beanName)) {
-   System.out.println("实例化前");
-  }
-  return null;
- }
+    @Override
+    public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
+        if ("userService".equals(beanName)) {
+            System.out.println("实例化前");
+        }
+        return null;
+    }
 }
 ```
 
-如上代码会导致，在userService这个Bean实例化前，会进行打印。
-​
+**注意**
 
-值得注意的是，postProcessBeforeInstantiation()是有返回值的，如果这么实现：
+postProcessBeforeInstantiation()是有返回值的，如果这么实现：
 
 ```java
 @Component
 public class ZhouyuBeanPostProcessor implements InstantiationAwareBeanPostProcessor {
-
- @Override
- public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
-  if ("userService".equals(beanName)) {
-   System.out.println("实例化前");
-   return new UserService();
-  }
-  return null;
- }
+    @Override
+    public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
+       if ("userService".equals(beanName)) {
+          System.out.println("实例化前");
+          return new UserService();
+       }
+       return null;
+    }
 }
 ```
 
+userService这个Bean，在实例化前会直接返回一个由我们所定义的UserService对象。
 
-
-userService这个Bean，在实例化前会直接返回一个由我们所定义的UserService对象。如果是这样，表示不需要Spring来实例化了，并且后续的Spring依赖注入也不会进行了，会跳过一些步骤，直接执行初始化后这一步。
+这种情况表示不需要Spring来实例化了，并且后续的Spring依赖注入也没了，会跳过这些步骤，直接到**13.初始化后**。
 
 ### 5.实例化
 
    在这个步骤中就会根据BeanDefinition去创建一个对象了。
+
+实现：org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean
 
 ### 5.1 Supplier创建对象
 
@@ -856,17 +924,14 @@ Bean对象实例化出来之后，接下来就应该给对象的属性赋值了�
 ```java
 @Component
 public class ZhouyuMergedBeanDefinitionPostProcessor implements MergedBeanDefinitionPostProcessor {
-
- @Override
- public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
-  if ("userService".equals(beanName)) {
-   beanDefinition.getPropertyValues().add("orderService", new OrderService());
-  }
- }
+ 	@Override
+ 	public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
+  		if ("userService".equals(beanName)) {
+   			beanDefinition.getPropertyValues().add("orderService", new OrderService());
+  		}
+ 	}
 }
 ```
-
-
 
 在Spring源码中，AutowiredAnnotationBeanPostProcessor就是一个MergedBeanDefinitionPostProcessor，它的postProcessMergedBeanDefinition()中会去查找注入点，并缓存在AutowiredAnnotationBeanPostProcessor对象的一个Map中（injectionMetadataCache）。
 
@@ -1004,18 +1069,81 @@ public class ZhouyuBeanPostProcessor implements BeanPostProcessor {
 
 ### 总结BeanPostProcessor
 
-1. InstantiationAwareBeanPostProcessor.postProcessBeforeInstantiation()
-2. 实例化
-3. MergedBeanDefinitionPostProcessor.postProcessMergedBeanDefinition()
-4. InstantiationAwareBeanPostProcessor.postProcessAfterInstantiation()
-5. 自动注入
-6. InstantiationAwareBeanPostProcessor.postProcessProperties()
-7. Aware对象
-8. BeanPostProcessor.postProcessBeforeInitialization()
-9. 初始化
-10. BeanPostProcessor.postProcessAfterInitialization()
+1. 实例化前 InstantiationAwareBeanPostProcessor.postProcessBeforeInstantiation()
 
-## SpringBoot 引导配置
+2. 实例化
+
+3. MergedBeanDefinitionPostProcessor.postProcessMergedBeanDefinition() 可以修改bdf
+
+4. 实例化后 InstantiationAwareBeanPostProcessor.postProcessAfterInstantiation()  此时bean可能属性没赋值
+
+5. 属性赋值（spring自带的依赖注入）
+
+6. InstantiationAwareBeanPostProcessor.postProcessProperties(@Autowired、@Resource、@Value)
+
+   此时bean已经创建
+
+7. Aware对象
+
+8. 初始化前 BeanPostProcessor.postProcessBeforeInitialization() （此时若有@PostConstruct，则执行）
+
+9. 初始化
+
+10. 初始化后 BeanPostProcessor.postProcessAfterInitialization()
+
+# 二、Bean销毁过程
+
+销毁时机：容器关闭时
+
+销毁对象：只销毁单例，因为容器根本不存原型bean
+
+```java
+AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+context.close();  // 关闭容器
+//context.registerShutdownHook();  // 方法2：调用关闭钩子
+```
+
+## 扫描过程
+
+实现：org.springframework.beans.factory.support.AbstractBeanFactory#registerDisposableBeanIfNecessary
+
+1. 不能是原型bean && **需要销毁**。是否需要销毁调requiresDestruction()判断：
+   1. 实现**DisposableBean**或**AutoCloseable**接口；
+   2. 或 bd设置了destroyMethodName属性（指定destroyMethod的方法名）。如果属性值为“(inferred)”，则自动找名为**close**的方法，找不到再找名为shutdown的。
+   3. 或 类实现了DestructionAwareBeanPostProcesso && 其中有一个实现了DestructionAwareBeanPostProcessor.requiresDestruction()返回true（其实就是看哪些方法有**@PreDestroy**）
+2. 是否单例，单例才继续走
+3. 把符合上述任意一个条件的Bean适配成DisposableBeanAdapter对象，并存入disposableBeans中（一个LinkedHashMap），并不立即执行
+
+## Spring容器关闭过程
+
+实现：org.springframework.context.support.AbstractApplicationContext#doClose
+
+1. 首先发布ContextClosedEvent事件
+2. 调用lifecycleProcessor的onCloese()方法
+3. 销毁单例Bean
+     i. 遍历disposableBeans
+       a. 把每个disposableBean从单例池中移除
+       b. 调用disposableBean的destroy()
+       c. 如果这个disposableBean还被其他Bean依赖了，那么也得销毁其他Bean
+       d. 如果这个disposableBean还包含了inner beans，将这些Bean从单例池中移除掉
+       (inner bean参考https://docs.spring.io/spring-framework/docs/current/springframework-reference/core.html#beans-inner-beans)
+       ii. 清空manualSingletonNames，是一个Set，存的是用户手动注册的单例Bean的
+       beanNameiii. 清空allBeanNamesByType，是一个Map，key是bean类型，value是该类型所有的
+       beanName数组
+       iv. 清空singletonBeanNamesByType，和allBeanNamesByType类似，只不过只存了单例
+       Bean
+
+这里涉及到一个设计模式：适配器模式
+  在销毁时，Spring会找出实现了DisposableBean接口的Bean。
+  但是我们在定义一个Bean时，如果这个Bean实现了DisposableBean接口，或者实现了
+  AutoCloseable接口，或者在BeanDefinition中指定了destroyMethodName，那么这个Bean都属
+  于“DisposableBean”，这些Bean在容器关闭时都要调用相应的销毁方法。
+  所以，这里就需要进行适配，将实现了DisposableBean接口、或者AutoCloseable接口等适配成实
+  现了DisposableBean接口，所以就用到了DisposableBeanAdapter。
+  会把实现了AutoCloseable接口的类封装成DisposableBeanAdapter，而DisposableBeanAdapter
+  实现了DisposableBean接口。
+
+# SpringBoot 引导配置
 
 **Spring Boot应用程序的入口点是使用@SpringBootApplication注释的类**
 
@@ -1159,15 +1287,14 @@ System.out.println(context.getBean("userService"));
 
 表示Bean工厂，负责创建Bean，并且提供获取Bean的API。 
 
-**“Spring容器”**就可以理解为BeanFactory
+**“Spring容器”** 就可以理解为BeanFactory
 
 BeanFactory接口存在一个非常重要的实现类是DefaultListableBeanFactory：
 
 ```java
 DefaultListableBeanFactory beanFactory = new DefaultListableBeanFactory();
 // 创建beanDefinition
-AbstractBeanDefinition beanDefinition =
-        BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
+AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
 beanDefinition.setBeanClass(UserService.class);
 // 将beanDefinition注册到工厂
 beanFactory.registerBeanDefinition("userService", beanDefinition);
@@ -1183,7 +1310,7 @@ DefaultListableBeanFactory的类继承实现结构来看
 
 
 
-**FactoryBean**
+## FactoryBean
 
 我们可以通过BeanPostPorcessor来干涉Spring创建Bean的过程，但是如果我们想一个
 Bean完完全全由我们来创造，也是可以的，比如通过FactoryBean 
@@ -1212,11 +1339,13 @@ public static void main(String[] args) throws IOException {
 }
 ```
 
- CssFactoryBean这个类实现了FactoryBean之后，从容器中getBean拿到的实际上是CssFactoryBean重写了getObject和getObjectType方法返回的bean。要获得CssFactoryBean这个bean本身，getBean传的名字要在前面加“&”。
+ CssFactoryBean这个类实现了FactoryBean之后，从容器中getBean拿到的实际上是CssFactoryBean重写了**getObject**和getObjectType方法返回的bean。
+
+要获得CssFactoryBean这个bean本身，getBean传的名字要在前面加“&”（加多个也可）。
 
 单例池singletonObjects中存的始终只有cssFactoryBean，而没有userService。factoryBeanObjectCache中存的key虽然为cssFactoryBean，指向却是userService实例
 
-### FactoryBean与@Bean区别？
+### Q：FactoryBean与@Bean区别？
 
 虽然都是创建bean，效果基本上一样，但@Bean会经过BeanPostPorcessor的初始化前和初始化后处理，而FactoryBean只会执行初始化后
 
@@ -1878,6 +2007,10 @@ public class CssCondition implements Condition {
 
 spring容器就会根据CssCondition的返回布尔值决定是否加载UserService
 
+## @DependsOn
+
+
+
 ## @Order
 
 用于修饰类
@@ -2095,6 +2228,12 @@ public class GlobalExceptionAdvice {
 ```
 org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Failed to convert value of type 'java.lang.String' to required type 'int'; nested exception is java.lang.NumberFormatException: For input string: "2147483648"
 ```
+
+## @PreDestroy
+
+修饰方法。容器关闭前执行。
+
+只对单例bean有效。若多个方法都带此注解，执行顺序无法指定
 
 
 

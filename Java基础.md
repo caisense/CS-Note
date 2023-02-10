@@ -1143,8 +1143,12 @@ public final void wait() throws InterruptedException
 
 ### 等价与相等
 
-- 对于基本类型，== 判断两个值是否相等，基本类型没有 equals() 方法。
-- 对于引用类型，== 判断两个变量是否引用同一个对象（**地址相同**），而 equals() 判断引用的对象是否等价。
+相等：== 运算符
+
+等价：对象的 `equals()` 方法
+
+- 对于基本类型，== 判断两个值是否相等，基本类型没有 `equals()` 方法。
+- 对于引用类型，== 判断两个变量是否引用同一个对象（**地址相同**）；而 `equals()` 判断引用的对象是否等价。
 
 ### equals()和Objects.equals()
 
@@ -1163,6 +1167,35 @@ System.out.println(Objects.equals(a, b)); //true
 ```
 
 
+
+## 继承
+
+### instanceof操作符
+
+java关键字，判断一个实例是否是某个类的对象（包括继承和实现），返回布尔值。
+
+```java
+ Object n = Integer.valueOf(123);
+ System.out.println(n instanceof Double); // false
+ System.out.println(n instanceof Integer); // true
+ System.out.println(n instanceof Number); // true，因为Integer的父类是Number
+ System.out.println(n instanceof java.io.Serializable); // true，因为Number实现了Serializable接口
+```
+
+### isAssignableFrom()
+
+A.class.isAssignableFrom(B.class); // 判断A是否B的父类
+
+```java
+// Integer i = ?
+Integer.class.isAssignableFrom(Integer.class); // true，因为Integer可以赋值给Integer
+// Number n = ?
+Number.class.isAssignableFrom(Integer.class); // true，因为Integer可以赋值给Number
+// Object o = ?
+Object.class.isAssignableFrom(Integer.class); // true，因为Integer可以赋值给Object
+// Integer i = ?
+Integer.class.isAssignableFrom(Number.class); // false，因为Number不能赋值给Integer
+```
 
 
 
