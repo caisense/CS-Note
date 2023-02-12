@@ -1197,7 +1197,29 @@ Object.class.isAssignableFrom(Integer.class); // true，因为Integer可以赋�
 Integer.class.isAssignableFrom(Number.class); // false，因为Number不能赋值给Integer
 ```
 
+## static
 
+1. 修饰变量--静态变量
+
+   又称**类变量**，属于类，只能在**类内声明**（不能在方法内），存储于jvm的方法区。
+
+   因为属于类，所以该类的所有对象都能访问，通过以下方式：
+
+   ```java
+   Test.var;  // 类名为Test，变量名为var
+   ```
+
+   
+
+2. 修饰方法--静态方法
+
+3. 修饰代码块--静态代码块
+
+4. 修饰内部类--静态内部类
+
+   非静态内部类依赖于外部类的实例，也就是说需要先创建外部类实例，才能用这个实例去创建非静态内部类。而静态内部类不需要。
+
+## final
 
 # 异常
 

@@ -579,569 +579,745 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 5. 观察者模式：定义对象键一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的
 对象都会得到通知被制动更新，如Spring中listener的实现–ApplicationListener。
 
-# Bean生命周期
+# Spring常用注解
 
-# 一、Bean生成过程
+## @Component
 
-生成时机：
+最普通的组件，可以被注入到spring容器进行管理。等效于XML的bean配置
 
-流程：
+是单例模式，因此bean会在全局共享。
 
-![image-20221201010853186](images/Spring常见问题/image-20221201010853186.png)
+根据类型注入，因此如果有多个同类型（或一个接口的多个实现，具体看程序getBean()获取的是类还是接口），启动时会报错：
 
-## 1.生成BeanDefinition  
+```
+Field sysUserApi in com.eshore.cmp.corp.service.service.base.CorpBaseService required a single bean, but 2 were found:
+	- userErrorDecoder: defined in URL [jar:file:/D:/Java/apache-maven-3.5.4/repository/com/eshore/cmp/cmp-ord-api/2.0.0-SNAPSHOT/cmp-ord-api-2.0.0-SNAPSHOT.jar!/com/eshore/cmp/ord/UserErrorDecoder.class]
+	- feignErrorDecoder: defined in URL [jar:file:/D:/Java/apache-maven-3.5.4/repository/com/eshore/cmppub/cmppub-springcloud-common/2.0.0-SNAPSHOT/cmppub-springcloud-common-2.0.0-20210618.070507-15.jar!/com/eshore/cmppub/springcloud/common/components/feign/FeignErrorDecoder.class]
+```
 
-   扫描流程
+@Repository, @Service  和 @Controller 都包含 @Component，是针对不同的使用场景所采取的特定功能化的注解组件
 
-   ![Spring扫描底层流程](images/Spring常见问题/Spring扫描底层流程.png)
+- @Repository注解可以标记在任何的类上，用来表明该类是用来执行与数据库相关的操作（即dao对象），并支持自动处理数据库操作产生的异常
+- @Service修饰服务（接口实现类）。如果你不知道要在项目的业务层采用@Service还是@Component注解。那么，@Service是一个更好的选择。
 
-实现：org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#scanCandidateComponents
+## @Scope
 
-1. 首先，通过ResourcePatternResolver获得指定包路径（默认是classpath）下的所有 .class 文件，保存为**Resource**对象。
+只有一个参数：value，别名scopeName
 
-2. 遍历每个Resource，解析Resource对象得到**MetadataReader**（具体实现类为SimpleMetadataReader）
+用法：
 
-   利用MetadataReaderFactory，实现类为CachingMetadataReaderFactory  
+- `singleton`：单例（默认），每次getBean都只返回同一个bean
+- `prototype`：原型，每次getBean返回一个新的bean
+- `request`: 表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP request内有效
+- `session`：表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP session内有效
 
-3. 过滤：
+**多例失效场景**
 
-   1.  利用MetadataReader进行@Component注解的**excludeFilters**和**includeFilters**判断，进行第一次过滤
-   2.  过滤后再进行条件注解**@Conditional**的筛选（条件注解并不能理解：某个类上是否存在@Conditional注解，如果存在则调用注解中所指定的类的match方法进行匹配，匹配成功则通过筛选，匹配失败则pass掉。）
+controller是默认的单例，对其Autowired注入的service层指定是多例时，多例失效。原因是多例service被单例controller依赖，而单例controller初始化时，多例的service注入，创建bean；单例controller调用service时，由于注入只有一次，因此调的还是注入时的service，即多例service没有起效
 
-4. 筛选通过后，基于MetadataReader生成**ScannedGenericBeanDefinition**
+解决：
 
-5. 再基于MetadataReader判断：
+- 方法1: 不使用`@Autowired` ,每次调用多例的时候,直接调用bean
 
-   1. 必须是**独立类**（可以不依赖外部类来构造，即不能是内部类，但可以是静态内部类 ）
-   2. 不能是接口或抽象类
+- 方法2:spring的解决方法:设置`proxyMode`,每次请求的时候实例化
 
-6. 如果筛选通过，那么就表示扫描到了一个Bean，将ScannedGenericBeanDefinition加入结果集。最后得到候选BeanDefinition集合
+  > `@Scope`注解添加了一个proxyMode的属性，有两个值`ScopedProxyMode.INTERFACES`和`ScopedProxyMode.TARGET_CLASS`，前一个表示表示Service是一个接口，后一个表示Service是一个类。
 
-7. 遍历候选BeanDefinition集合
+```java
+@Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE, proxyMode = ScopedProxyMode.TARGET_CLASS)
+```
 
-   1. 读scope注解
+## @ComponentScan
 
-   2. 根据类名生成bean名字（规则：**首字母大写，直接转小写；多个大写字母开头，不转，直接用类名**）
+扫描含有@Component的类，注入spring容器。包含@Component的注解也算，如：@Controller，@Service和@Repository
 
-   3. 设置BeanDefinition的默认值（不使用lazy等）
+**原理**
 
-   4. 解析@Lazy、@Primary、@DependsOn等注解（实际上都是开关），为BeanDefinition设置开关
+org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#registerDefaultFilters
 
-   5. 检查**BeanDefinitionMap**中是否存在同名BeanDefinition。如果存在，再看是否兼容；兼容则跳过该bean，不兼容则抛错。
+方法中给includeFilters添加了@Component过滤器，因此默认扫描带@Component的类：
 
-      > 兼容指的是该BeanDefinition与已存在的等价，或者源自同一个类
-      >
-      > 两次扫描扫到相同bean就是兼容的，但同一次扫描扫到相同的bean就是不兼容的
+```java
+this.includeFilters.add(new AnnotationTypeFilter(Component.class));
+```
 
-   6. 注册到BeanDefinitionMap
+**value**
 
-      先生成BeanDefinitionHolder（其实就是BeanDefinitionMap + beanName）。如果有别名，beanName添加到**别名map**。最后写入DefaultListableBeanFactory的beanDefinitionMap<String, BeanDefinition>（ConcurrentHashMap类型）
+指定扫描路径，默认扫描该注解修饰的当前类所在目录
 
-8. 
+**ExcludeFilter 和 IncludeFilter**
+
+1.ExcludeFilter表示**排除过滤器**。
+
+比如以下配置，表示扫描com.zhouyu这个包下面的所有类，但是排除UserService类，也就是就算它上面有@Component注解也不会成为Bean。
+
+```java
+@ComponentScan(value = "com.css.service",
+        excludeFilters = {@ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = UserService.class)})
+public class AppConfig {
+}
+```
+
+2.IncludeFilter表示**包含过滤器**
+
+以下配置，即使UserService类没加@Component也能注入spring容器。
+
+```java
+@ComponentScan(value = "com.css.service",
+        includeFilters = {@ComponentScan.Filter(
+                type = FilterType.ASSIGNABLE_TYPE,
+                classes = UserService.class)})
+public class AppConfig {
+}
+```
+
+FilterType分为：
+
+1. ANNOTATION：通过注解过滤
+2. ASSIGNABLE_TYPE：通过Class类型过滤
+3. ASPECTJ：Aspectj表达式过滤
+4. REGEX：正则表达式过滤
+5. CUSTOM：自定义 过滤 
+
+在Spring的扫描逻辑中，默认会添加一个**Annotation**类型的FilterType给includeFilters，表示默认情况下Spring会认为类上有@Component注解的就是Bean。  
+
+## @Configuration
+
+用于修饰类，告诉Springboot这是一个配置类（等同于配置文件）
+
+参数：proxyBeanMethods，代理bean的方法，布尔类型
+
+- true：保证每个@Bean方法被调用多少次返回的组件都是单实例的
+- false：每个@Bean方法被调用多少次返回的组件都是新创建的
+
+
+
+## @Bean
+
+用于修饰方法，按**类型**装配。一般与@Configuration搭配使用，在配置类中，使用@Bean标注的方法给容器中添加组件。默认以**方法名**作为组件name，返回类型就是组件类型。
+
+组件name必须是唯一的，否则会冲突。
+
+1. 方法无参，则容器中注入的bean名称为方法名
+
+   ```java
+   // 配置类
+   @Configuration(proxyBeanMethods = false)  
+   public class Myconfig {
+       @Bean  
+       public User user01() {  // 向容器中添加组件，名称默认为user01，即方法名
+           return new User("zhangsan", 18);
+       }
+   }
+   // 主启动类main方法, 获取IOC容器
+   ConfigurableApplicationContext run = SpringApplication.run(MainApplicaition.class, args);
+   
+   // 从容器中获取组件
+   User user = run.getBean("user01", User.class);
+   ```
+
+2. 方法带参
+
+   @Bean修饰的方法若带参数，则根据**形参类型**寻找容器组件。容器中注入的bean名称为传入参数
+
+   ```java
+   @Bean
+   @ConditionalOnMissingBean(name = "user123")  // 若容器中不存在名为user123的组件
+   public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
+       return user1;
+   }
+   ```
+
+   带多个参数，其他参数是别名
+
+   ```java
+   @Bean({"user", "user1", "user2"})			// 名字是user，有两个别名user1和user2
+   public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
+       return user1;
+   }
+   ```
 
    
 
-MetadataReader表示类的元数据读取器，主要包含了一个AnnotationMetadata，功能有
-1. 获取类的名字
-2. 获取父类的名字
-3. 获取所实现的所有接口名
-4. 获取所有内部类的名字
-5. 判断是不是抽象类
-6. 判断是不是接口
-7. 判断是不是一个注解
-8. 获取拥有某个注解的方法集合
-9. 获取类上添加的所有注解信息
-10. 获取类上添加的所有注解类型集合
-合
+## @Autowired
 
-值得注意的是，CachingMetadataReaderFactory解析某个.class文件得到MetadataReader对象是利用的ASM技术，并没有加载这个类到JVM。并且，最终得到的ScannedGenericBeanDefinition对象，beanClass属性存储的是当前类的**名字**，而不是class对象。（beanClass属性的类型是Object，它即可以存储类的名字，也可以存储class对象）
+**参数**
 
-最后，上面是说的通过扫描得到BeanDefinition对象，我们还可以通过直接定义BeanDefinition，或解析spring.xml文件的<bean/>，或者@Bean注解得到BeanDefinition对象。（后续课程会分析@Bean注解是怎么生成BeanDefinition的）。
+required，布尔值，默认true--表示注入的对象必须存在。false--允许为null
 
-## 2.合并BeanDefinition  
+**作用**
 
-实现：org.springframework.beans.factory.support.DefaultListableBeanFactory#preInstantiateSingletons
+自动注入对象到类中，被注入进的类同样要被 Spring 容器管理，比如：Service 类注入到 Controller 类中。
 
-遍历DefaultListableBeanFactory的beanDefinitionNames，是bean名的列表
+被注入的类加上@Component（或者@Service、@Controller等包含@Component的注解），否则在类中的变量加@Autowired注解无法生效。因为如果一个类new对象生成的，那么这个类就不归spring容器管理，IOC等spring的功能也就无法使用了。
 
-1. 获取【合并后】的BeanDefinition
+可以修饰：
 
-   先从AbstractBeanFactory的 **mergedBeanDefinitions**（ConcurrentHashMap <String, RootBeanDefinition>）中取RootBeanDefinition
+1. 属性：先根据属性**类型（而不是名字）**去找Bean，如果找到多个再根据属性名确定一个
+2. 构造方法：先根据方法参数类型去找Bean，如果找到多个再根据参数名确定一个
+3. set方法：先根据方法参数类型去找Bean，如果找到多个再根据参数名确定一个
 
-   如果取不到，递归找父BeanDefinition合并，最后用子BeanDefinition属性覆盖父BeanDefinition属性
+@Bean 和 @Autowired 做了两件完全不同的事情：
 
-2. 如果【非**抽象Bean** && 单例 && 非懒加载】，才处理
+1. @Bean 告诉 Spring：“这是这个类的一个实例，请保留它，并在我请求时将它还给我”。
+2. @Autowired 说：“请给我一个这个类的实例，例如，一个我之前用@Bean注释创建的实例”。
 
-3. `isFactoryBean()`判断是否为FactoryBean：先从**单例池**找；找不到再去找BeanDefinition，再递归找父的BeanFactory。
+**常规用法：单个注入**
 
-   1. 如果是，要特殊处理：安全判断（如果系统有设置安全管理器），再看是否实现SmartFactoryBean接口（继承FactoryBean接口），有则getBean()创建bean对象（最终调用该类覆写的**getObject()**方法创建）
-   2. 如果不是，getBean()创建bean对象
-
-   所以FactoryBean很特殊，实现这个接口的bean类，可通过重写getObject()向spring容器注册自定义的bean（一般类注册的都是class为类自身的bean）
-
-4. 
-
-**抽象Bean**
-
-父子BeanDefinition实际用的比较少。例如，这么定义的情况下，child是单例Bean：
-
-```xml
-<bean id="parent" class="com.zhouyu.service.Parent" scope="prototype"/>
-<bean id="child" class="com.zhouyu.service.Child"/>
-```
-
-但是这么定义的情况下，child就是原型Bean了 ：
-
-   ```xml
-   <bean id="parent" class="com.zhouyu.service.Parent" scope="prototype"/>
-   <bean id="child" class="com.zhouyu.service.Child" parent="parent"/>
-   ```
-
-因为child的父BeanDefinition是parent，所以会继承parent上所定义的scope属性。
-而在根据child来生成Bean对象之前，需要进行BeanDefinition的合并，得到完整的child的
-BeanDefinition  。 
-
-抽象Bean  并不是指抽象类，而是抽象的xml bean。其唯一作用在于继承
-
-```xml
-<bean id="parent" class="com.zhouyu.service.Parent" abstract="true"/>
-<bean id="child" class="com.zhouyu.service.Child"/>
-```
-
-
-
-## getBean方法
-
-前期扫描是准备工作，这里真正开始创建bean
-
-AbstractBeanFactory 类的 `getBean(String name)`：返回一个bean，若容器没有就创建。
-
-具体逻辑在类内
+  
 
 ```java
-protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullable Object[] args, boolean typeCheckOnly)
-```
-
-
-
-1. 用bean名找BeanDefinition，如果没有就去父bean工厂找。
-
-2. 检查@DependsOn。遍历依赖该bean的所有bean，只用名字检查，依赖关系存入dependentBeanMap中。先创建该bean依赖的bean
-
-3. 开始创建，看@Scope。
-
-   1. 是单例，getSingleton()——传入一个lambda表达式（用于回调），先锁单例池，然后看池里是否有，没有就创建后加入池。
-   2. 是原型，创建一个对象
-   3. 是其他：request或session
-
-   三种情况都调**createBean()**（下文3.加载类详述）
-
-   最后都调getObjectForBeanInstance()：如果是&开头，检查是否FactoryBean，不满足抛错。
-
-4. 检查前几步通过name生成的beanInstance类型是否是requiredType
-
-
-
-## 3.加载类
-
-BeanDefinition合并之后，就可以去创建Bean对象了。
-
-创建Bean就必须实例化对象，实例化就必须先加载当前BeanDefinition所对应的class，AbstractAutowireCapableBeanFactory类的createBean()方法中，一开始就会调用这行代码就是去加载类：  
-
-```java
-Class<?> resolvedClass = resolveBeanClass(mbd, beanName);  
-```
-
-如果beanClass被加载了（Object beanClass属性的类型变为Class），就直接返回。否则**根据bean名**加载对应类
-（doResolveBeanClass方法）
-默认使用**ClassUtils.getDefaultClassLoader()**所返回的类加载器，如果BeanFactory有指定就用指定的类加载器。  
-
-> ClassUtils.getDefaultClassLoader()：
->
-> 1. 优先返回当前线程中的ClassLoader
-> 2. 线程中类加载器为null的情况下，返回ClassUtils类的类加载器
-> 3. 如果ClassUtils类的类加载器为空，那么则表示是Bootstrap类加载器加载的ClassUtils类，那么
->    则返回系统类加载器  
->
-
-### 4.实例化前
-
-当前BeanDefinition对应的类成功加载后，就可以实例化对象了。
-
-但是Spring在实例化对象之前，提供了一个扩展点**InstantiationAwareBeanPostProcessor.postProcessBeforeInstantiation()**，允许用户来控制是否在某些Bean实例化之前做一些启动动作。比如下面代码会导致，在userService这个Bean实例化前打印：
-
-```java
-@Component
-public class ZhouyuBeanPostProcessor implements InstantiationAwareBeanPostProcessor {
-    @Override
-    public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
-        if ("userService".equals(beanName)) {
-            System.out.println("实例化前");
-        }
-        return null;
-    }
-}
+@Autowired // 直接注入
+private  BeanInterface beaninterface; 
 ```
 
 **注意**
 
-postProcessBeforeInstantiation()是有返回值的，如果这么实现：
+由于@Autowired根据类型装配，因此容器中有多个同类型Bean时，需要加@Qualifier指定要注入的Bean名称，否则会出错。
 
 ```java
-@Component
-public class ZhouyuBeanPostProcessor implements InstantiationAwareBeanPostProcessor {
-    @Override
-    public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName) throws BeansException {
-       if ("userService".equals(beanName)) {
-          System.out.println("实例化前");
-          return new UserService();
-       }
-       return null;
+//控制器 
+@RestController
+public class HelloController {
+    @Autowired
+    @Qualifier("Zhang")  //指定注入名为“Zhang"的组件
+    private User user;
+}
+// 配置类
+@Configuration(proxyBeanMethods = false)
+public class Myconfig {
+    @Bean("Zhang")
+    public User user01() {
+        return new User("zhangsan", 18);
+    }
+    @Bean("Li")
+    public User user03() {
+        return new User("lisi", 19);
     }
 }
 ```
 
-userService这个Bean，在实例化前会直接返回一个由我们所定义的UserService对象。
+若想将多个同类型Bean都注入，参考下文注入Map<T>
 
-这种情况表示不需要Spring来实例化了，并且后续的Spring依赖注入也没了，会跳过这些步骤，直接到**13.初始化后**。
+**注入集合**
 
-### 5.实例化
+注入`List<T>`
 
-   在这个步骤中就会根据BeanDefinition去创建一个对象了。
+按类型搜寻相应的Bean并注入List，还可以使用@Order指定加载的顺序（也即是Bean在List中的顺序，spring根据加载顺序填入list。
 
-实现：org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean
+注入`Set<T>`
 
-### 5.1 Supplier创建对象
+也是按类型注入，但是没有顺序
 
-首先判断BeanDefinition中是否设置了Supplier，如果设置了则调用Supplier的get()得到对象。
-​
+注入`Map<T>`
 
-得直接使用BeanDefinition对象来设置Supplier，比如：
+ @Autowired 标注作用于 Map 类型时，如果 Map 的 key 为 String 类型，则 Spring 会将容器中所有**类型符合** Map 的 value 对应的类型的 Bean 增加进来，用 Bean 的 id 或 name 作为 Map 的 key。
 
-```java
-AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
-beanDefinition.setInstanceSupplier(new Supplier<Object>() {
- @Override
- public Object get() {
-  return new UserService();
- }
-});
-context.registerBeanDefinition("userService", beanDefinition);
-```
 
-### 5.2 工厂方法创建对象
 
-如果没有设置Supplier，则检查BeanDefinition中是否设置了factoryMethod，也就是工厂方法，有两种方式可以设置factoryMethod，比如：
-​
+## @Conditional
 
-方式一：
+参数：条件类。根据条件类返回的布尔值决定是否加载该类
+
+使用：
 
 ```java
-<bean id="userService" class="com.zhouyu.service.UserService" factory-method="createUserService" />
-```
-
-对应的UserService类为：
-
-```java
+@Component
+@Conditional(CssCondition.class)
 public class UserService {
 
- public static UserService createUserService() {
-  System.out.println("执行createUserService()");
-  UserService userService = new UserService();
-  return userService;
- }
-
- public void test() {
-  System.out.println("test");
- }
-
-}
-```
-
-方式二：
-
-```java
-<bean id="commonService" class="com.zhouyu.service.CommonService"/>
-<bean id="userService1" factory-bean="commonService" factory-method="createUserService" />
-```
-
-对应的CommonService的类为：
-
-```java
-public class CommonService {
-
- public UserService createUserService() {
-  return new UserService();
- }
-}
-```
-
-
-
-Spring发现当前BeanDefinition方法设置了工厂方法后，就会区分这两种方式，然后调用工厂方法得到对象。
-​
-
-值得注意的是，我们通过@Bean所定义的BeanDefinition，是存在factoryMethod和factoryBean的，也就是和上面的方式二非常类似，@Bean所注解的方法就是factoryMethod，AppConfig对象就是factoryBean。如果@Bean所所注解的方法是static的，那么对应的就是方式一。
-
-### 5.3 推断构造方法
-
-第一节已经讲过一遍大概原理了，后面有一节课单独分析源码实现。推断完构造方法后，就会使用构造方法来进行实例化了。
-​
-
-额外的，在推断构造方法逻辑中除开会去选择构造方法以及查找入参对象意外，会还判断是否在对应的类中是否存在使用**@Lookup注解**了方法。如果存在则把该方法封装为LookupOverride对象并添加到BeanDefinition中。
-​
-
-在实例化时，如果判断出来当前BeanDefinition中没有LookupOverride，那就直接用构造方法反射得到一个实例对象。如果存在LookupOverride对象，也就是类中存在@Lookup注解了的方法，那就会生成一个代理对象。
-​
-
-
-
-@Lookup注解就是**方法注入**，使用demo如下：
-
-```java
-@Component
-public class UserService {
-
- private OrderService orderService;
-
- public void test() {
-  OrderService orderService = createOrderService();
-  System.out.println(orderService);
- }
-
- @Lookup("orderService")
- public OrderService createOrderService() {
-  return null;
- }
-
-}
-```
-
-### 6. BeanDefinition的后置处理
-
-Bean对象实例化出来之后，接下来就应该给对象的属性赋值了。在真正给属性赋值之前，Spring又提供了一个扩展点**MergedBeanDefinitionPostProcessor.postProcessMergedBeanDefinition()**，可以对此时的BeanDefinition进行加工，比如：
-
-```java
-@Component
-public class ZhouyuMergedBeanDefinitionPostProcessor implements MergedBeanDefinitionPostProcessor {
- 	@Override
- 	public void postProcessMergedBeanDefinition(RootBeanDefinition beanDefinition, Class<?> beanType, String beanName) {
-  		if ("userService".equals(beanName)) {
-   			beanDefinition.getPropertyValues().add("orderService", new OrderService());
-  		}
- 	}
-}
-```
-
-在Spring源码中，AutowiredAnnotationBeanPostProcessor就是一个MergedBeanDefinitionPostProcessor，它的postProcessMergedBeanDefinition()中会去查找注入点，并缓存在AutowiredAnnotationBeanPostProcessor对象的一个Map中（injectionMetadataCache）。
-
-### 7. 实例化后
-
-在处理完BeanDefinition后，Spring又设计了一个扩展点：**InstantiationAwareBeanPostProcessor.postProcessAfterInstantiation()**，比如：
-​
-
-```java
-@Component
-public class ZhouyuInstantiationAwareBeanPostProcessor implements InstantiationAwareBeanPostProcessor {
-
- @Override
- public boolean postProcessAfterInstantiation(Object bean, String beanName) throws BeansException {
-
-  if ("userService".equals(beanName)) {
-   UserService userService = (UserService) bean;
-   userService.test();
-  }
-
-  return true;
- }
-}
-```
-
-上述代码就是对userService所实例化出来的对象进行处理。
-​
-
-这个扩展点，在Spring源码中基本没有怎么使用。
-
-### 8. 自动注入
-
-这里的自动注入指的是Spring的自动注入，后续依赖注入课程中单独讲
-​
-
-### 9. 处理属性
-
-这个步骤中，就会处理@Autowired、@Resource、@Value等注解，也是通过**InstantiationAwareBeanPostProcessor.postProcessProperties()**扩展点来实现的，比如我们甚至可以实现一个自己的自动注入功能，比如：
-
-```java
-@Component
-public class ZhouyuInstantiationAwareBeanPostProcessor implements InstantiationAwareBeanPostProcessor {
-
- @Override
- public PropertyValues postProcessProperties(PropertyValues pvs, Object bean, String beanName) throws BeansException {
-  if ("userService".equals(beanName)) {
-   for (Field field : bean.getClass().getFields()) {
-    if (field.isAnnotationPresent(ZhouyuInject.class)) {
-     field.setAccessible(true);
-     try {
-      field.set(bean, "123");
-     } catch (IllegalAccessException e) {
-      e.printStackTrace();
-     }
-    }
+   public void test(){
+      System.out.println("test ");
    }
-  }
-
-  return pvs;
- }
 }
 ```
 
-关于@Autowired、@Resource、@Value的底层源码，会在后续的依赖注入课程中详解。
+再写一个条件类，实现Condition接口
 
-### 10. 执行Aware
+```java
+public class CssCondition implements Condition {
+   @Override
+   public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+      try {
+         context.getClassLoader().loadClass("com.zhouyu.service.user");
+         return true;
+      } catch (ClassNotFoundException e) {
+         return false;
+      }
+   }
+}
+```
 
-完成了属性赋值之后，Spring会执行一些回调，包括：
+spring容器就会根据CssCondition的返回布尔值决定是否加载UserService
 
-1. BeanNameAware：回传beanName给bean对象。
-2. BeanClassLoaderAware：回传classLoader给bean对象。
-3. BeanFactoryAware：回传beanFactory给对象。
+## @DependsOn
 
-### 11. 初始化前
 
-初始化前，也是Spring提供的一个扩展点：**BeanPostProcessor.postProcessBeforeInitialization()**，比如
+
+## @Order
+
+用于修饰类
+
+```java
+@Order(1)
+@Service
+public class CustomerHandler extends BaseSyncCorpDataHandler implements ISyncCorpDataHandler {
+	// 实现dealData方法
+    @Override
+    public CorpDataHandleResult dealData() {
+        ...
+    }
+}
+```
+
+参数x越小，优先级越高。如果不标注数字，默认最低优先级（int最大值）
+
+该注解等同于实现Ordered接口getOrder方法，并返回数字。
+
+配合@Autowired，就能在类中按顺序注入List
+
+```java
+public class SyncCorpDataServiceImpl extends CorpBaseService implements ISyncCorpDataService {
+	// 按Order的排序，扫描ISyncCorpDataHandler的所有实现类，依次注入到List中
+    @Autowired
+    List<ISyncCorpDataHandler> syncCorpDataHandlers;
+    
+    public String dealCorpDataFromIotReqInfo(SyncReqInfoBo svcCont) {
+        // 依次执行每个ISyncCorpDataHandler接口实现类的dealData
+        for (ISyncCorpDataHandler syncCorpDataHandler : syncCorpDataHandlers) {
+            syncCorpDataHandler.dealData();
+            ...
+        }
+    }
+}
+```
+
+注意：@Order不能决定Spring容器加载Bean的顺序，只能决定@Autowired注入List<>的顺序
+
+## @PostConstruct
+
+jdk1.6开始，用于修饰非静态的void方法，在当前类构造完成时执行该方法，完成某些初始化动作。
+
+执行顺序：Constructor -> @Autowired -> @PostConstruct  （构造完成，说明是完整的bean，因此依赖注入已完成）
+
+例：当某个类中，注入的bean加载顺序迟于当前类，则程序无法启动，因为@PostConstruct方法依赖于注入bean，而此时bean未加载，无法继续
+
+```java
+// 某个类中
+    @Autowired
+    private IParamApi paramApi;
+
+    @PostConstruct
+    public void initOiddUrl() {
+        if (!"local".equals(envActive)) {
+            CmpParam param = paramApi.queryCmpParam("OIDD_URL");
+            if (StringHelper.isNotEmpty(param.getParamValue())) {
+                this.oiddUrl = param.getParamValue();
+            }
+        }
+    }
+```
+
+
+
+
+
+## @ControllerAdvice
+
+全局Controller异常处理
+
+用法：在打上注解的类中，对每种要处理的异常类型，写一个处理方法，每个方法用@ExceptionHandler注解指定处理的异常类型，方法的参数一般也是要处理的异常类型
+
+优点：将 Controller 层的异常和数据校验的异常进行统一处理，减少模板代码，减少编码量，提升扩展性和可维护性。
+
+缺点：只能处理 Controller 层未捕获（往外抛）的异常，对于 Interceptor（拦截器）层的异常，Spring 框架层的异常，就无能为力了。
+
+```java
+// 全局Controller异常处理
+@ControllerAdvice
+public class GlobalExceptionAdvice {
+
+    private Logger logger = LoggerFactory.getLogger(this.getClass());
+
+	// valid异常
+    @ResponseBody
+    // 指定处理异常类型
+    @ExceptionHandler(value = MethodArgumentNotValidException.class)
+    // 入参为要处理的异常类型
+    public NaResult<Object> methodArgumentNotValidHandler(MethodArgumentNotValidException e) {
+        if (e != null && CollectionHelper.isNotEmpty(e.getBindingResult().getFieldErrors())) {
+            FieldError error = CollectionHelper.getFirst(e.getBindingResult().getFieldErrors());
+            return new NaResult<>(NaConstant.FAIL_CODE, error.getDefaultMessage(), null);
+        }
+        return new NaResult<>(NaConstant.FAIL_CODE, ExceptionMsgs.CommonErrMsg.PARAM_ERROR, null);
+    }
+
+    // NA自定义异常
+    @ResponseBody
+    @ExceptionHandler(value = NaException.class)
+    public NaResult<Object> naExceptionHandler(NaException e) {
+        logger.error("GlobalExceptionAdvice-naExceptionHandler:{}", e.getMessage(), e);
+        return new NaResult<>(NaConstant.FAIL_CODE, e.getMessage(), null);
+    }
+
+    // 其他异常
+    @ResponseBody
+    @ExceptionHandler(value = Exception.class)
+    public NaResult<Object> exceptionHandler(Exception e) {
+        logger.error("GlobalExceptionAdvice-exceptionHandler:{}", e.getMessage(), e);
+        return new NaResult<>(NaConstant.FAIL_CODE, e.getMessage(), null);
+    }
+
+}
+```
+
+
+
+## @RequestParam
+
+参数：
+
+- name（别名value）-- String类型
+
+  name不能重复（即使不同类型取同名也不行）
+
+- required -- 布尔类型
+
+  默认为true，设为false才需要显式：
+
+  ```java
+  @RequestParam(value = "xxx", required = false) double d //xxx为传入参数名
+  ```
+
+  required参数为true的误区：
+  required = true是在前端没有传参数（也就是null）的时候报错，并不能防止参数为空字符串""。
+
+请求传来的参数实际上都是String类型，由框架转为相应类型，若超出类型取值范围，会报转换异常：
+
+```
+org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Failed to convert value of type 'java.lang.String' to required type 'int'; nested exception is java.lang.NumberFormatException: For input string: "2147483648"
+```
+
+## @PreDestroy
+
+修饰方法。容器关闭前执行。
+
+只对单例bean有效。若多个方法都带此注解，执行顺序无法指定
+
+
+
+## 参数校验（validation框架）
+
+@Validated：用在方法入参上
+
+@Valid：用在属性上，配合@Validated嵌套验证
+
+例：数据结构是Item类包裹Prop类，最外层用@Validated校验Item，Item内用@Valid校验Prop，就能启用校验
+
+```java
+@PostMapping("/item/add")
+public void addItem(@RequestBody @Validated Item item) {
+    System.out.println("input:" + jsonMapper.toJson(item));
+}
+
+public class Item {
+    @NotNull(message = "id不能为空")
+    @Min(value = 1, message = "id必须为正整数")
+    private Long id;
+
+    @Valid
+    @NotNull(message = "props不能为空")
+    @Size(min = 1, message = "至少要有一个属性")
+    private List<Prop> props;
+    // get、set省略
+}
+
+public class Prop {
+    @NotNull(message = "pid不能为空")
+    @Min(value = 1, message = "pid必须为正整数")
+    private Long pid;
+
+    @NotBlank(message = "pidName不能为空")
+    private String pidName;
+    // get、set省略
+}
+```
+
+**常用校验注解**
+
+1. @NotNull：不能为null，但可以为empty（空字符串，空对象）
+
+2. @NotEmpty：不能为null，而且长度必须大于0
+
+3. @NotBlank：只能作用在String上，不能为null，而且调用trim()去除前后空格后，长度必须大于0
+
+4. @Max(value)：最大值，用于一个枚举值的数据范围控制
+
+5. @Min(value)：最小值，用于一个枚举值的数据范围控制
+
+6. @Size(min=a, max=b)：限制字符长度必须在min到max之间
+
+7. @Pattern(regexp = "正则")：正则表达式校验
+
+   
+
+## controller不能直接返回数字
+
+如下代码直接返回int
+
+```java
+@Controller
+@RequestMapping("/api/v1/authBillDetail")
+public class AuthBillDetailController extends CMPController {
+    @Autowired
+    private IAuthBillDetailService authBillDetailService;
+    
+    @ApiOperation(value = "xxx notes = "xxx")
+    @PostMapping("/insert")
+    //@ResponseBody
+    int insert(@RequestBody AuthBillDetail entity) {
+        int res = authBillDetailService.insert(entity);
+        return res;
+    }
+}
+```
+
+报错：
+
+```
+java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
+	at org.springframework.web.method.support.HandlerMethodReturnValueHandlerComposite.handleReturnValue(HandlerMethodReturnValueHandlerComposite.java:80)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:123)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:879)
+```
+
+若返回其他数字类型，如long等，也会报错。
+
+解决：加@ResponseBody，或者返回非整数类型，或用自定义泛型包裹数字类型
+
+## @Async
+
+标注在方法或者类上，从而可以方便的实现方法的异步调用。调用者在调用异步方法时将立即返回，方法的实际执行将提交给指定的线程池中的线程执行。
+
+编写Task组件：
 
 ```java
 @Component
-public class ZhouyuBeanPostProcessor implements BeanPostProcessor {
-
- @Override
- public Object postProcessBeforeInitialization(Object bean, String beanName) throws BeansException {
-  if ("userService".equals(beanName)) {
-   System.out.println("初始化前");
-  }
-
-  return bean;
- }
+public class Task {
+    public static Random random =new Random();
+	//@Async
+    public void doTaskOne() throws Exception {
+        System.out.println("开始做任务一");
+        long start = System.currentTimeMillis();
+        Thread.sleep(random.nextInt(10000));
+        long end = System.currentTimeMillis();
+        System.out.println("完成任务一，耗时：" + (end - start) + "毫秒");
+    }
+	//@Async
+    public void doTaskTwo() throws Exception {
+        System.out.println("开始做任务二");
+        long start = System.currentTimeMillis();
+        Thread.sleep(random.nextInt(10000));
+        long end = System.currentTimeMillis();
+        System.out.println("完成任务二，耗时：" + (end - start) + "毫秒");
+    }
+	//@Async
+    public void doTaskThree() throws Exception {
+        System.out.println("开始做任务三");
+        long start = System.currentTimeMillis();
+        Thread.sleep(random.nextInt(10000));
+        long end = System.currentTimeMillis();
+        System.out.println("完成任务三，耗时：" + (end - start) + "毫秒");
+    }
 }
 ```
 
-利用初始化前，可以对进行了依赖注入的Bean进行处理。
-​
-
-在Spring源码中：
-
-1. InitDestroyAnnotationBeanPostProcessor会在初始化前这个步骤中执行@PostConstruct的方法，
-2. ApplicationContextAwareProcessor会在初始化前这个步骤中进行其他Aware的回调：
-   1. EnvironmentAware：回传环境变量
-   2. EmbeddedValueResolverAware：回传占位符解析器
-   3. ResourceLoaderAware：回传资源加载器
-   4. ApplicationEventPublisherAware：回传事件发布器
-   5. MessageSourceAware：回传国际化资源
-   6. ApplicationStartupAware：回传应用其他监听对象，可忽略
-   7. ApplicationContextAware：回传Spring容器ApplicationContext
-
-### 12. 初始化
-
-1. 查看当前Bean对象是否实现了InitializingBean接口，如果实现了就调用其afterPropertiesSet()方法
-2. 执行BeanDefinition中指定的初始化方法
-
-### 
-
-### 13. 初始化后
-
-这是Bean创建生命周期中的最后一个步骤，也是Spring提供的一个扩展点：**BeanPostProcessor.postProcessAfterInitialization()**，比如：
+编写单元测试：
 
 ```java
-@Component
-public class ZhouyuBeanPostProcessor implements BeanPostProcessor {
+@RunWith(SpringJUnit4ClassRunner.class)
+@SpringBootTest(classes = LearnSpringApplication.class)  // 填启动类
+public class ApplicationTests {
+    @Autowired
+    private Task task;
 
- @Override
- public Object postProcessAfterInitialization(Object bean, String beanName) throws BeansException {
-  if ("userService".equals(beanName)) {
-   System.out.println("初始化后");
-  }
+    @Test
+    public void test() throws Exception {
+        // 正常情况下是顺序执行
+        task.doTaskOne();
+        task.doTaskTwo();
+        task.doTaskThree();
+    }
+}
+/* 输出：
+开始做任务一
+完成任务一，耗时：3753毫秒
+开始做任务二
+完成任务二，耗时：528毫秒
+开始做任务三
+完成任务三，耗时：5775毫秒
+*/
+```
 
-  return bean;
- }
+改用异步：将Task中三个函数加上@Async 注解，在**启动类**加@EnableAsync，则三个函数异步执行，乱序输出：例如：开始做任务二，开始做任务三，开始做任务一……等。但都没有打印耗时，因为主程序不等待三个函数执行完成就结束了
+
+**异步回调**
+
+使用Future返回异步调用结果，do函数改造如下：
+
+```java
+@Async
+public Future<String> doTaskOne() throws Exception {
+    System.out.println("开始做任务一");
+    long start = System.currentTimeMillis();
+    Thread.sleep(random.nextInt(10000));
+    long end = System.currentTimeMillis();
+    System.out.println("完成任务一，耗时：" + (end - start) + "毫秒");
+    return new AsyncResult<>("任务一完成");
+}
+// doTaskTwo doTaskThree略
+```
+
+test改造
+
+```java
+@Test
+public void test() throws Exception {
+    long start = System.currentTimeMillis();
+
+    Future<String> task1 = task.doTaskOne();
+    Future<String> task2 = task.doTaskTwo();
+    Future<String> task3 = task.doTaskThree();
+
+    while(true) {
+        if(task1.isDone() && task2.isDone() && task3.isDone()) {
+            // 三个任务都调用完成，退出循环等待
+            break;
+        }
+        Thread.sleep(1000);
+    }
+    long end = System.currentTimeMillis();
+    System.out.println("任务全部完成，总耗时：" + (end - start) + "毫秒");
+}
+/* 输出：
+开始做任务一
+开始做任务三
+开始做任务二
+完成任务三，耗时：4362毫秒
+完成任务二，耗时：7272毫秒
+完成任务一，耗时：7555毫秒
+任务全部完成，总耗时：8015毫秒
+/*
+```
+
+**注意**
+
+- @Async标注在类上时，表示该类的所有方法都是异步方法。
+- @Async注解的方法一定要通过**依赖注入**调用（因为要通过**代理对象调用**，基于aop），不能直接通过this对象调用，否则不生效。
+- @Async注解的方法不能是static或final，同样因为是基于aop，静态方法无法被代理
+
+### 配置自定义线程池
+
+Spring首先会通过下面两种方式查找作为异步方法的默认线程池：
+
+1. 查找唯一的一个TaskExecutor类型的bean
+2. 或者是一个名称为“taskExecutor”的Executor类型的Bean。
+
+如果上面两种方式都没有查找到，则使用SimpleAsyncTaskExecutor作为异步方法的默认线程池
+
+如果要配置自定义线程池，有多种方式：
+
+1. 重新实现接口AsyncConfigurer，重写getAsyncExecutor方法
+2. 继承AsyncConfigurerSupport
+3. 自定义一个TaskExecutor类型的bean。
+4. 自定义一个名称为“taskExecutor”的Executor类型的Bean。
+
+方式1例：
+
+```java
+@Configuration
+@EnableAsync  // 注意在配置类加这个注解
+public class SpringAsyncConfig implements AsyncConfigurer {
+    @Override
+    public Executor getAsyncExecutor() {
+        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
+        executor.setCorePoolSize(3);//核心池大小
+        executor.setMaxPoolSize(6);//最大线程数
+        executor.setKeepAliveSeconds(60);//线程空闲时间
+        executor.setQueueCapacity(10);//队列程度
+        executor.setThreadNamePrefix("my-executor1-");//线程前缀名称
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());//配置拒绝策略
+        executor.setAllowCoreThreadTimeOut(true);// 允许销毁核心线程
+        executor.initialize();
+        return executor;
+    }
 }
 ```
 
-可以在这个步骤中，对Bean最终进行处理，Spring中的**AOP就是基于初始化后实现**的，**初始化后返回的对象才是最终的Bean对象**。
+这样所有@Async方法都由这个指定线程池执行
 
-### 总结BeanPostProcessor
-
-1. 实例化前 InstantiationAwareBeanPostProcessor.postProcessBeforeInstantiation()
-
-2. 实例化
-
-3. MergedBeanDefinitionPostProcessor.postProcessMergedBeanDefinition() 可以修改bdf
-
-4. 实例化后 InstantiationAwareBeanPostProcessor.postProcessAfterInstantiation()  此时bean可能属性没赋值
-
-5. 属性赋值（spring自带的依赖注入）
-
-6. InstantiationAwareBeanPostProcessor.postProcessProperties(@Autowired、@Resource、@Value)
-
-   此时bean已经创建
-
-7. Aware对象
-
-8. 初始化前 BeanPostProcessor.postProcessBeforeInitialization() （此时若有@PostConstruct，则执行）
-
-9. 初始化
-
-10. 初始化后 BeanPostProcessor.postProcessAfterInitialization()
-
-# 二、Bean销毁过程
-
-销毁时机：容器关闭时
-
-销毁对象：只销毁单例，因为容器根本不存原型bean
+如果不同方法需要配置**不同线程池**，在@Async()参数上指定线程池的名称
 
 ```java
-AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
-context.close();  // 关闭容器
-//context.registerShutdownHook();  // 方法2：调用关闭钩子
+// 配置类
+@Configuration
+public class ExecutorConfig {
+    @Bean("customExecutor-1")// 自定义线程池1
+    public Executor customExecutor1() {
+        ...
+    }
+
+    @Bean("customExecutor-2")// 自定义线程池2
+    public Executor customExecutor2() {
+        ...
+    }
+}
+
+// 方法
+@Async("customExecutor-1")  // 使用自定义线程池1
+public void method1(){}
+
+@Async("customExecutor-2") // 使用自定义线程池2
+public void method2(){}
 ```
 
-## 扫描过程
+### 异常处理
 
-实现：org.springframework.beans.factory.support.AbstractBeanFactory#registerDisposableBeanIfNecessary
+当方法是带Future返回值的时候，Future.get()方法会抛出异常，所以异常捕获是没问题的。但是当方法是不带返回值的时候，那么此时主线程就不能捕获到异常，需要额外的配置来处理异常，可以有下面两种方式。
 
-1. 不能是原型bean && **需要销毁**。是否需要销毁调requiresDestruction()判断：
-   1. 实现**DisposableBean**或**AutoCloseable**接口；
-   2. 或 bd设置了destroyMethodName属性（指定destroyMethod的方法名）。如果属性值为“(inferred)”，则自动找名为**close**的方法，找不到再找名为shutdown的。
-   3. 或 类实现了DestructionAwareBeanPostProcesso && 其中有一个实现了DestructionAwareBeanPostProcessor.requiresDestruction()返回true（其实就是看哪些方法有**@PreDestroy**）
-2. 是否单例，单例才继续走
-3. 把符合上述任意一个条件的Bean适配成DisposableBeanAdapter对象，并存入disposableBeans中（一个LinkedHashMap），并不立即执行
+1. 通过try-catch处理异常
 
-## Spring容器关闭过程
+   直接在异步方法中使用try-catch来处理抛出的异常。这个方法也可以用于带Future返回值的异步方法。
 
-实现：org.springframework.context.support.AbstractApplicationContext#doClose
+2. 通过重写`getAsyncUncaughtExceptionHandler`方法
 
-1. 首先发布ContextClosedEvent事件
-2. 调用lifecycleProcessor的onCloese()方法
-3. 销毁单例Bean
-     i. 遍历disposableBeans
-       a. 把每个disposableBean从单例池中移除
-       b. 调用disposableBean的destroy()
-       c. 如果这个disposableBean还被其他Bean依赖了，那么也得销毁其他Bean
-       d. 如果这个disposableBean还包含了inner beans，将这些Bean从单例池中移除掉
-       (inner bean参考https://docs.spring.io/spring-framework/docs/current/springframework-reference/core.html#beans-inner-beans)
-       ii. 清空manualSingletonNames，是一个Set，存的是用户手动注册的单例Bean的
-       beanNameiii. 清空allBeanNamesByType，是一个Map，key是bean类型，value是该类型所有的
-       beanName数组
-       iv. 清空singletonBeanNamesByType，和allBeanNamesByType类似，只不过只存了单例
-       Bean
+   ```java
+   @Configuration
+   @EnableAsync
+   public class SpringAsyncConfig implements AsyncConfigurer {
+       @Override
+       public Executor getAsyncExecutor() {
+           // 省略自定义线程池的代码
+       }
+   
+       // 自定义异常处理
+       @Override
+       public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
+           return new AsyncUncaughtExceptionHandler() {
+               @Override
+               public void handleUncaughtException(Throwable throwable, Method method, Object... objects) {
+                   System.out.println(method.getName() + "发生异常！异常原因：" + throwable.getMessage() );
+               }
+           };
+       }
+   }
+   ```
 
-这里涉及到一个设计模式：适配器模式
-  在销毁时，Spring会找出实现了DisposableBean接口的Bean。
-  但是我们在定义一个Bean时，如果这个Bean实现了DisposableBean接口，或者实现了
-  AutoCloseable接口，或者在BeanDefinition中指定了destroyMethodName，那么这个Bean都属
-  于“DisposableBean”，这些Bean在容器关闭时都要调用相应的销毁方法。
-  所以，这里就需要进行适配，将实现了DisposableBean接口、或者AutoCloseable接口等适配成实
-  现了DisposableBean接口，所以就用到了DisposableBeanAdapter。
-  会把实现了AutoCloseable接口的类封装成DisposableBeanAdapter，而DisposableBeanAdapter
-  实现了DisposableBean接口。
+   
+
+
 
 # SpringBoot 引导配置
 
@@ -1809,744 +1985,4 @@ WebApp destroyed.
 示意图：
 
 <img src="images/Spring常见问题/8701b36673e94fc887f403f35783f06dnoop.image_iz=58558&from=article.png" alt="img" style="zoom: 25%;" />
-
-# Spring常用注解
-
-## @Component
-
-最普通的组件，可以被注入到spring容器进行管理。等效于XML的bean配置
-
-是单例模式，因此bean会在全局共享。
-
-根据类型注入，因此如果有多个同类型（或一个接口的多个实现，具体看程序getBean()获取的是类还是接口），启动时会报错：
-
-```
-Field sysUserApi in com.eshore.cmp.corp.service.service.base.CorpBaseService required a single bean, but 2 were found:
-	- userErrorDecoder: defined in URL [jar:file:/D:/Java/apache-maven-3.5.4/repository/com/eshore/cmp/cmp-ord-api/2.0.0-SNAPSHOT/cmp-ord-api-2.0.0-SNAPSHOT.jar!/com/eshore/cmp/ord/UserErrorDecoder.class]
-	- feignErrorDecoder: defined in URL [jar:file:/D:/Java/apache-maven-3.5.4/repository/com/eshore/cmppub/cmppub-springcloud-common/2.0.0-SNAPSHOT/cmppub-springcloud-common-2.0.0-20210618.070507-15.jar!/com/eshore/cmppub/springcloud/common/components/feign/FeignErrorDecoder.class]
-```
-
-@Repository, @Service  和 @Controller 都包含 @Component，是针对不同的使用场景所采取的特定功能化的注解组件
-
-- @Repository注解可以标记在任何的类上，用来表明该类是用来执行与数据库相关的操作（即dao对象），并支持自动处理数据库操作产生的异常
-- @Service修饰服务（接口实现类）。如果你不知道要在项目的业务层采用@Service还是@Component注解。那么，@Service是一个更好的选择。
-
-## @Scope
-
-只有一个参数：value，别名scopeName
-
-用法：
-
-- `singleton`：单例（默认），每次getBean都只返回同一个bean
-- `prototype`：原型，每次getBean返回一个新的bean
-- `request`: 表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP request内有效
-- `session`：表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP session内有效
-
-**多例失效场景**
-
-controller是默认的单例，对其Autowired注入的service层指定是多例时，多例失效。原因是多例service被单例controller依赖，而单例controller初始化时，多例的service注入，创建bean；单例controller调用service时，由于注入只有一次，因此调的还是注入时的service，即多例service没有起效
-
-解决：
-
-- 方法1: 不使用`@Autowired` ,每次调用多例的时候,直接调用bean
-
-- 方法2:spring的解决方法:设置`proxyMode`,每次请求的时候实例化
-
-  > `@Scope`注解添加了一个proxyMode的属性，有两个值`ScopedProxyMode.INTERFACES`和`ScopedProxyMode.TARGET_CLASS`，前一个表示表示Service是一个接口，后一个表示Service是一个类。
-
-```java
-@Scope(value = ConfigurableBeanFactory.SCOPE_PROTOTYPE, proxyMode = ScopedProxyMode.TARGET_CLASS)
-```
-
-## @ComponentScan
-
-扫描含有@Component的类，注入spring容器。包含@Component的注解也算，如：@Controller，@Service和@Repository
-
-**原理**
-
-org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#registerDefaultFilters
-
-方法中给includeFilters添加了@Component过滤器，因此默认扫描带@Component的类：
-
-```java
-this.includeFilters.add(new AnnotationTypeFilter(Component.class));
-```
-
-**value**
-
-指定扫描路径，默认扫描该注解修饰的当前类所在目录
-
-**ExcludeFilter 和 IncludeFilter**
-
-1.ExcludeFilter表示**排除过滤器**。
-
-比如以下配置，表示扫描com.zhouyu这个包下面的所有类，但是排除UserService类，也就是就算它上面有@Component注解也不会成为Bean。
-
-```java
-@ComponentScan(value = "com.css.service",
-        excludeFilters = {@ComponentScan.Filter(
-                type = FilterType.ASSIGNABLE_TYPE,
-                classes = UserService.class)})
-public class AppConfig {
-}
-```
-
-2.IncludeFilter表示**包含过滤器**
-
-以下配置，即使UserService类没加@Component也能注入spring容器。
-
-```java
-@ComponentScan(value = "com.css.service",
-        includeFilters = {@ComponentScan.Filter(
-                type = FilterType.ASSIGNABLE_TYPE,
-                classes = UserService.class)})
-public class AppConfig {
-}
-```
-
-FilterType分为：
-
-1. ANNOTATION：通过注解过滤
-2. ASSIGNABLE_TYPE：通过Class类型过滤
-3. ASPECTJ：Aspectj表达式过滤
-4. REGEX：正则表达式过滤
-5. CUSTOM：自定义 过滤 
-
-在Spring的扫描逻辑中，默认会添加一个**Annotation**类型的FilterType给includeFilters，表示默认情况下Spring会认为类上有@Component注解的就是Bean。  
-
-## @Configuration
-
-用于修饰类，告诉Springboot这是一个配置类（等同于配置文件）
-
-参数：proxyBeanMethods，代理bean的方法，布尔类型
-
-- true：保证每个@Bean方法被调用多少次返回的组件都是单实例的
-- false：每个@Bean方法被调用多少次返回的组件都是新创建的
-
-
-
-## @Bean
-
-用于修饰方法，按**类型**装配。一般与@Configuration搭配使用，在配置类中，使用@Bean标注的方法给容器中添加组件。默认以**方法名**作为组件name，返回类型就是组件类型。
-
-组件name必须是唯一的，否则会冲突。
-
-1. 方法无参，则容器中注入的bean名称为方法名
-
-   ```java
-   // 配置类
-   @Configuration(proxyBeanMethods = false)  
-   public class Myconfig {
-       @Bean  
-       public User user01() {  // 向容器中添加组件，名称默认为user01，即方法名
-           return new User("zhangsan", 18);
-       }
-   }
-   // 主启动类main方法, 获取IOC容器
-   ConfigurableApplicationContext run = SpringApplication.run(MainApplicaition.class, args);
-   
-   // 从容器中获取组件
-   User user = run.getBean("user01", User.class);
-   ```
-
-2. 方法带参
-
-   @Bean修饰的方法若带参数，则根据**形参类型**寻找容器组件。容器中注入的bean名称为传入参数
-
-   ```java
-   @Bean
-   @ConditionalOnMissingBean(name = "user123")  // 若容器中不存在名为user123的组件
-   public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
-       return user1;
-   }
-   ```
-   
-   带多个参数，其他参数是别名
-   
-   ```java
-   @Bean({"user", "user1", "user2"})			// 名字是user，有两个别名user1和user2
-   public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
-       return user1;
-   }
-   ```
-   
-   
-
-## @Conditional
-
-参数：条件类。根据条件类返回的布尔值决定是否加载该类
-
-使用：
-
-```java
-@Component
-@Conditional(CssCondition.class)
-public class UserService {
-
-   public void test(){
-      System.out.println("test ");
-   }
-}
-```
-
-再写一个条件类，实现Condition接口
-
-```java
-public class CssCondition implements Condition {
-   @Override
-   public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-      try {
-         context.getClassLoader().loadClass("com.zhouyu.service.user");
-         return true;
-      } catch (ClassNotFoundException e) {
-         return false;
-      }
-   }
-}
-```
-
-spring容器就会根据CssCondition的返回布尔值决定是否加载UserService
-
-## @DependsOn
-
-
-
-## @Order
-
-用于修饰类
-
-```java
-@Order(1)
-@Service
-public class CustomerHandler extends BaseSyncCorpDataHandler implements ISyncCorpDataHandler {
-	// 实现dealData方法
-    @Override
-    public CorpDataHandleResult dealData() {
-        ...
-    }
-}
-```
-
-参数x越小，优先级越高。如果不标注数字，默认最低优先级（int最大值）
-
-该注解等同于实现Ordered接口getOrder方法，并返回数字。
-
-配合@Autowired，就能在类中按顺序注入List
-
-```java
-public class SyncCorpDataServiceImpl extends CorpBaseService implements ISyncCorpDataService {
-	// 按Order的排序，扫描ISyncCorpDataHandler的所有实现类，依次注入到List中
-    @Autowired
-    List<ISyncCorpDataHandler> syncCorpDataHandlers;
-    
-    public String dealCorpDataFromIotReqInfo(SyncReqInfoBo svcCont) {
-        // 依次执行每个ISyncCorpDataHandler接口实现类的dealData
-        for (ISyncCorpDataHandler syncCorpDataHandler : syncCorpDataHandlers) {
-            syncCorpDataHandler.dealData();
-            ...
-        }
-    }
-}
-```
-
-注意：@Order不能决定Spring容器加载Bean的顺序，只能决定@Autowired注入List<>的顺序
-
-## @PostConstruct
-
-jdk1.6开始，用于修饰非静态的void方法，在当前类构造完成时执行该方法，完成某些初始化动作。
-
-执行顺序：Constructor -> @Autowired -> @PostConstruct  （构造完成，说明是完整的bean，因此依赖注入已完成）
-
-例：当某个类中，注入的bean加载顺序迟于当前类，则程序无法启动，因为@PostConstruct方法依赖于注入bean，而此时bean未加载，无法继续
-
-```java
-// 某个类中
-    @Autowired
-    private IParamApi paramApi;
-
-    @PostConstruct
-    public void initOiddUrl() {
-        if (!"local".equals(envActive)) {
-            CmpParam param = paramApi.queryCmpParam("OIDD_URL");
-            if (StringHelper.isNotEmpty(param.getParamValue())) {
-                this.oiddUrl = param.getParamValue();
-            }
-        }
-    }
-```
-
-
-
-## @Autowired
-
-**作用**
-
-自动导入对象到类中，被注入进的类同样要被 Spring 容器管理比如：Service 类注入到 Controller 类中。
-
-默认 按类型装配（而不是变量名），默认情况下必须要求依赖对象必须存在，如果要允许null值，可以设置它的required属性为false
-
-@Bean 和 @Autowired 做了两件完全不同的事情：
-
-1. @Bean 告诉 Spring：“这是这个类的一个实例，请保留它，并在我请求时将它还给我”。
-2. @Autowired 说：“请给我一个这个类的实例，例如，一个我之前用@Bean注释创建的实例”。
-
-**前提**
-
-要注入的类加上@Component（或者@Service、@Controller等包含@Component的注解）。
-
-在类中的变量加@Autowired注解无法生效。
-
-因为如果一个类new对象生成的，那么这个类就不归spring容器管理，IOC等spring的功能也就无法使用了。
-
-
-
-**常规用法：单个注入**
-
-  
-
-```java
-@Autowired // 直接注入
-private  BeanInterface beaninterface; 
-```
-
-**注意**
-
-由于@Autowired根据类型装配，因此容器中有多个同类型Bean时，需要加@Qualifier指定要注入的Bean名称，否则会出错。
-
-```java
-//控制器 
-@RestController
-public class HelloController {
-    @Autowired
-    @Qualifier("Zhang")  //指定注入名为“Zhang"的组件
-    private User user;
-}
-// 配置类
-@Configuration(proxyBeanMethods = false)
-public class Myconfig {
-    @Bean("Zhang")
-    public User user01() {
-        return new User("zhangsan", 18);
-    }
-    @Bean("Li")
-    public User user03() {
-        return new User("lisi", 19);
-    }
-}
-```
-
-若想将多个同类型Bean都注入，参考下文注入Map<T>
-
-**注入集合**
-
-注入`List<T>`
-
-按类型搜寻相应的Bean并注入List，还可以使用@Order指定加载的顺序（也即是Bean在List中的顺序，spring根据加载顺序填入list。
-
-注入`Set<T>`
-
-也是按类型注入，但是没有顺序
-
-注入`Map<T>`
-
- @Autowired 标注作用于 Map 类型时，如果 Map 的 key 为 String 类型，则 Spring 会将容器中所有**类型符合** Map 的 value 对应的类型的 Bean 增加进来，用 Bean 的 id 或 name 作为 Map 的 key。
-
-
-
-## @ControllerAdvice
-
-全局Controller异常处理
-
-用法：在打上注解的类中，对每种要处理的异常类型，写一个处理方法，每个方法用@ExceptionHandler注解指定处理的异常类型，方法的参数一般也是要处理的异常类型
-
-优点：将 Controller 层的异常和数据校验的异常进行统一处理，减少模板代码，减少编码量，提升扩展性和可维护性。
-
-缺点：只能处理 Controller 层未捕获（往外抛）的异常，对于 Interceptor（拦截器）层的异常，Spring 框架层的异常，就无能为力了。
-
-```java
-// 全局Controller异常处理
-@ControllerAdvice
-public class GlobalExceptionAdvice {
-
-    private Logger logger = LoggerFactory.getLogger(this.getClass());
-
-	// valid异常
-    @ResponseBody
-    // 指定处理异常类型
-    @ExceptionHandler(value = MethodArgumentNotValidException.class)
-    // 入参为要处理的异常类型
-    public NaResult<Object> methodArgumentNotValidHandler(MethodArgumentNotValidException e) {
-        if (e != null && CollectionHelper.isNotEmpty(e.getBindingResult().getFieldErrors())) {
-            FieldError error = CollectionHelper.getFirst(e.getBindingResult().getFieldErrors());
-            return new NaResult<>(NaConstant.FAIL_CODE, error.getDefaultMessage(), null);
-        }
-        return new NaResult<>(NaConstant.FAIL_CODE, ExceptionMsgs.CommonErrMsg.PARAM_ERROR, null);
-    }
-
-    // NA自定义异常
-    @ResponseBody
-    @ExceptionHandler(value = NaException.class)
-    public NaResult<Object> naExceptionHandler(NaException e) {
-        logger.error("GlobalExceptionAdvice-naExceptionHandler:{}", e.getMessage(), e);
-        return new NaResult<>(NaConstant.FAIL_CODE, e.getMessage(), null);
-    }
-
-    // 其他异常
-    @ResponseBody
-    @ExceptionHandler(value = Exception.class)
-    public NaResult<Object> exceptionHandler(Exception e) {
-        logger.error("GlobalExceptionAdvice-exceptionHandler:{}", e.getMessage(), e);
-        return new NaResult<>(NaConstant.FAIL_CODE, e.getMessage(), null);
-    }
-
-}
-```
-
-
-
-## @RequestParam
-
-参数：
-
-- name（别名value）-- String类型
-
-  name不能重复（即使不同类型取同名也不行）
-
-- required -- 布尔类型
-
-  默认为true，设为false才需要显式：
-
-  ```java
-  @RequestParam(value = "xxx", required = false) double d //xxx为传入参数名
-  ```
-
-  required参数为true的误区：
-  required = true是在前端没有传参数（也就是null）的时候报错，并不能防止参数为空字符串""。
-
-请求传来的参数实际上都是String类型，由框架转为相应类型，若超出类型取值范围，会报转换异常：
-
-```
-org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Failed to convert value of type 'java.lang.String' to required type 'int'; nested exception is java.lang.NumberFormatException: For input string: "2147483648"
-```
-
-## @PreDestroy
-
-修饰方法。容器关闭前执行。
-
-只对单例bean有效。若多个方法都带此注解，执行顺序无法指定
-
-
-
-## 参数校验（validation框架）
-
-@Validated：用在方法入参上
-
-@Valid：用在属性上，配合@Validated嵌套验证
-
-例：数据结构是Item类包裹Prop类，最外层用@Validated校验Item，Item内用@Valid校验Prop，就能启用校验
-
-```java
-@PostMapping("/item/add")
-public void addItem(@RequestBody @Validated Item item) {
-    System.out.println("input:" + jsonMapper.toJson(item));
-}
-
-public class Item {
-    @NotNull(message = "id不能为空")
-    @Min(value = 1, message = "id必须为正整数")
-    private Long id;
-
-    @Valid
-    @NotNull(message = "props不能为空")
-    @Size(min = 1, message = "至少要有一个属性")
-    private List<Prop> props;
-    // get、set省略
-}
-
-public class Prop {
-    @NotNull(message = "pid不能为空")
-    @Min(value = 1, message = "pid必须为正整数")
-    private Long pid;
-
-    @NotBlank(message = "pidName不能为空")
-    private String pidName;
-    // get、set省略
-}
-```
-
-**常用校验注解**
-
-1. @NotNull：不能为null，但可以为empty（空字符串，空对象）
-
-2. @NotEmpty：不能为null，而且长度必须大于0
-
-3. @NotBlank：只能作用在String上，不能为null，而且调用trim()去除前后空格后，长度必须大于0
-
-4. @Max(value)：最大值，用于一个枚举值的数据范围控制
-
-5. @Min(value)：最小值，用于一个枚举值的数据范围控制
-
-6. @Size(min=a, max=b)：限制字符长度必须在min到max之间
-
-7. @Pattern(regexp = "正则")：正则表达式校验
-
-   
-
-## controller不能直接返回数字
-
-如下代码直接返回int
-
-```java
-@Controller
-@RequestMapping("/api/v1/authBillDetail")
-public class AuthBillDetailController extends CMPController {
-    @Autowired
-    private IAuthBillDetailService authBillDetailService;
-    
-    @ApiOperation(value = "xxx notes = "xxx")
-    @PostMapping("/insert")
-    //@ResponseBody
-    int insert(@RequestBody AuthBillDetail entity) {
-        int res = authBillDetailService.insert(entity);
-        return res;
-    }
-}
-```
-
-报错：
-
-```
-java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
-	at org.springframework.web.method.support.HandlerMethodReturnValueHandlerComposite.handleReturnValue(HandlerMethodReturnValueHandlerComposite.java:80)
-	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:123)
-	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:879)
-```
-
-若返回其他数字类型，如long等，也会报错。
-
-解决：加@ResponseBody，或者返回非整数类型，或用自定义泛型包裹数字类型
-
-## @Async
-
-标注在方法或者类上，从而可以方便的实现方法的异步调用。调用者在调用异步方法时将立即返回，方法的实际执行将提交给指定的线程池中的线程执行。
-
-编写Task组件：
-
-```java
-@Component
-public class Task {
-    public static Random random =new Random();
-	//@Async
-    public void doTaskOne() throws Exception {
-        System.out.println("开始做任务一");
-        long start = System.currentTimeMillis();
-        Thread.sleep(random.nextInt(10000));
-        long end = System.currentTimeMillis();
-        System.out.println("完成任务一，耗时：" + (end - start) + "毫秒");
-    }
-	//@Async
-    public void doTaskTwo() throws Exception {
-        System.out.println("开始做任务二");
-        long start = System.currentTimeMillis();
-        Thread.sleep(random.nextInt(10000));
-        long end = System.currentTimeMillis();
-        System.out.println("完成任务二，耗时：" + (end - start) + "毫秒");
-    }
-	//@Async
-    public void doTaskThree() throws Exception {
-        System.out.println("开始做任务三");
-        long start = System.currentTimeMillis();
-        Thread.sleep(random.nextInt(10000));
-        long end = System.currentTimeMillis();
-        System.out.println("完成任务三，耗时：" + (end - start) + "毫秒");
-    }
-}
-```
-
-编写单元测试：
-
-```java
-@RunWith(SpringJUnit4ClassRunner.class)
-@SpringBootTest(classes = LearnSpringApplication.class)  // 填启动类
-public class ApplicationTests {
-    @Autowired
-    private Task task;
-
-    @Test
-    public void test() throws Exception {
-        // 正常情况下是顺序执行
-        task.doTaskOne();
-        task.doTaskTwo();
-        task.doTaskThree();
-    }
-}
-/* 输出：
-开始做任务一
-完成任务一，耗时：3753毫秒
-开始做任务二
-完成任务二，耗时：528毫秒
-开始做任务三
-完成任务三，耗时：5775毫秒
-*/
-```
-
-改用异步：将Task中三个函数加上@Async 注解，在**启动类**加@EnableAsync，则三个函数异步执行，乱序输出：例如：开始做任务二，开始做任务三，开始做任务一……等。但都没有打印耗时，因为主程序不等待三个函数执行完成就结束了
-
-**异步回调**
-
-使用Future返回异步调用结果，do函数改造如下：
-
-```java
-@Async
-public Future<String> doTaskOne() throws Exception {
-    System.out.println("开始做任务一");
-    long start = System.currentTimeMillis();
-    Thread.sleep(random.nextInt(10000));
-    long end = System.currentTimeMillis();
-    System.out.println("完成任务一，耗时：" + (end - start) + "毫秒");
-    return new AsyncResult<>("任务一完成");
-}
-// doTaskTwo doTaskThree略
-```
-
-test改造
-
-```java
-@Test
-public void test() throws Exception {
-    long start = System.currentTimeMillis();
-
-    Future<String> task1 = task.doTaskOne();
-    Future<String> task2 = task.doTaskTwo();
-    Future<String> task3 = task.doTaskThree();
-
-    while(true) {
-        if(task1.isDone() && task2.isDone() && task3.isDone()) {
-            // 三个任务都调用完成，退出循环等待
-            break;
-        }
-        Thread.sleep(1000);
-    }
-    long end = System.currentTimeMillis();
-    System.out.println("任务全部完成，总耗时：" + (end - start) + "毫秒");
-}
-/* 输出：
-开始做任务一
-开始做任务三
-开始做任务二
-完成任务三，耗时：4362毫秒
-完成任务二，耗时：7272毫秒
-完成任务一，耗时：7555毫秒
-任务全部完成，总耗时：8015毫秒
-/*
-```
-
-**注意**
-
-- @Async标注在类上时，表示该类的所有方法都是异步方法。
-- @Async注解的方法一定要通过**依赖注入**调用（因为要通过**代理对象调用**，基于aop），不能直接通过this对象调用，否则不生效。
-- @Async注解的方法不能是static或final，同样因为是基于aop，静态方法无法被代理
-
-### 配置自定义线程池
-
-Spring首先会通过下面两种方式查找作为异步方法的默认线程池：
-
-1. 查找唯一的一个TaskExecutor类型的bean
-2. 或者是一个名称为“taskExecutor”的Executor类型的Bean。
-
-如果上面两种方式都没有查找到，则使用SimpleAsyncTaskExecutor作为异步方法的默认线程池
-
-如果要配置自定义线程池，有多种方式：
-
-1. 重新实现接口AsyncConfigurer，重写getAsyncExecutor方法
-2. 继承AsyncConfigurerSupport
-3. 自定义一个TaskExecutor类型的bean。
-4. 自定义一个名称为“taskExecutor”的Executor类型的Bean。
-
-方式1例：
-
-```java
-@Configuration
-@EnableAsync  // 注意在配置类加这个注解
-public class SpringAsyncConfig implements AsyncConfigurer {
-    @Override
-    public Executor getAsyncExecutor() {
-        ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
-        executor.setCorePoolSize(3);//核心池大小
-        executor.setMaxPoolSize(6);//最大线程数
-        executor.setKeepAliveSeconds(60);//线程空闲时间
-        executor.setQueueCapacity(10);//队列程度
-        executor.setThreadNamePrefix("my-executor1-");//线程前缀名称
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());//配置拒绝策略
-        executor.setAllowCoreThreadTimeOut(true);// 允许销毁核心线程
-        executor.initialize();
-        return executor;
-    }
-}
-```
-
-这样所有@Async方法都由这个指定线程池执行
-
-如果不同方法需要配置**不同线程池**，在@Async()参数上指定线程池的名称
-
-```java
-// 配置类
-@Configuration
-public class ExecutorConfig {
-    @Bean("customExecutor-1")// 自定义线程池1
-    public Executor customExecutor1() {
-        ...
-    }
-
-    @Bean("customExecutor-2")// 自定义线程池2
-    public Executor customExecutor2() {
-        ...
-    }
-}
-
-// 方法
-@Async("customExecutor-1")  // 使用自定义线程池1
-public void method1(){}
-
-@Async("customExecutor-2") // 使用自定义线程池2
-public void method2(){}
-```
-
-### 异常处理
-
-当方法是带Future返回值的时候，Future.get()方法会抛出异常，所以异常捕获是没问题的。但是当方法是不带返回值的时候，那么此时主线程就不能捕获到异常，需要额外的配置来处理异常，可以有下面两种方式。
-
-1. 通过try-catch处理异常
-
-   直接在异步方法中使用try-catch来处理抛出的异常。这个方法也可以用于带Future返回值的异步方法。
-
-2. 通过重写`getAsyncUncaughtExceptionHandler`方法
-
-   ```java
-   @Configuration
-   @EnableAsync
-   public class SpringAsyncConfig implements AsyncConfigurer {
-       @Override
-       public Executor getAsyncExecutor() {
-           // 省略自定义线程池的代码
-       }
-   
-       // 自定义异常处理
-       @Override
-       public AsyncUncaughtExceptionHandler getAsyncUncaughtExceptionHandler() {
-           return new AsyncUncaughtExceptionHandler() {
-               @Override
-               public void handleUncaughtException(Throwable throwable, Method method, Object... objects) {
-                   System.out.println(method.getName() + "发生异常！异常原因：" + throwable.getMessage() );
-               }
-           };
-       }
-   }
-   ```
-
-   
-
-
-
-
 
