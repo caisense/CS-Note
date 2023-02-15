@@ -571,9 +571,9 @@ context.close();  // 关闭容器
 
 # 三、依赖注入
 
-![image-20230211235541437](images/spring源码/image-20230211235541437.png)
 
 
+<img src="images/spring源码/image-20230213091743919.png" alt="image-20230213091743919" style="zoom: 50%;" />
 
 org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#populateBean
 
@@ -605,8 +605,42 @@ org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#aut
 
 @Autowired注解相当于XML中的autowire属性的**注解方式的替代**  
 
-调用AutowiredAnnotationBeanPostProcessor的postProcessProperties()方法，会直接给对象中的属性赋值。内部并不会处理pvs，直接返回了
+由AutowiredAnnotationBeanPostProcessor处理，执行postProcessProperties()方法，会直接给对象中的属性赋值。内部并不会处理pvs，直接返回了
 
-1. 找出该类的所有注入点（@Autowired、@Value、@Inject 修饰的**属性、方法**），解析注入点并缓存。static修饰的除外（原因？static修饰的属性和方法只属于类，只有一份，如果多处注入导致冲突）。String类型也除外（根本需要注入）
+1. 找出该类的所有注入点（@Autowired、@Value、@Inject 修饰的**属性、方法**），解析注入点并缓存（用于原型），生成`InjectedElement`。如果有父类，再往上找直到Object，头插法放入列表（父在前）
+
+   static修饰的除外（原因？static修饰的属性和方法只属于类，只有一份，如果多处注入导致冲突）。String类型也除外（根本不需要注入）
+
 2. 遍历1中每个注入点，对bean的执行注入
+
+   1. 对属性，先找值，再反射set。（org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor.AutowiredFieldElement#inject）
+   2. 对方法（必须是setXX），遍历参数列表找到**每个参数**的值，先找值，然后反射invoke调用。（org.springframework.beans.factory.annotation.AutowiredAnnotationBeanPostProcessor.AutowiredMethodElement#inject）
+
+找值最终都调AutowireCapableBeanFactory.resolveDependency()，原型bean只在第一次执行时解析，之后有缓存了，再创建就直接取缓存
+
+DefaultListableBeanFactory中**resolveDependency()**是上面方法的具体实现，具体流程图  :
+
+<img src="images/spring源码/image-20230214112901786.png" alt="image-20230214112901786" style="zoom:67%;" />
+
+findAutowireCandidates()  
+
+根据类型找beanName的底层流程  
+
+<img src="images/spring源码/image-20230214113440475.png" alt="image-20230214113440475"  />
+
+
+
+DefaultListableBeanFactory.doResolveDependency()具体流程图为  
+
+<img src="images/spring源码/image-20230214112949038.png" alt="image-20230214112949038" style="zoom: 50%;" />
+
+## 3. @Resource注解
+
+由CommonAnnotationBeanPostProcessor处理，执行postProcessProperties()
+
+底层工作流程图  
+
+<img src="images/spring源码/image-20230214113614488.png" alt="image-20230214113614488" style="zoom: 80%;" />  
+
+# 四、循环依赖
 

@@ -696,11 +696,22 @@ FilterType分为：
 
 ## @Bean
 
-用于修饰方法，按**类型**装配。一般与@Configuration搭配使用，在配置类中，使用@Bean标注的方法给容器中添加组件。默认以**方法名**作为组件name，返回类型就是组件类型。
+用于修饰方法，按**类型**装配。一般与@Configuration搭配使用，在配置类中，使用@Bean标注的方法给容器中添加组件。默认以**方法名**作为beanName（必须是唯一的，否则会冲突），返回类型就是bean类型。
 
-组件name必须是唯一的，否则会冲突。
+参数：给bean命名，无参则默认取方法名为beanName。
 
-1. 方法无参，则容器中注入的bean名称为方法名
+参数为列表，则第一个是真名，其他参数是别名：
+
+```java
+@Bean({"user", "user1", "user2"})			// 名字是user，有两个别名user1和user2
+public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
+    return user1;
+}
+```
+
+方法的bean搜寻机制分为无参和有参：
+
+1. 方法无参，则编写方法逻辑返回bean，容器并不帮你找bean。
 
    ```java
    // 配置类
@@ -718,28 +729,18 @@ FilterType分为：
    User user = run.getBean("user01", User.class);
    ```
 
-2. 方法带参
-
-   @Bean修饰的方法若带参数，则根据**形参类型**寻找容器组件。容器中注入的bean名称为传入参数
+2. 方法带参，则spring根据**形参类型**寻找容器组件。容器中注入的bean名称为传入参数
 
    ```java
    @Bean
    @ConditionalOnMissingBean(name = "user123")  // 若容器中不存在名为user123的组件
-   public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
+   public User user123(User user1) {       // 则获取容器中类型为User（不看名字）的组件，并将其命名为user123以返回。
        return user1;
    }
    ```
-
-   带多个参数，其他参数是别名
-
-   ```java
-   @Bean({"user", "user1", "user2"})			// 名字是user，有两个别名user1和user2
-   public User user123(User user1) {            // 则获取容器中类型为User的组件，并将其命名为user123以返回
-       return user1;
-   }
-   ```
-
    
+   
+
 
 ## @Autowired
 
@@ -755,9 +756,73 @@ required，布尔值，默认true--表示注入的对象必须存在。false--�
 
 可以修饰：
 
-1. 属性：先根据属性**类型（而不是名字）**去找Bean，如果找到多个再根据属性名确定一个
-2. 构造方法：先根据方法参数类型去找Bean，如果找到多个再根据参数名确定一个
-3. set方法：先根据方法参数类型去找Bean，如果找到多个再根据参数名确定一个
+1. 属性：先根据**属性类型（而不是名字）**去找Bean，如果找到多个再根据**属性名**确定一个
+
+2. set方法：先根据**方法参数**类型去找Bean，如果找到多个再根据**参数名**确定一个
+
+3. 构造方法：先根据**方法参数**类型去找Bean，如果找到多个再根据**参数名**确定一个
+
+   用途：由于Java变量的初始化顺序为：静态变量或静态语句块–>实例变量或初始化语句块–>构造方法–>@Autowired，因此构造时属性还未注入，如果此时需要这个属性值，则应在构造方法加@Autowired
+
+   ```java
+   public class UserService {
+       // 下面两种@Autowired效果相同
+       @Autowired
+       private OrderService os; // 用于字段上
+       
+       @Autowired
+       public void setOrderService(OrderService os) { // 用于属性的方法上
+           this.os = os;
+       }
+   }
+   ```
+
+   ```java
+   // 第3种：加载构造方法
+   @Component
+   public class UserService {
+   	private OrderService os;
+   	@Autowired  
+   	public UserService(OrderService os) {
+   		System.out.println(this.os);  // null
+   		System.out.println(os);  // com.zhouyu.service.OrderService@59690aa4
+   	}
+   }
+   
+   //测试：
+   public static void main(String[] args) {
+   		// 创建一个Spring容器
+    		AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+   		UserService userService = (UserService) context.getBean("userService");
+   }
+   ```
+
+   如果根据属性名还是找不到，则报错
+   
+   ```java
+   public class AppConfig {  // 配置类
+   
+   	@Bean({"orderService2", "orderService3"})  // 名字orderService2，别名orderService3
+   	public OrderService orderService() {
+   		return new OrderService();
+   	}
+   	@Bean
+   	public OrderService orderService1() {  // 名字orderService1
+   		return new OrderService();
+   	}
+   }
+   public class UserService {
+   	@Autowired
+   	private OrderService orderService;  // 报错，因为OrderService类型bean有两个，但没有名为orderService的
+       @Autowired
+   	private OrderService orderService3  // 正确，因为有一个别名为orderService3的bean
+   	@Value("#{orderService3}")
+   	@Autowired
+   	private OrderService orderService;  // 正确，虽然Autowired没找到，但是value找到了
+   }
+   ```
+   
+   
 
 @Bean 和 @Autowired 做了两件完全不同的事情：
 
@@ -803,17 +868,152 @@ public class Myconfig {
 
 **注入集合**
 
-注入`List<T>`
+1. 注入`List<T>`
 
-按类型搜寻相应的Bean并注入List，还可以使用@Order指定加载的顺序（也即是Bean在List中的顺序，spring根据加载顺序填入list。
+   按类型搜寻相应的Bean并注入List，还可以使用@Order指定加载的顺序（也即是Bean在List中的顺序，spring根据加载顺序填入list。
 
-注入`Set<T>`
+2. 注入`Set<T>`
 
-也是按类型注入，但是没有顺序
+   也是按类型注入，但是没有顺序
 
-注入`Map<T>`
+3. 注入`Map ---- Map <beanName，Bean>`
 
- @Autowired 标注作用于 Map 类型时，如果 Map 的 key 为 String 类型，则 Spring 会将容器中所有**类型符合** Map 的 value 对应的类型的 Bean 增加进来，用 Bean 的 id 或 name 作为 Map 的 key。
+   @Autowired 标注作用于 Map 类型时，spring强制要求 key **必须为 String** 类型，则并将容器中所有**类型** 为value 的 Bean 注入进来，用 Bean 的 id 或 name 作为 key：
+
+
+
+
+## @Primary
+
+只能修饰属性，配合@Autowired使用，当容器中同类型Bean有多个时，直接取带@Primary的
+
+## @Order
+
+用于修饰bean，常配合@Autowired使用
+
+```java
+@Order(1)
+@Service
+public class CustomerHandler extends BaseSyncCorpDataHandler implements ISyncCorpDataHandler {
+	// 实现dealData方法
+    @Override
+    public CorpDataHandleResult dealData() {
+        ...
+    }
+}
+```
+
+参数x越小，优先级越高。如果不标注数字，默认最低优先级（int最大值）
+
+该注解等同于实现Ordered接口getOrder方法，并返回数字。
+
+配合@Autowired，就能在类中按顺序注入List
+
+```java
+public class SyncCorpDataServiceImpl extends CorpBaseService implements ISyncCorpDataService {
+	// 按Order的排序，扫描ISyncCorpDataHandler的所有实现类，依次注入到List中
+    @Autowired
+    List<ISyncCorpDataHandler> syncCorpDataHandlers;
+    
+    public String dealCorpDataFromIotReqInfo(SyncReqInfoBo svcCont) {
+        // 依次执行每个ISyncCorpDataHandler接口实现类的dealData
+        for (ISyncCorpDataHandler syncCorpDataHandler : syncCorpDataHandlers) {
+            syncCorpDataHandler.dealData();
+            ...
+        }
+    }
+}
+```
+
+注意：@Order不能决定Spring容器加载Bean的顺序，只能决定@Autowired注入List<>的顺序
+
+## @Priority
+
+修饰bean，参数为数字，越小表示优先级越高（当容器中有多个@Priority修饰的同类bean时）
+
+判断优先级：@Qualifier > @Primary > @Priority > @Order
+
+## @Qualifier
+
+也是配合@Autowired使用，修饰属性。由于@Autowired根据**类型**装配，因此容器中有多个同类型Bean时，需要加@Qualifier指定要注入的Bean名称，否则会报错
+
+```java
+@RestController
+public class HelloController {
+    @Autowired
+    @Qualifier("Zhang")  //指定注入名为“Zhang"的User类型bean
+    private User user;
+    ...
+}
+// 配置类，向容器中注册两个同类不同名bean
+@Configuration(proxyBeanMethods = false)
+public class Myconfig {
+    @Bean("Zhang")
+    public User user01() {
+        return new User("zhangsan", 18);
+    }
+    @Bean("Li")
+    public User user03() {
+        return new User("lisi", 19);
+    }
+}
+```
+
+## @Value
+
+修饰属性。唯一参数：字符串类型。
+
+1. @Value("abc")
+
+   直接将字符串”abc“赋值给属性
+
+2. @Value("${oidd.passwd}")
+
+   **${}**：占位符，取Properties文件中的对应值，或Environment对应值（java启动时-D参数配置）
+
+3. @Value("#{orderService3}")
+
+   **#{}**：Spring表达式，找容器中名为orderService3的bean
+
+## @Resource
+
+修饰属性和方法，默认按照**byName**自动注入，找不到再**byType**。由**J2EE提供**（而不是spring，需要导入包javax.annotation.Resource）。
+
+与@Autowired区别：
+
+- @Autowired按照byType自动注入；
+- @Autowired可以给List<T>、Map<T>注入
+
+参数：
+
+1. name：bean名，使用**byName策略**（参数作为名字去找bean）
+2. type：bean类型，使用**byType策略**（参数作为类型去找bean）
+
+装配规则：
+
+1. 如果同时指定了name和type，则从Spring上下文中找到唯一匹配的bean进行装配，找不到则抛出异常。
+
+2. 如果指定了name，则从上下文中查找名称（id）匹配的bean进行装配，找不到则抛出异常。
+
+3. 如果指定了type，则从上下文中找到类似匹配的唯一bean进行装配，找不到或是找到多个，都会抛出异常。
+
+4. 如果不指定name和type，则自动用**属性名**找bean；找不到再用类型找。
+
+```java
+public class TestServiceImpl {
+    // 下面两种@Resource只要使用一种即可
+    @Resource(name="userDao")
+    private UserDao userDao; // 用于字段上
+    
+    @Resource(name="userDao")
+    public void setUserDao(UserDao userDao) { // 用于属性的setter方法上
+        this.userDao = userDao;
+    }
+}
+```
+
+
+注：最好是将@Resource放在setter方法上，因为这样更符合面向对象的思想，通过set、get去操作属性，而不是直接去操作属性。
 
 
 
@@ -856,45 +1056,7 @@ spring容器就会根据CssCondition的返回布尔值决定是否加载UserServ
 
 
 
-## @Order
 
-用于修饰类
-
-```java
-@Order(1)
-@Service
-public class CustomerHandler extends BaseSyncCorpDataHandler implements ISyncCorpDataHandler {
-	// 实现dealData方法
-    @Override
-    public CorpDataHandleResult dealData() {
-        ...
-    }
-}
-```
-
-参数x越小，优先级越高。如果不标注数字，默认最低优先级（int最大值）
-
-该注解等同于实现Ordered接口getOrder方法，并返回数字。
-
-配合@Autowired，就能在类中按顺序注入List
-
-```java
-public class SyncCorpDataServiceImpl extends CorpBaseService implements ISyncCorpDataService {
-	// 按Order的排序，扫描ISyncCorpDataHandler的所有实现类，依次注入到List中
-    @Autowired
-    List<ISyncCorpDataHandler> syncCorpDataHandlers;
-    
-    public String dealCorpDataFromIotReqInfo(SyncReqInfoBo svcCont) {
-        // 依次执行每个ISyncCorpDataHandler接口实现类的dealData
-        for (ISyncCorpDataHandler syncCorpDataHandler : syncCorpDataHandlers) {
-            syncCorpDataHandler.dealData();
-            ...
-        }
-    }
-}
-```
-
-注意：@Order不能决定Spring容器加载Bean的顺序，只能决定@Autowired注入List<>的顺序
 
 ## @PostConstruct
 
@@ -1316,6 +1478,14 @@ public void method2(){}
    ```
 
    
+
+## Q：@Autowired和@Resource区别？
+
+|            | @Autowired | @Resource                                                    |
+| ---------- | ---------- | ------------------------------------------------------------ |
+| 框架       | Spring     | **J2EE提供**（而不是spring），需要导入包javax.annotation.Resource。 |
+| static修饰 | 打印警告   | 抛异常                                                       |
+|            |            |                                                              |
 
 
 
