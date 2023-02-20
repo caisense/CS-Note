@@ -579,6 +579,96 @@ Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某
 5. 观察者模式：定义对象键一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的
 对象都会得到通知被制动更新，如Spring中listener的实现–ApplicationListener。
 
+## Q：如何解决循环依赖？
+
+A创建时--->需要B---->B去创建--->需要A，从而产生了循环依赖
+
+Spring使用三级缓存，其实就是三个map：
+
+1. `singletonObjects `：也称单例池，ConcurrentHashMap<beanName, bean>。
+
+   缓存已经经历了完整生命周期的bean对象。
+
+2.  `earlySingletonObjects `：HashMap<beanName, bean>。
+
+   比单例池多了一个early，表示缓存的是早期的bean对象（Bean的生命周期还没完整） 
+
+3. `singletonFactories ` ：ConcurrentHashMap<beanName, bean>
+
+   缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
+
+SingletonObjecs 完成初始化的单例对象的cache（一级缓存）
+
+EarlySingletonObjecs 完成实例化但没有初始化的 提前曝光的单例对象的Cache（二级缓存）
+
+SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级缓存）
+
+![image-20220311095851373-16469639344001](images/Spring常见问题/image-20220311095851373-16469639344001.png)
+
+
+
+## Q：循环依赖无法解决的场景？
+
+1.@Repository
+
+```java
+// IA 、 IB是两个空接口，略
+@Repository
+public class A implements IA {
+    @Autowired
+    private IB ib;
+}
+@Repository
+public class B implements IB {
+    @Autowired
+    private IA ia;
+}
+```
+
+A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Repository，则spring无法启动，报错： Error creating bean with name 'a': Bean with name 'a' has been injected into other beans [b] in its raw version as part of a circular reference, but has eventually been wrapped. This means that said other beans do not use the final version of the bean. This is often the result of over-eager type matchin                                   
+
+只有当其中一个不是@Repository，或两个都不是，比如用@Service、@Controller或@Component时，才不会报错
+
+2.循环依赖+@Async
+
+```java
+@Component
+public class AService {
+   @Autowired
+   private BService bService;
+
+   @Async
+   public void test() {
+      System.out.println(bService);
+   }
+}
+```
+
+```java
+@Component
+public class BService {
+   @Autowired
+   private AService aService;
+}
+```
+
+原因：@Async也会生成代理对象（但与AOP是两码事）。由于循环依赖+AOP，AService**提前AOP**，因此B注入的是AService的**AOP代理对象**。而AService的@Async代理对象并不会提前，依然是初始化后生成，因此放入单例池的是@Async代理对象，与注入B的产生不一致冲突。
+
+解决：本质都是避免提前AOP
+1 在A的bService加@Lazy。于是B在使用的时候才创建（即test方法）
+
+2 test方法移到B。Spring对循环依赖的两个类创建还是有**先后顺序**的，先创建A再创建B，因此B不会提前AOP，而是顺利走完生命周期添加到单例池，然后A也顺利创建
+
+## Q：@Component 和 @Configuration + @Bean 同时存在，创建bean用哪个？
+
+`allowBeanDefinitionOverriding=true;`，默认是允许BeanDefinition覆盖
+
+因此若同时存在，默认情况下，容器加载的是@Configuration + @Bean 配置的bean
+
+
+
+
+
 # Spring常用注解
 
 ## @Component
@@ -739,7 +829,16 @@ public User user123(User user1) {            // 则获取容器中类型为User�
    }
    ```
    
-   
+
+## @lazy
+
+表示延迟加载，没有指定此注解时，单例会在容器初始化时就被创建。而当使用此注解后，单例对象的创建时机会在该bean在被**第一次使用**时才创建（即getBean()、打印bean等动作，只声明bean不算使用）
+
+只对单例bean有用，原型bean无效。
+
+1. 修饰属性，与@Autowired配合，用于延迟注入
+2. 修饰类，与@Component配合，用于延迟IoC
+3. 修饰方法，与@Bean配合，用于延迟IoC
 
 
 ## @Autowired
@@ -1902,60 +2001,6 @@ SpringBootApplication有三个Annotation
  
 
 @ComponentScan 对应XML配置中的元素 其功能就是自动扫描并加载符合条件的组件（比如@Component和@Repository等）或者bean定义，最终将这些bean定义加载到IoC容器
-
-## 如何解决循环依赖
-
-A创建时--->需要B---->B去创建--->需要A，从而产生了循环依赖
-
-Spring使用三级缓存
-
-1. 一级缓存`singletonObjects `ConcurrentHashMap<beanName, bean对象> ：
-
-   缓存已经经历了完整生命周期的bean对象。
-
-2. 二级缓存`earlySingletonObjects `HashMap<beanName, bean对象>：
-
-   比`singletonObjects`多了一个early，表示缓存的是早期的bean对象。 早期是什么意思？表示Bean的生命周期还没走完就把这个Bean放入了earlySingletonObjects。 
-
-3. 三级缓存`singletonFactories ` ConcurrentHashMap<beanName, bean对象>：
-
-   缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
-
-SingletonObjecs 完成初始化的单例对象的cache（一级缓存）
-
-EarlySingletonObjecs 完成实例化但没有初始化的 提前曝光的单例对象的Cache（二级缓存）
-
-SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级缓存）
-
-![image-20220311095851373-16469639344001](images/Spring常见问题/image-20220311095851373-16469639344001.png)
-
-
-
-## 循环依赖无法解决的场景
-
-```java
-// IA 、 IB是两个空接口，略
-@Repository
-public class A implements IA {
-    @Autowired
-    private IB ib;
-}
-@Repository
-public class B implements IB {
-    @Autowired
-    private IA ia;
-}
-```
-
-A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Repository，则spring无法启动，报错： Error creating bean with name 'a': Bean with name 'a' has been injected into other beans [b] in its raw version as part of a circular reference, but has eventually been wrapped. This means that said other beans do not use the final version of the bean. This is often the result of over-eager type matchin                                   
-
-只有当其中一个不是@Repository，或两个都不是，比如用@Service、@Controller或@Component时，才不会报错
-
-## @Component 和 @Configuration + @Bean 同时存在，创建bean用哪个？
-
-`allowBeanDefinitionOverriding=true;`，默认是允许BeanDefinition覆盖
-
-因此若同时存在，默认情况下，容器加载的是@Configuration + @Bean 配置的bean
 
 
 
