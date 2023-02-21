@@ -715,27 +715,26 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 - 2.4 初始化前、初始化、 初始化后
 - 2.5 放入单例池
 
-注意提前AOP只是为了解决**循环依赖情况下的AOP**，而普通情况的AOP是不需要提前的，因此第2步还要加判断是否需要AOP，这里用了一个trick，增加一个**工厂map<bean名，lambda表达式>**，众所周知lambda有回调函数的作用，不会立即执行，而是在延后的某个时机再执行，得到优化版本。
+注意提前AOP只是为了解决**循环依赖情况下的AOP**，而普通情况的AOP是不需要提前的，因此第2步还要加判断是否需要AOP，这里用了一个trick，增加一个**工厂对象map<bean名，ObjectFactory<?>>**，存放提前暴露的`ObjectFactory` 类型的工厂对象，也就是lambda表达式。众所周知lambda有回调函数的作用，不会立即执行，而是在未来某个需要的时机再执行，于是得到优化版本2。
 
 ### 版本2
 
 先创建A，执行A的生命周期：
 
 1. A放入creatingSet
-
-2. 实例化A-->放入工厂map<A, lambda<A原始对象>>
-
-3. 填充B属性-->去单例池中找B-->没有再找early单例池-->没有则创建B（到2.2
-
-   后面步骤略
+2. 实例化A-->放入工厂对象map<A, lambda<A原始对象>>
+3. 填充B属性-->去单例池中找B-->没有则创建B（跳到2.2，这一步完成后得到的B是**完整的bean**）并放入单例池
+4. 初始化前、初始化 
+5. 初始化后
+6. A放入单例池
 
 创建B，执行B的生命周期：
 
 - 2.1 实例化B
-- 2.2 填充A属性-->去单例池中找A-->creatingSet中有A，说明出现循环依赖-->找early单例池-->再找工厂map-->得到lambda<A原始对象>-->**执行lambda得到A原始对象或代理对象**-->放入early单例池
+- 2.2 填充A属性-->去单例池中找A-->creatingSet中有A，说明出现循环依赖-->找early单例池-->再找工厂对象map-->得到lambda<A原始对象>-->**执行lambda得到A原始对象或代理对象**-->放入early单例池
 - 2.3 填充其他属性
 - 2.4 初始化前、初始化、 初始化后
-- 2.5 放入单例池
+- 2.5 B放入单例池
 
 ## 最终方案
 
@@ -747,9 +746,13 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 
   如果某个bean出现了循环依赖，就会提前把这个暂时未经过完整生命周期的bean放入earlySingletonObjects中，这个bean如果要经过AOP，那么就会把代理对象放入earlySingletonObjects中，否则就是把原始对象放入earlySingletonObjects，但是不管怎么样，就是是代理对象，代理对象所代理的原始对象也是没有经过完整生命周期的，所以放入earlySingletonObjects我们就可以统一认为是未经过完整生命周期的bean。
 
-3. **singletonFactories**：（三级缓存，ConcurrentHashMap）缓存的是一个ObjectFactory，也就是一个Lambda表达式。是【兜底】的map，从里面取一定能获得bean
+3. **singletonFactories**：（三级缓存，ConcurrentHashMap）缓存的是一个ObjectFactory，也就是一个Lambda表达式。作用是解决循环依赖时的AOP，是【兜底】的map，从里面取一定能获得bean。
 
-  在每个Bean的生成过程中，经过实例化得到一个原始对象后，都会提前基于原始对象暴露一个Lambda表达式，并保存到三级缓存中，这个Lambda表达式可能用到，也可能用不到，如果当前Bean没有出现循环依赖，那么这个Lambda表达式没用，当前bean按照自己的生命周期正常执行，执行完后直接把当前bean放入singletonObjects中，如果当前bean在依赖注入时发现出现了循环依赖（当前正在创建的bean被其他bean依赖了），则从三级缓存中拿到Lambda表达式，并执行Lambda表达式得到一个对象，并把得到的对象放入二级缓存（如果当前Bean需要AOP，那么执行lambda表达式，得到就是对应的代理对象，如果无需AOP，则直接得到一个原始对象）。
+  在每个Bean的生成过程中，经过实例化得到一个原始对象后，都会提前基于原始对象暴露一个Lambda表达式，并保存到三级缓存中，这个Lambda表达式**可能用到，也可能用不到**。
+
+  1. 如果当前Bean没有出现循环依赖，那么这个Lambda表达式没用，当前bean按照自己的生命周期正常执行，执行完后直接把当前bean放入singletonObjects中。
+
+  2. 如果当前bean在依赖注入时发现出现了循环依赖，则从三级缓存中拿到Lambda表达式，并执行Lambda表达式得到一个对象，并把得到的对象放入二级缓存（如果当前Bean需要AOP，那么执行lambda表达式，得到就是对应的代理对象；如果无需AOP，则直接得到一个原始对象）。
 
 还有两个辅助数据结构：
 
@@ -763,12 +766,23 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 **缓存流动顺序**
 
 1. 先找单例池-->
-2. 再找二级缓存-->
+
+2. 找不到，且bean被循环依赖（在creationSet中），再找二级缓存-->
+
 3. 找不到，对**单例池加锁**再找三级-->
+
 4. 取出lambda并执行，得到单例bean-->
-5. 放入二级缓存，并从三级移除（org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#getSingleton(java.lang.String, boolean)）
+
+5. 放入二级缓存，并从三级移除
+
+   前5步实现：org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#getSingleton(java.lang.String, boolean)
+
 6. 最后放入单例池，并从二三级移除（org.springframework.beans.factory.support.DefaultSingletonBeanRegistry#addSingleton）。
 
 **流程图**
 
 ![img](images/spring源码/17395320ad095cfbtplv-t2oaga2asx-zoom-in-crop-mark3024000.webp)
+
+`You` and `Me` 的例子在注解注入造成循环依赖时，Spring的调用链时序图如下：
+
+![img](images/spring源码/656873-20190628213759517-954779861.png)

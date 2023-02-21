@@ -609,7 +609,7 @@ SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级�
 
 ## Q：循环依赖无法解决的场景？
 
-1.@Repository
+### 1.@Repository
 
 ```java
 // IA 、 IB是两个空接口，略
@@ -629,7 +629,7 @@ A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Rep
 
 只有当其中一个不是@Repository，或两个都不是，比如用@Service、@Controller或@Component时，才不会报错
 
-2.循环依赖+@Async
+### 2.循环依赖+@Async
 
 ```java
 @Component
@@ -658,6 +658,50 @@ public class BService {
 1 在A的bService加@Lazy。于是B在使用的时候才创建（即test方法）
 
 2 test方法移到B。Spring对循环依赖的两个类创建还是有**先后顺序**的，先创建A再创建B，因此B不会提前AOP，而是顺利走完生命周期添加到单例池，然后A也顺利创建
+
+### 3.都是原型
+
+```java
+@Scope("prototype")
+@Component
+public class AService {
+   @Autowired
+   private BService bService;
+}
+@Scope("prototype")
+@Component
+public class BService {
+	@Autowired
+	private AService aService;
+}
+```
+
+A需要注入一个新的B（因为B是原型），同理然后B也需要注入一个新的A，如此死循环。
+
+解决：将其中一个设为单例
+
+### 4.构造函数注入
+
+```java
+@Component
+public class AService {
+   private BService bService;
+   public AService(BService bService) {
+      this.bService = bService;
+   }
+}
+@Component
+public class BService {
+	private AService aService;
+	public BService(AService aService) {
+		this.aService = aService;
+	}
+}
+```
+
+先构造A，发现A需要注入B；再构造B，发现B需要注入A，互相死锁。
+
+解决：构造方法加@Lazy
 
 ## Q：@Component 和 @Configuration + @Bean 同时存在，创建bean用哪个？
 
