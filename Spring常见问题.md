@@ -709,7 +709,13 @@ public class BService {
 
 因此若同时存在，默认情况下，容器加载的是@Configuration + @Bean 配置的bean
 
+## getBean方法机制
 
+推断构造方法，并调用生成bean，如果是单例（默认），放入spring容器。
+
+可以传多个参数，第一个为beanName，后面的作为构造函数参数。
+
+对同一个beanName，默认只生成一次，多次调用（即使构造参数不同）返回的都是单例
 
 
 

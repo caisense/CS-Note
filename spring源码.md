@@ -786,3 +786,114 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 `You` and `Me` 的例子在注解注入造成循环依赖时，Spring的调用链时序图如下：
 
 ![img](images/spring源码/656873-20190628213759517-954779861.png)
+
+
+
+# 五、推断构造
+
+spring实例化一个bean时，选择构造方法的几种情况：
+
+1. 默认使用**默认构造方法**（未显式定义构造，由jvm生成的）
+
+2. getBean()可以传多个参数，第一个是beanName，后面的参数作为构造函数参数去找构造方法
+
+3. 用@Autowired强制指定使用某个构造方法（只能有一个true，或者多个false，否则抛错）
+
+4. 如果不用@Component纳入容器管理，还可以用注册BeanDefinition的方式将bean纳入容器，并指定构造方法
+
+   例：UserService有三种构造方法，参数分别为0，1，2个
+
+   ```java
+   public class UserService {
+      @Autowired
+      private  OrderService orderService;
+   
+      public UserService() {
+         this.orderService = orderService;
+         System.out.println(0);
+      }
+   
+      public UserService(OrderService orderService) {
+         this.orderService = orderService;
+         System.out.println(1);
+      }
+   
+      public UserService(OrderService orderService, OrderService orderService1) {
+         this.orderService = orderService;
+         System.out.println(2);
+      }
+   
+      public void test(){
+         System.out.println("test ");
+         System.out.println(orderService);
+      }
+   }
+   ```
+
+   从容器中获取UserService
+
+   ```java
+   public static void main(String[] args) {
+      // 创建一个Spring容器
+      AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
+      context.register(AppConfig.class);
+   
+      // 通过beanDefinition指定构造方法
+      AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
+      beanDefinition.setBeanClass(UserService.class);
+      beanDefinition.getConstructorArgumentValues().addGenericArgumentValue(new OrderService());
+      // beanDefinition.getConstructorArgumentValues().addGenericArgumentValue(new OrderService());
+      context.registerBeanDefinition("userService", beanDefinition);
+      context.refresh();
+      UserService userService = (UserService) context.getBean("userService"); // 1
+      userService.test();
+   }
+   ```
+
+   第9行为构造方法添加了一个OrderService对象作为参数，调用的构造方法就是一个参数的（打印1）。
+
+   如果第10行再增加一个参数，调用的构造方法就是两个参数的（打印2）。
+
+   如果UserService加了@Component，getBean之后还会再调用一次无参构造（打印0）
+
+实例化时（org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBeanInstance），调determineConstructorsFromBeanPostProcessors()找所有候选的构造方法，思路见下图：
+
+![image-20230221165332634](images/spring源码/image-20230221165332634.png)
+
+候选的构造方法为null，则直接使用无参构造。否则调
+
+
+
+
+
+![image-20230222090947075](images/spring源码/image-20230222090947075.png)
+
+![image-20230222091016515](images/spring源码/image-20230222091016515.png)
+
+
+
+使用bdf定义。getBean无参时：优先选public构造，再看参数个数最多的
+
+```java
+AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
+beanDefinition.setBeanClass(UserService.class);
+beanDefinition.getConstructorArgumentValues().addIndexedArgumentValue(1, new OrderService());
+
+beanDefinition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_CONSTRUCTOR);
+context.registerBeanDefinition("userService", beanDefinition);
+
+UserService userService = (UserService) context.getBean("userService");  // 调3参数
+userService.test();
+```
+
+如果这样写，调2参数
+
+```java
+UserService userService = (UserService) context.getBean("userService", new OrderService(), new OrderService());
+```
+
+这样写调1参数
+
+```java
+UserService userService = (UserService) context.getBean("userService", new OrderService());
+```
