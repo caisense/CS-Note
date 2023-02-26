@@ -791,15 +791,21 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 
 # 五、推断构造
 
-spring实例化一个bean时，选择构造方法的几种情况：
+## 流程
 
-1. 默认使用**默认构造方法**（未显式定义构造，由jvm生成的）
+spring实例化一个bean时，默认使用**默认构造方法**（未显式定义构造，由jvm生成的）。需要推断选择构造方法的几种情况：
 
-2. getBean()可以传多个参数，第一个是beanName，后面的参数作为构造函数参数去找构造方法
+1. 有多个构造方法可选。
 
-3. 用@Autowired强制指定使用某个构造方法（只能有一个true，或者多个false，否则抛错）
+2. getBean()可以传多个参数，**第一个是beanName**，后面的参数作为构造函数参数去找构造方法。
 
-4. 如果不用@Component纳入容器管理，还可以用注册BeanDefinition的方式将bean纳入容器，并指定构造方法
+3. @Autowired的构造方法有多个（只能有一个true，或者多个false，否则抛错）。
+
+4. 如果不用@Component纳入容器管理，还可以用注册BeanDefinition的方式将bean纳入容器，并指定构造方法。
+
+   从容器中获取UserService，直接用名字找，不加其他参数。在一般情况下，spring肯定会调用无参构造。
+
+   对BeanDefinition的**constructorArgumentValues**做修改，可以指定spring调用的构造。有addGenericArgumentValue和addIndexedArgumentValue两种
 
    例：UserService有三种构造方法，参数分别为0，1，2个
 
@@ -830,14 +836,21 @@ spring实例化一个bean时，选择构造方法的几种情况：
    }
    ```
 
-   从容器中获取UserService
+   1）`addGenericArgumentValue(Object val)`方法。
+
+   为构造方法的指定入参val，默认从左到右
+
+   第9行为构造方法添加了一个OrderService对象作为参数，调用的构造方法就是一个参数的（打印1）。
+
+   如果第10行再增加一个参数，调用的构造方法就是两个参数的（打印2）。
+
+   如果UserService加了@Component，getBean之后还会再调用一次无参构造（打印0）
 
    ```java
    public static void main(String[] args) {
       // 创建一个Spring容器
       AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext();
       context.register(AppConfig.class);
-   
       // 通过beanDefinition指定构造方法
       AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
       beanDefinition.setBeanClass(UserService.class);
@@ -850,11 +863,42 @@ spring实例化一个bean时，选择构造方法的几种情况：
    }
    ```
 
-   第9行为构造方法添加了一个OrderService对象作为参数，调用的构造方法就是一个参数的（打印1）。
+   2）`addIndexedArgumentValue(int i, Object val)`方法。
 
-   如果第10行再增加一个参数，调用的构造方法就是两个参数的（打印2）。
+   为构造方法的第i个参数指定入参val
 
-   如果UserService加了@Component，getBean之后还会再调用一次无参构造（打印0）
+   例：
+
+   ```java
+   public static void main(String[] args) {
+      // 创建一个Spring容器
+      AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+      // 通过beanDefinition指定构造方法
+      AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
+      beanDefinition.setBeanClass(UserService.class);
+      beanDefinition.getConstructorArgumentValues().addIndexedArgumentValue(0, new OrderService());  // 为构造方法的第0个参数指定入参
+      context.registerBeanDefinition("userService", beanDefinition);
+      UserService userService = (UserService) context.getBean("userService");
+      userService.test();
+   }
+   ```
+
+   会调用1个参数的构造。
+
+   如果是下列设置：
+
+   ```java
+   //会报错，因为第0个参数未指定
+   addIndexedArgumentValue(1, new OrderService());
+   // 也会报错，同样因为第0个参数未指定
+   addIndexedArgumentValue(1, new OrderService())
+   addIndexedArgumentValue(2, new OrderService()); 
+   // 会调用2个参数的构造。
+   addIndexedArgumentValue(0, new OrderService());
+   addIndexedArgumentValue(1, new OrderService()); 
+   ```
+
+   
 
 实例化时（org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBeanInstance），调determineConstructorsFromBeanPostProcessors()找所有候选的构造方法，思路见下图：
 
@@ -872,14 +916,24 @@ spring实例化一个bean时，选择构造方法的几种情况：
 
 
 
-使用bdf定义。getBean无参时：优先选public构造，再看参数个数最多的
+## 优先级
+
+@Autowired指定  > getBean()指定 > beanDefinition指定 
+
+1. 加@Autowired构造的直接选中。
+2. getBean()只有beanName参数时，再看beanDefinition。若beanDefinition指定AutowireMode为**AUTOWIRE_CONSTRUCTOR**，则优先选public构造，再看参数个数最多的。
+3. 若beanDefinition未指定AUTOWIRE_CONSTRUCTOR，则看ConstructorArgumentValues是否添加了参数
+
+例：
+
+使用beanDefinition定义。getBean无参时：优先选public构造，再看参数个数最多的
 
 ```java
 AbstractBeanDefinition beanDefinition = BeanDefinitionBuilder.genericBeanDefinition().getBeanDefinition();
 beanDefinition.setBeanClass(UserService.class);
 beanDefinition.getConstructorArgumentValues().addIndexedArgumentValue(1, new OrderService());
 
-beanDefinition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_CONSTRUCTOR);
+beanDefinition.setAutowireMode(AbstractBeanDefinition.AUTOWIRE_CONSTRUCTOR);  // 指定AutowireMode
 context.registerBeanDefinition("userService", beanDefinition);
 
 UserService userService = (UserService) context.getBean("userService");  // 调3参数
@@ -897,3 +951,15 @@ UserService userService = (UserService) context.getBean("userService", new Order
 ```java
 UserService userService = (UserService) context.getBean("userService", new OrderService());
 ```
+
+
+
+## 宽松模式和严格模式
+
+- 宽松模式（默认）会看参数类型的继承和实现，根据规则算分，最后选分最小的构造方法
+
+  规则：父类+2分，接口+1分，恰好匹配+0分
+
+- 严格模式要精确匹配
+
+# 六、启动过程
