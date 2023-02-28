@@ -763,7 +763,7 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 
 不管是初始化后，还是提前AOP，都是调org.springframework.aop.framework.autoproxy.AbstractAutoProxyCreator#wrapIfNecessary() 来生成代理对象。
 
-**缓存流动顺序**
+### 缓存流动顺序
 
 1. 先找单例池-->
 

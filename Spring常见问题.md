@@ -1317,7 +1317,39 @@ org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: F
 
 只对单例bean有效。若多个方法都带此注解，执行顺序无法指定
 
+## @Lookup
 
+```java
+@Component
+public class UserService {
+   @Autowired
+   private  OrderService orderService;
+
+   @Lookup("orderService")
+   public OrderService a() {
+      return null;
+   }
+   public void test(){
+      System.out.println(a());
+   }
+}
+@Component
+@Scope("prototype")
+public class OrderService  {
+}
+```
+
+测试：会打印三个不同的OrderService
+
+```java
+public static void main(String[] args) {
+   AnnotationConfigApplicationContext context = new AnnotationConfigApplicationContext(AppConfig.class);
+   UserService userService = (UserService) context.getBean("userService");
+   userService.test();  // OrderService@6ec8211c
+   userService.test();  // OrderService@7276c8cd
+   userService.test();  // OrderService@544a2ea6
+}
+```
 
 ## 参数校验（validation框架）
 
