@@ -712,17 +712,17 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 3. SingleThreadExecutor：仅单线程执行的线程池，相当于大小为1的`FixedThreadPool`。
 4. ScheduledThreadPool：线程任务可以定期反复执行
 
-**线程池7个参数**
+### 参数
 
 1. `int corePoolSize`： 核心线程数
 
-2. `int maximumPoolSize`： 最大线程数，一般要大于核心线程数
+2. `int maximumPoolSize`： 最大线程数（一般要大于核心线程数，多出来的部分理解为非核心线程
 
-3. `long keepAliveTime`： 最大空闲时间，表示线程没有任务执行时最多保持多久时间会终止（只有当线程池中的线程数大于 corePoolSize 时，keepAliveTime 才会起作用）
+3. `long keepAliveTime`：最大空闲时间，表示线程没有任务执行时最多保持多久时间会终止（只有当线程池中的线程数大于 corePoolSize 时，keepAliveTime 才会起作用）
 
 4. `TimeUnit unit`： 时间单位
 
-5. `BlockingQueue workQueue`： 阻塞队列
+5. `BlockingQueue workQueue`： 工作队列
 
    以下这几种选择：ArrayBlockingQueue、LinkedBlockingQueue、SynchronousQueue。
 
@@ -740,17 +740,100 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
    - ThreadPoolExecutor.CallerRunsPolicy：由调用线程处理该任务。
 
-**执行流程**
+### 调度
 
 ![img](images/Java并发/bVcO4HQ.png)
 
-1. 线程池创建时，线程数为0，当有任务提交给线程池时，在核心池corePool创建一个线程执行，直到线程数达到corePoolSize 
-2. 当线程数达到corePoolSize 时，再有任务提交进来，就放到阻塞队列，当有线程执行完任务，就从队列中取任务执行（按先进先出顺序）
-3. 当阻塞队列也满了，corePool还是没有空闲，则新来任务就在maxPool创建线程
+1. 线程池创建时，线程数为0，当有任务提交给线程池时，在核心池**corePool**创建一个线程执行，直到线程数达到corePoolSize 
+2. 当线程数达到corePoolSize 时，再有任务提交进来，就放到工作队列，当有线程执行完任务，就从队列中取任务执行（按先进先出顺序）
+3. 当工作队列也满了，corePool还是没有空闲线程，则新来任务就在maxPool创建线程
 4. 当maxPool也满了，则对新来任务执行拒绝策略
 5. 当线程数大于corePoolSize时，keepAliveTime参数起作用，关闭没有任务执行的线程，直到线程数不超过corePoolSize。线程池通过这个机制动态调节线程数。
 
+### 源码
 
+#### 1.Executor.execute()执行流程
+
+java.util.concurrent.ThreadPoolExecutor#execute
+
+```java
+public void execute(Runnable command) {
+    if (command == null)
+        throw new NullPointerException();
+    /*
+     * Proceed in 3 steps:
+     *
+     * 1. If fewer than corePoolSize threads are running, try to
+     * start a new thread with the given command as its first
+     * task.  The call to addWorker atomically checks runState and
+     * workerCount, and so prevents false alarms that would add
+     * threads when it shouldn't, by returning false.
+     *
+     * 2. If a task can be successfully queued, then we still need
+     * to double-check whether we should have added a thread
+     * (because existing ones died since last checking) or that
+     * the pool shut down since entry into this method. So we
+     * recheck state and if necessary roll back the enqueuing if
+     * stopped, or start a new thread if there are none.
+     *
+     * 3. If we cannot queue task, then we try to add a new
+     * thread.  If it fails, we know we are shut down or saturated
+     * and so reject the task.
+     */
+    int c = ctl.get();
+    // ==========创建核心线程============
+    // 如果工作线程数 小于 核心线程数，则调addWorker()创建核心线程
+    if (workerCountOf(c) < corePoolSize) {
+        // command就是任务，true表示分配核心线程执行
+        if (addWorker(command, true))
+            // 成功直接返回
+            return;
+        // 不成功，说明有其他线程竞争
+        c = ctl.get();
+    }
+    // ==========将任务添加到工作队列============
+    // 如果状态是RUNNING，才会添加
+    if (isRunning(c) && workQueue.offer(command)) {
+        // 放入队列后重新检查
+        int recheck = ctl.get();
+        // 状态不是RUNNING，队列弹出
+        if (! isRunning(recheck) && remove(command))
+            reject(command);
+        // 如果状态是RUNNING，且工作线程数是0，则创建非核心线程
+        else if (workerCountOf(recheck) == 0)
+            addWorker(null, false);
+    }
+    // ==========创建核心线程============
+    else if (!addWorker(command, false))
+        reject(command);
+}
+```
+
+#### 2.添加工作线程:addWorker()
+
+
+
+**核心属性**
+
+```java
+public class ThreadPoolExecutor extends AbstractExecutorService {
+
+    private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+    private static final int COUNT_BITS = Integer.SIZE - 3;  // 29
+    private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
+
+    // runState is stored in the high-order bits
+    private static final int RUNNING    = -1 << COUNT_BITS;
+    private static final int SHUTDOWN   =  0 << COUNT_BITS;
+    private static final int STOP       =  1 << COUNT_BITS;
+    private static final int TIDYING    =  2 << COUNT_BITS;
+    private static final int TERMINATED =  3 << COUNT_BITS;
+}
+```
+
+ctl是32bit，高三位记录线程池状态（5种），低29位记录工作线程个数。
+
+所以每个状态int都要左移29位，使得状态值保存在int的高三位
 
 ### Q：为什么核心线程满后，先放阻塞队列，而不是创建非核心线程？
 
@@ -764,7 +847,7 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
 最佳线程数目 =(( 线程等待时间 + 线程 CPU 时间 )/线程 CPU 时间 )* CPU 数目
 
-
+并不绝对，需要动态调整
 
 **线程池状态变化**
 
@@ -908,9 +991,9 @@ try (var ctx = new UserContext()) {
 
 这样就在`ConnContext`中完全封装了`ThreadLocal`，外部代码在`try (resource) {...}`内部可以随时调用`ConnContext.currentConn()`获取当前线程绑定的数据库连接
 
-# 线程安全
+## 线程安全
 
-## Q：SimpleDateFormat类为何不是线程安全的？
+### Q：SimpleDateFormat类为何不是线程安全的？
 
 SimpleDateFormat是继承自DateFormat类，其中的Calendar对象被多线程共享，而Calendar对象本身不支持线程安全。
 
