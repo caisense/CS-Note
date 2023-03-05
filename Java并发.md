@@ -747,10 +747,42 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 1. 线程池创建时，线程数为0，当有任务提交给线程池时，在核心池**corePool**创建一个线程执行，直到线程数达到corePoolSize 
 2. 当线程数达到corePoolSize 时，再有任务提交进来，就放到工作队列，当有线程执行完任务，就从队列中取任务执行（按先进先出顺序）
 3. 当工作队列也满了，corePool还是没有空闲线程，则新来任务就在maxPool创建线程
-4. 当maxPool也满了，则对新来任务执行拒绝策略
+4. 当maxPool也满了，则对新来任务执行拒绝策略（**注意**：这些步骤中，如果发现线程池状态不是RUNNING，则直接拒绝）
 5. 当线程数大于corePoolSize时，keepAliveTime参数起作用，关闭没有任务执行的线程，直到线程数不超过corePoolSize。线程池通过这个机制动态调节线程数。
 
 ### 源码
+
+**核心属性**
+
+```java
+public class ThreadPoolExecutor extends AbstractExecutorService {
+    private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
+    private static final int COUNT_BITS = Integer.SIZE - 3;  // 29
+    private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
+    // runState is stored in the high-order bits
+    private static final int RUNNING    = -1 << COUNT_BITS;
+    private static final int SHUTDOWN   =  0 << COUNT_BITS;
+    private static final int STOP       =  1 << COUNT_BITS;
+    private static final int TIDYING    =  2 << COUNT_BITS;
+    private static final int TERMINATED =  3 << COUNT_BITS;
+    // Packing and unpacking ctl
+    // 获取线程池状态，通过按位与操作，低29位将全部变成0
+    private static int runStateOf(int c)     { return c & ~CAPACITY; }
+    // 获取线程池worker数量，通过按位与操作，高3位将全部变成0
+    // 注意工作线程并不区分核心线程和非核心线程，就是在执行任务的线程
+    private static int workerCountOf(int c)  { return c & CAPACITY; }
+    // 根据线程池状态和线程池worker数量，生成ctl值
+    private static int ctlOf(int rs, int wc) { return rs | wc; }
+    // 线程池状态小于xx
+    private static boolean runStateLessThan(int c, int s) { return c < s; }
+    // 线程池状态大于等于xx
+    private static boolean runStateAtLeast(int c, int s) { return c >= s; }
+}
+```
+
+ctl是32bit，高三位记录线程池状态（5种），低29位记录工作线程个数。
+
+所以每个状态int都要左移29位，使得状态值保存在int的高三位
 
 #### 1.Executor.execute()执行流程
 
@@ -781,7 +813,7 @@ public void execute(Runnable command) {
      * and so reject the task.
      */
     int c = ctl.get();
-    // ==========创建核心线程============
+    // ==========1.创建核心线程============
     // 如果工作线程数 小于 核心线程数，则调addWorker()创建核心线程
     if (workerCountOf(c) < corePoolSize) {
         // command就是任务，true表示分配核心线程执行
@@ -791,19 +823,20 @@ public void execute(Runnable command) {
         // 不成功，说明有其他线程竞争
         c = ctl.get();
     }
-    // ==========将任务添加到工作队列============
-    // 如果状态是RUNNING，才会添加
+    // ==========2.（第1步不成功，则）将任务添加到工作队列============
+    // 2.1 如果状态是RUNNING，才会添加
     if (isRunning(c) && workQueue.offer(command)) {
         // 放入队列后重新检查
         int recheck = ctl.get();
-        // 状态不是RUNNING，队列弹出
+        // 状态不是RUNNING---则队列弹出，并拒绝 
+        // （******这个状态很多网上的图都没画出来，比如前面的流程图）
         if (! isRunning(recheck) && remove(command))
             reject(command);
-        // 如果状态是RUNNING，且工作线程数是0，则创建非核心线程
+        // 如果状态是RUNNING，且工作线程数是0，则创建非核心线程（用于处理工作队列，所以不分配任务）
         else if (workerCountOf(recheck) == 0)
             addWorker(null, false);
     }
-    // ==========创建核心线程============
+    // ==========3. （第2步不成功，则）创建非核心线程并分配任务。若不成功，就执行拒绝策略============
     else if (!addWorker(command, false))
         reject(command);
 }
@@ -811,29 +844,76 @@ public void execute(Runnable command) {
 
 #### 2.添加工作线程:addWorker()
 
-
-
-**核心属性**
-
 ```java
-public class ThreadPoolExecutor extends AbstractExecutorService {
+private boolean addWorker(Runnable firstTask, boolean core) {
+    retry:
+    for (;;) {
+        int c = ctl.get();
+        int rs = runStateOf(c);
 
-    private final AtomicInteger ctl = new AtomicInteger(ctlOf(RUNNING, 0));
-    private static final int COUNT_BITS = Integer.SIZE - 3;  // 29
-    private static final int CAPACITY   = (1 << COUNT_BITS) - 1;
+        // Check if queue empty only if necessary.
+        if (rs >= SHUTDOWN &&
+            ! (rs == SHUTDOWN &&
+               firstTask == null &&
+               ! workQueue.isEmpty()))
+            return false;
 
-    // runState is stored in the high-order bits
-    private static final int RUNNING    = -1 << COUNT_BITS;
-    private static final int SHUTDOWN   =  0 << COUNT_BITS;
-    private static final int STOP       =  1 << COUNT_BITS;
-    private static final int TIDYING    =  2 << COUNT_BITS;
-    private static final int TERMINATED =  3 << COUNT_BITS;
+        for (;;) {
+            int wc = workerCountOf(c);
+            if (wc >= CAPACITY ||
+                wc >= (core ? corePoolSize : maximumPoolSize))
+                return false;
+            if (compareAndIncrementWorkerCount(c))
+                break retry;
+            c = ctl.get();  // Re-read ctl
+            if (runStateOf(c) != rs)
+                continue retry;
+            // else CAS failed due to workerCount change; retry inner loop
+        }
+    }
+
+    boolean workerStarted = false;
+    boolean workerAdded = false;
+    Worker w = null;
+    try {
+        w = new Worker(firstTask);
+        final Thread t = w.thread;
+        if (t != null) {
+            final ReentrantLock mainLock = this.mainLock;
+            mainLock.lock();
+            try {
+                // Recheck while holding lock.
+                // Back out on ThreadFactory failure or if
+                // shut down before lock acquired.
+                int rs = runStateOf(ctl.get());
+
+                if (rs < SHUTDOWN ||
+                    (rs == SHUTDOWN && firstTask == null)) {
+                    if (t.isAlive()) // precheck that t is startable
+                        throw new IllegalThreadStateException();
+                    workers.add(w);
+                    int s = workers.size();
+                    if (s > largestPoolSize)
+                        largestPoolSize = s;
+                    workerAdded = true;
+                }
+            } finally {
+                mainLock.unlock();
+            }
+            if (workerAdded) {
+                t.start();
+                workerStarted = true;
+            }
+        }
+    } finally {
+        if (! workerStarted)
+            addWorkerFailed(w);
+    }
+    return workerStarted;
 }
 ```
 
-ctl是32bit，高三位记录线程池状态（5种），低29位记录工作线程个数。
 
-所以每个状态int都要左移29位，使得状态值保存在int的高三位
 
 ### Q：为什么核心线程满后，先放阻塞队列，而不是创建非核心线程？
 
