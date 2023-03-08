@@ -712,7 +712,7 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 3. SingleThreadExecutor：仅单线程执行的线程池，相当于大小为1的`FixedThreadPool`。
 4. ScheduledThreadPool：线程任务可以定期反复执行
 
-### 参数
+### 线程池参数
 
 1. `int corePoolSize`： 核心线程数
 
@@ -740,7 +740,7 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
    - ThreadPoolExecutor.CallerRunsPolicy：由调用线程处理该任务。
 
-### 调度
+### 任务调度
 
 ![img](images/Java并发/bVcO4HQ.png)
 
@@ -749,6 +749,26 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 3. 当工作队列也满了，corePool还是没有空闲线程，则新来任务就在maxPool创建线程
 4. 当maxPool也满了，则对新来任务执行拒绝策略（**注意**：这些步骤中，如果发现线程池状态不是RUNNING，则直接拒绝）
 5. 当线程数大于corePoolSize时，keepAliveTime参数起作用，关闭没有任务执行的线程，直到线程数不超过corePoolSize。线程池通过这个机制动态调节线程数。
+
+### **线程池状态变化**
+
+![在这里插入图片描述](images/Java并发/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5aW95aW9546pX3R5cmFudA==,size_20,color_FFFFFF,t_70,g_se,x_16.png)
+
+1. RUNNING：正常运行，既接受新任务，也处理队列中任务
+2. SHUTDOWN：正常状态调用shutdown()方法，就进入SHUTDOWN状态，不再接受新任务，但会继续处理队列中任务
+3. STOP：正常状态调用shutdownNow()方法，就进入STOP状态，不接受新任务，也不处理队列中的任务，正在运行的线程也会中断
+4. TIDYING：过渡状态，表示线程池即将结束。由两种状态转变而来：1）SHUTDOWN状态处理完队列中的任务，且没有线程在运行；2）或者STOP状态的工作线程为空（必然为空，因为线程全中断）
+5. TERMINATED：终止状态，TIDYING状态调用terminated()方法，就进入TERMINATED状态。该方法是一个空方法，留给用户扩展。
+
+
+
+### 使用
+
+execute：提交一个任务给线程池执行，如果线程异常直接抛出
+
+submit：提交一个任务给线程池执行，如果线程异常并不会直接抛出，而要用Futrue的get方法获取（前提是线程未捕获异常）
+
+
 
 ### 源码
 
@@ -913,6 +933,65 @@ private boolean addWorker(Runnable firstTask, boolean core) {
 }
 ```
 
+#### 3.submit方法
+
+java.util.concurrent.AbstractExecutorService#submit
+
+有几种重载，入参可以是Runnable或Callable
+
+```java
+public Future<?> submit(Runnable task) {
+    if (task == null) throw new NullPointerException();
+    RunnableFuture<Void> ftask = newTaskFor(task, null);
+    execute(ftask);
+    return ftask;
+}
+```
+
+submit 方法提交的时候把任务包裹了一层，就是用 FutureTask 包裹的。FutureTask 的构造方法里面默认了状态为 NEW：
+
+<img src="images/Java并发/640.png" alt="图片" style="zoom: 67%;" />
+
+**FutureTask** 有七种状态，流转关系如下：
+
+```java
+NEW -> COMPLETING -> NORMAL
+NEW -> COMPLETING -> EXCEPTIONAL
+NEW -> CANCELLED
+NEW -> INTERRUPTING -> INTERRUPTED
+```
+
+ runWorker 方法的 task.run ， task 是一个 FutureTask，所以 run 方法其实是 FutureTask 的 run 方法。
+
+![图片](images/Java并发/640-1678123229445-3.png)
+
+① 处call执行的是线程的任务
+
+- 如果线程抛异常则进入②，执行**setException()**
+- 线程正常执行则进入③，执行**set()**
+
+两个方法都是先进行一个 **CAS** 的操作。如果 cas 成功，把当前 FutureTask 的 status 字段从 NEW 修改为 COMPLETING 。然后设置outcome。如果cas 操作失败了，则不会进行任何操作（说明当前的状态是 CANCELLED 或者 INTERRUPTING 或者 INTERRUPTED。也就是这个任务被取消了或者被中断了。所以不再进行任何操作），也不会设置outcome。
+
+区别是**setException()**最终状态流转到 EXCEPTIONAL，而set()最终状态流转到NORMAL。
+
+```java
+protected void set(V v) {
+    if (UNSAFE.compareAndSwapInt(this, stateOffset, NEW, COMPLETING)) {
+        outcome = v;
+        UNSAFE.putOrderedInt(this, stateOffset, NORMAL); // final state
+        finishCompletion();
+    }
+}
+
+protected void setException(Throwable t) {
+    if (UNSAFE.compareAndSwapInt(this, stateOffset, NEW, COMPLETING)) {
+        outcome = t;
+        UNSAFE.putOrderedInt(this, stateOffset, EXCEPTIONAL); // final state
+        finishCompletion();
+    }
+}
+```
+
 
 
 ### Q：为什么核心线程满后，先放阻塞队列，而不是创建非核心线程？
@@ -923,21 +1002,29 @@ private boolean addWorker(Runnable firstTask, boolean core) {
 
 阿里规约，由于FixedThreadPool和SingleThreadPool里面的阻塞队列基本是没有上限的（默认队列长度Integer.MAX_VALUE=21亿），这就可能会导致任务过多，内存溢出（OOM），而CachedThreadPool和ScheduledThreadPool则可能会创建大量线程（< 21亿），也可能会导致内存溢出（OOM）
 
+### Q：线程异常是否会抛出？
+
+具体看使用ThreadPoolExecutor的哪种方法
+
+execute：提交一个任务给线程池执行，如果线程异常直接抛出
+
+submit：提交一个任务给线程池执行，如果线程异常并不会直接抛出，而要用Futrue的get方法获取（前提是线程未捕获异常。如果子线程捕获了异常，该异常不会被封装到 Future 里面。）
+
+### Q：如果线程的异常未处理，最后谁来处理？
+
+由jvm调用
+
+java.lang.Thread#dispatchUncaughtException，最终调
+
+java.lang.ThreadGroup#uncaughtException()处理
+
 ### Q：线程数如何设置？
 
 最佳线程数目 =(( 线程等待时间 + 线程 CPU 时间 )/线程 CPU 时间 )* CPU 数目
 
 并不绝对，需要动态调整
 
-**线程池状态变化**
 
-![在这里插入图片描述](images/Java并发/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5aW95aW9546pX3R5cmFudA==,size_20,color_FFFFFF,t_70,g_se,x_16.png)
-
-1. RUNNING：正常运行，既接受新任务，也处理队列中任务
-2. SHUTDOWN：正常状态调用shutdown()方法，就进入SHUTDOWN状态，不再接受新任务，但会继续处理队列中任务
-3. STOP：正常状态调用shutdownNow()方法，就进入STOP状态，不接受新任务，也不处理队列中的任务，正在运行的线程也会中断
-4. TIDYING：过渡状态，表示线程池即将结束。由两种状态转变而来：1）SHUTDOWN状态处理完队列中的任务，且没有线程在运行；2）或者STOP状态的工作线程为空（必然为空，因为线程全中断）
-5. TERMINATED：终止状态，TIDYING状态调用terminated()方法，就进入TERMINATED状态。该方法是一个空方法，留给用户扩展。
 
 ## ThreadLocal
 
