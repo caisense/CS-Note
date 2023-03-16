@@ -1131,7 +1131,7 @@ public class Myconfig {
 与@Autowired区别：
 
 - @Autowired按照byType自动注入；
-- @Autowired可以给List<T>、Map<T>注入
+- @Autowired可以给集合List<T>、Map<T>注入，而@Resource不适合集合注入
 
 参数：
 
@@ -1163,6 +1163,15 @@ public class TestServiceImpl {
 
 
 注：最好是将@Resource放在setter方法上，因为这样更符合面向对象的思想，通过set、get去操作属性，而不是直接去操作属性。
+
+## Q：@Autowired和@Resource区别？
+
+|              | @Autowired                           | @Resource                                                    |
+| ------------ | ------------------------------------ | ------------------------------------------------------------ |
+| 框架         | Spring                               | **J2EE提供**（而不是spring），需要导入包javax.annotation.Resource。 |
+| static修饰   | 打印警告                             | 抛异常                                                       |
+| 默认注入方式 | ByType                               | ByName                                                       |
+| 使用场景     | 需要注入此类型的所有资源（注入集合） | 注入确定性的单一资源（不适用于注入集合                       |
 
 
 
@@ -1659,14 +1668,6 @@ public void method2(){}
    ```
 
    
-
-## Q：@Autowired和@Resource区别？
-
-|            | @Autowired | @Resource                                                    |
-| ---------- | ---------- | ------------------------------------------------------------ |
-| 框架       | Spring     | **J2EE提供**（而不是spring），需要导入包javax.annotation.Resource。 |
-| static修饰 | 打印警告   | 抛异常                                                       |
-|            |            |                                                              |
 
 
 
