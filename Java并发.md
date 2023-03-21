@@ -1294,6 +1294,21 @@ public interface RejectedExecutionHandler {
 
 因为创建线程消耗资源，因此先考虑将任务缓存起来等待执行。
 
+### Q：核心线程数会被回收吗？需要什么设置？
+
+核心线程数默认是不会被回收的，如果需要回收核心线程数，需要调用下面的方法：allowCoreThreadTimeOut();
+
+### Q：如何动态指定队列长度？
+
+因为LinkedBlockingQueue的capacity是被final修饰的，所以不允许动态修改
+
+```
+/** The capacity bound, or Integer.MAX_VALUE if none */
+private final int capacity;
+```
+
+所以要想动态修改只能自己实现一个BlockingQueue：复制LinkedBlockingQueue源码，将capacity的final修饰去掉，添加set方法，保存为ResizableCapacityLinkedBlockingQueue.java即可
+
 ### Q：为什么一般不建议使用JDK提供的线程池？
 
 阿里规约，由于FixedThreadPool和SingleThreadPool里面的阻塞队列基本是没有上限的（默认队列长度Integer.MAX_VALUE=21亿），这就可能会导致任务过多，内存溢出（OOM），而CachedThreadPool和ScheduledThreadPool则可能会创建大量线程（< 21亿），也可能会导致内存溢出（OOM）
