@@ -2284,3 +2284,58 @@ WebApp destroyed.
 
 <img src="images/Spring常见问题/8701b36673e94fc887f403f35783f06dnoop.image_iz=58558&from=article.png" alt="img" style="zoom: 25%;" />
 
+
+
+## ApplicationRunner
+
+SpringBoot提供了两个接口来实现Spring容器**启动完成**后执行的功能，两个接口分别为`CommandLineRunner`和`ApplicationRunner`。
+
+这两个接口需要实现一个run方法，将代码在run中实现即可。这两个接口功能基本一致，其区别在于run方法的入参。`ApplicationRunner`的run方法入参为`ApplicationArguments`，为`CommandLineRunner`的run方法入参为String数组。执行顺序用@Order指定
+
+**TestPostConstruct**
+
+```java
+@Component
+public class TestPostConstruct {
+
+    static { // 静态代码块
+        System.out.println("static");
+    }
+    public TestPostConstruct() {
+        System.out.println("constructer");
+    }
+
+    @PostConstruct
+    public void init() {
+        System.out.println("PostConstruct");
+    }
+}
+```
+
+TestApplicationRunner
+
+```java
+@Component
+@Order(1)
+public class TestApplicationRunner implements ApplicationRunner{
+    @Override
+    public void run(ApplicationArguments applicationArguments) throws Exception {
+        System.out.println("order1:TestApplicationRunner");
+    }
+}
+```
+
+TestCommandLineRunner
+
+```java
+@Component
+@Order(2)
+public class TestCommandLineRunner implements CommandLineRunner {
+    @Override
+    public void run(String... strings) throws Exception {
+        System.out.println("order2:TestCommandLineRunner");
+    }
+}
+```
+
+加载顺序为`static静态代码块`>`constructer`>`@PostConstruct`>`CommandLineRunner`和`ApplicationRunner`
