@@ -1064,6 +1064,8 @@ Stream的中间操作得到的结果还是一个Stream，将一个Stream转换�
 
 ## 形参
 
+方法的参数。如果参数类型是非基本类型（例如类A），则参数只能传A类型及其子类，若传A的父类则编译报错。
+
 **值传递**：传基本类型，不影响方法外部的变量
 
 **引用传递**：传引用类型（地址），有可能影响方法外部的变量
@@ -1108,6 +1110,77 @@ public class Exam {
     }
 }
 ```
+
+## 方法重写（override）
+
+又称方法覆盖，即子类方法覆盖父类方法 ，或a类实现b接口方法。必须加上@Override 注解。
+
+为了满足里式替换原则，重写有以下三个限制： 
+
+1. 子类方法的访问权限必须大于等于父类方法；
+2. 子类方法的返回类型必须是父类方法返回类型或为其子类型。
+3. 子类方法抛出的异常类型必须是父类抛出异常类型或为其子类型。
+
+### Q：在子类实例中调用重写方法时，编译器如何判断调用子类还是父类方法？
+
+遵循“**最近原则**”。例如几个类的继承关系为A-B-C-D：
+
+- 子类和父类的方法参数类型相同（例如B），则无论传参为哪种类型，均调用子类方法（但有约束必须是B类及其子类。否则编译报错）
+- 子类和父类的方法参数类型不同，则看入参类型在继承链上离谁的形参类型更近，就调谁的
+
+```java
+// 子类和父类的方法参数类型不同的例子1
+class A {
+  public void show(B obj) {System.out.println("A.show()");}
+}
+class B extends A {
+  public void show(C obj) {System.out.println("B.show()");}
+}
+class Test1{
+    public static void main(String[] args) {
+       A a = new A();B b = new B();C c = new C();D d = new D();
+        // 子类方法形参为C类型，父类方法形参为B类型，传参C、D类型，都离子类的方法形参C更近。
+        b.show(c);   // B.show()
+        b.show(d);   // B.show()
+        // 虽然创建子类实例 ，但使用父类引用，因此调用方法全是父类的
+        A ba = new B();
+        ba.show(c);   // A.show()
+        ba.show(d);   // A.show()
+    }
+}
+// 子类和父类的方法参数类型不同的例子2
+class A {
+    public void show(B obj) {System.out.println("A.show()");}
+}
+class B extends A {
+    public void show(A obj) {System.out.println("B.show()");}
+}
+class Test1{
+    public static void main(String[] args) {
+        A a = new A();B b = new B();C c = new C();D d = new D();
+        // 子类方法形参为A类型，父类方法形参为B类型，传参C、D类型，都离父类的方法形参C更近。
+        b.show(c);   // A.show()
+        b.show(d);   // A.show()
+        // 虽然创建子类实例 ，但使用父类引用，因此调用方法全是父类的
+        A ba = new B();
+        ba.show(c);   // A.show()
+        ba.show(d);   // A.show()
+    }
+}
+```
+
+
+
+## 方法重载（overload）
+
+存在于同一个类中，指一个方法与已经存在的方法：
+
+1. 名称上相同
+2. 但是参数列表不同（类型、个数、顺序三者至少有一个不同）
+
+其余的修饰符、返回值等要素是否相同均不影响重载
+
+重载的目的：功能类似的方法使用同一名字，更容易记住，因此，调用起来更简单。
 
 # 面向对象
 
@@ -1197,37 +1270,299 @@ Object.class.isAssignableFrom(Integer.class); // true，因为Integer可以赋�
 Integer.class.isAssignableFrom(Number.class); // false，因为Number不能赋值给Integer
 ```
 
+### 覆盖
+
+1. 属性覆盖
+   对属性而言，子类与父类属性名相同，则称为属性覆盖（为何类型不作要求？因为访问属性时只用名字进行，不关心类型）。从父类继承的该属性被子类属性屏蔽。
+2. 方法覆盖（方法重写override）
+
+## super关键字
+
+表示父类（超类）。
+
+- 子类引用父类的字段时，可以用super.fieldName;
+- 调用父类方法可以用super.function();
+
+### super局部性
+
+可以看到尽管在实例b中获取了父类的变量num并进行修改，但只是实例b的局部变量，并不会影响父类实例a的num
+
+```java
+public class A {public int num = 1;}
+public class B extends A {
+    public int num = 2;
+    public void test() {
+        System.out.println(num);  // 2 ->覆盖了父类的num=1
+        System.out.println(super.num);  // 1
+        super.num += 10;
+        System.out.println(super.num);  // 11
+    }
+}
+ 
+public class Test {
+    public static void main(String[] args) {
+        A a = new A();B b = new B();
+        b.test();
+        System.out.println(a.num);  // 1 -> 不会受b影响
+    }
+}
+```
+
+super只是一个标志，仅表示可以通过它调用父类方法和访问属性。
+子类实例调用super不依赖父类实例，**super地址还是子类实例自身，并不指向父类对象**
+
+可以输出他们的地址来验证：
+
+```java
+public class A {
+    public int num = 1;
+    public void hash() {System.out.println("hash " + this.hashCode());}
+}
+public class B extends A{
+    public int num = 2;
+    public void test() {
+        System.out.println(super.hashCode()); // 621009875
+        System.out.println(this.hashCode());  // 621009875
+        super.hash();  // hash 621009875
+    }
+}
+public class Test {
+    public static void main(String[] args) {
+        A a = new A(); B b = new B();
+        b.test();
+        a.hash();  // hash 1265094477
+    }
+}
+```
+
+
+
+## 访问控制
+
+1. 公有public：可被其他任何对象访问
+2. 保护protected：只可被同一类及其子类的实例、同一包中类的实例，以及不同包中的子类访问
+3. 私有private：只能被这个类本身访问，类外都不可见
+4. 默认（不常用，即不加修饰符）：仅允许同一包内访问，又称为包访问权限
+
+| 类型/修饰符            | private | 无修饰符 | protected | public |
+| ---------------------- | ------- | -------- | --------- | ------ |
+| 同一类                 | Y       | Y        | Y         | Y      |
+| 同一包（子类、非子类） | N       | Y        | Y         | Y      |
+| 不同包中子类           | N       | N        | Y         | Y      |
+| 不同包中非子类         | N       | N        | N         | Y      |
+
+
+
 ## static
 
-1. 修饰变量--静态变量
+### 静态变量
 
-   又称**类变量**，属于类，只能在**类内声明**（不能在方法内），存储于jvm的方法区。
+static修饰的变量。又称**类变量**，属于类，只能在**类内声明**（不能在方法内），存储于jvm的方法区。
 
-   因为属于类，所以该类的所有对象都能访问，通过以下方式：
+因为属于类，所以该类的所有对象都能访问，通过以下方式：
 
-   ```java
-   Test.var;  // 类名为Test，变量名为var
-   ```
+```java
+Test.var;  // 类名为Test，变量名为var
+```
 
-   
 
-2. 修饰方法--静态方法
 
-3. 修饰代码块--静态代码块
+### 静态方法
 
-4. 修饰内部类--静态内部类
+static修饰的方法。静态方法属于类，在类加载时就存在了，它不依赖于任何实例。也不能有 this 和 super 关键字，因为这两个关键字与具体对象关联。
 
-   非静态内部类依赖于外部类的实例，也就是说需要先创建外部类实例，才能用这个实例去创建非静态内部类。而静态内部类不需要。
+所以静态方法必须有实现，即不能是抽象方法。
+
+静态方法内只能访问所属类的静态字段和其他静态方法，不能访问其他字段和方法（此时还未chu'shi'h。
+
+静态方法不能被重写（override），因为override基于运行时的**动态绑定**，静态方法在编译时使用**静态绑定**进行绑定，静态方法属于类而不是实例。
+
+例如，A类有一个普通方法和一个静态方法 ：
+
+```java
+public class A {
+    public void upper() {System.out.println("A");}
+    public static void lower() {System.out.println("a");}
+}
+```
+
+B类继承A类，并重载两个方法
+
+```java
+public class B extends A{
+    public void upper() {System.out.println("B");}
+    public static void lower() {System.out.println("b");}
+}
+```
+
+测试结果表明，c本质上是一个B类实例，因此upper方法覆盖了父类方法，输出B
+
+而lower是静态方法，不会被重写，编译器会提示不应该实例调用，而应写成类名调用
+
+```java
+public class Test {
+  public static void main(String[] args) {
+    A a = new A();  B b = new B();  A c = new B();
+    a.upper(); //A
+    a.lower(); //a
+    b.upper(); //B
+    b.lower(); //b
+    c.upper(); //B
+    c.lower(); //a
+  }
+}
+```
+
+### 静态代码块
+
+static修饰的代码块
+
+### 静态内部类
+
+static修饰的内部类
+
+非静态内部类依赖于外部类的实例，也就是说需要先创建外部类实例，才能用这个实例去创建非静态内部类。而静态内部类不需要。
 
 ## final
 
+使用final修饰过的都是不可改变的：
+
+1. final修饰变量
+   表示常量，即声明创建后就恒定不变的属性，如果在程序中重新赋值则编译报错。
+2. final修饰方法
+   表示最终的方法，任何继承类**无法重写**（或叫覆盖，Override）该方法。
+   但重载（Overload）不会受到限制。
+3. final修饰类
+   表示最终的累，该类不能作为任何类的父类，即不能被继承
+   类中的**方法会全部被隐式定义为final**类型。但类变量不会隐式加final，需要手动加final修饰。
+
 # 异常
+
+![图片](images/Java基础/640.jpeg)
+
+Thorwable类（表示可抛出）是所有异常和错误的超类，两个直接子类为Error和Exception。
+
+- Error表示严重的错误，程序对此一般无能为力。
+- Exception则是运行时的错误，它可以被捕获并处理。
+
+Exception又分为两大类：
+
+- RuntimeException以及它的子类：运行时异常
+- 非RuntimeException（包括IOException、ReflectiveOperationException等）
+
+针对编译器又分为：
+
+- 检查异常：Exception下**非RuntimeException**的子类，是编译器在编译期间检查的那些异常，也称“编译时异常”。
+- 非检查异常：Error和Exception下的RuntimeException子类，编译器不会检查运行时异常，也称为“运行时异常”。
+
+## Java异常处理机制
+
+当一个异常被抛出时，JVM会在当前的方法里寻找一个匹配的处理，如果没有找到，这个方法会**强制结束**并弹出当前栈帧，并且异常会重新抛给上层调用的方法（在调用方法帧）。如果在所有帧弹出前仍然没有找到合适的异常处理，这个线程将终止。如果这个异常在最后一个非守护线程（比如main线程）里抛出，将会导致JVM自己终止。
+
+## 异常处理方式
+
+有两种，一种是 try-catch 捕获异常，另一种是通过 throw 抛出异常。
+
+在程序中可以抛出两种类型的异常，一种是检查异常，另一种是非检查异常，应该尽量抛出非检查异常，遇到检查异常应该捕获进行处理不要抛给上层。在异常处理的时候应该尽可能晚的处理异常，最好是定义一个全局异常处理器，在全局异常处理器中处理所有抛出的异常，并将异常信息封装到 Result 对象中返回给调用者。
+
+## try-with-resources 语句
+
+JDK1.7新增语法，声明包含三部分：**try(声明需要关闭的资源)、try 块、catch 块**。
+
+要求在 try-with-resources 声明中定义的变量实现了 **AutoCloseable** 接口并重写**close**方法，这样在系统可以自动调用它们的close方法，从而替代了finally中关闭资源的功能。使用分号分隔，每个声明可以管理多个资源。
+
+```java
+private static void autoClosable() throws IOException {
+    //jdk1.7版本流会自动关闭，实现了AutoClosable接口
+	// 在try括号中创建文件输入输出流，在代码块中操作流
+	// 不用再考虑关闭流
+    try(
+            FileInputStream fis = new FileInputStream("xxx.txt"); 
+            FileOutputStream fos = new FileOutputStream("hhh.txt");
+    ){
+        int len = -1;
+        while((len=fis.read())!=-1) {
+            fos.write(len);
+        }
+    }
+}
+```
+
+
+
+## 全局异常处理
+
+springboot 项目，http 接口的异常处理主要分为三类：
+
+- 基于请求转发：**真正**的全局异常处理。
+
+  实现方式：BasicExceptionController
+
+- 基于异常处理器：不是真正的全局异常处理，因为它处理不了过滤器等抛出的异常。
+
+  实现方式：
+
+  - @ExceptionHandler
+  - @ControllerAdvice+@ExceptionHandler
+  - SimpleMappingExceptionResolver
+  - HandlerExceptionResolver
+
+- 基于过滤器：近似全局异常处理。它能处理过滤器及之后的环节抛出的异常
+
+  实现方式：Filter
+
+异常处理器示例：通过 @ControllerAdvice+@ExceptionHandler 实现**基于异常处理器的http接口全局异常处理**
+
+在 HttpExceptionHandler 类中，@RestControllerAdvice = @ControllerAdvice + @ResponseBody ，如果有其他的异常类型需要处理，只需要新增@ExceptionHandler注解的方法即可。
+
+```java
+//http 接口异常处理类
+@Slf4j
+@RestControllerAdvice("org.example.controller")
+public class HttpExceptionHandler {
+    /**
+     * 处理业务异常
+     * @param request 请求参数
+     * @param e 异常
+     * @return Result
+     */
+    @ExceptionHandler(value = BizException.class)
+    public Object bizExceptionHandler(HttpServletRequest request, BizException e) {
+        log.warn("业务异常：" + e.getMessage() , e);
+        return Result.fail(e.getCode(), e.getMessage());
+    }
+    /**
+     * 处理系统异常
+     * @param request 请求参数
+     * @param e 异常
+     * @return Result
+     */
+    @ExceptionHandler(value = SystemException.class)
+    public Object systemExceptionHandler(HttpServletRequest request, SystemException e) {
+        log.error("系统异常：" + e.getMessage() , e);
+        return Result.fail(e.getCode(), e.getMessage());
+    }
+    /**
+     * 处理未知异常
+     * @param request 请求参数
+     * @param e 异常
+     * @return Result
+     */
+    @ExceptionHandler(value = Throwable.class)
+    public Object unknownExceptionHandler(HttpServletRequest request, Throwable e) {
+        log.error("未知异常：" + e.getMessage() , e);
+        return Result.fail(e.getMessage());
+    }
+}
+```
+
+
 
 ## Q：finally和return的执行顺序？
 
 已知先执行try/catch，然后必然执行finally
 
-1. 若try/catch中有return，先计算return值，然后进finally（finally中无法修改return值），最后return。
+1. 若try/catch中有return，先计算return值，然后进finally（但finally中无法修改return值），最后return。
 2. 若finally中有return，则无论try/catch中return值如何，以finally中的return为最终返回。
 
 无论如何，甚至在try/catch结构以外都其他语法中，return都是**最后执行**
