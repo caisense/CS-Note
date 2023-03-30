@@ -561,7 +561,7 @@ method.invoke(object, 1);
 
 #### Q：静态代码块、构造代码块、构造函数以及Java类初始化顺序？
 
-执行顺序：**静态块——main()——构造块——构造方法**。
+创建对象时执行顺序：**静态块——main()——构造块——构造方法**。
 
 1. 静态代码块：类中以static开头的`{}`代码块
 
@@ -609,9 +609,7 @@ method.invoke(object, 1);
 
    ```java
    public class HelloA {
-       public HelloA(){	//构造函数
-           System.out.println("A的构造函数");
-       }
+       public HelloA(){	System.out.println("A的构造函数");  }  //构造函数
        {	//构造代码块
            System.out.println("A的构造代码块");
        }
@@ -620,28 +618,29 @@ method.invoke(object, 1);
        }
    }
    public class HelloB extends HelloA{
-       public HelloB(){  //构造函数
-           System.out.println("B的构造函数");
-       }
+       public HelloB(){  System.out.println("B的构造函数");  }   //构造函数
        {  //构造代码块
            System.out.println("B的构造代码块");
        }
        static {  //静态代码块
            System.out.println("B的静态代码块");
        }
-       public static void main(String[] args) {
+       public static void main(String[] args) {// 测试
+           System.out.println("main");
            HelloB b = new HelloB();
        }
    }
    // 输出：
    A的静态代码块
    B的静态代码块
+   main
    A的构造代码块
    A的构造函数
    B的构造代码块
    B的构造函数
+   // 如果new两个B，只会多输出main后面的内容一次，因为静态代码块在程序中只执行一次。
    ```
-
+   
    
 
 ## 垃圾回收（GC）
