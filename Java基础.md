@@ -184,13 +184,15 @@ byte、char、short三种类型实际存储的数据都是整数，在实际使�
 
 ## 二、引用类型
 
+> [JDK12之后引入的四种引用类型](./Java高级.md#####Java中引用的类型)
+
 除了上述基本类型的变量，剩下的都是引用类型，也就是对象。例如，引用类型最常用的就是String字符串
 
 ### String
 
 String 类被声明为 final，因此它不可被继承。(Integer 等包装类也不能被继承）
 
-String底层实现数组也被声明为 final，意味着数组初始化后地址不能改变，且内部不提供改变数组的方法，保证了**String不可变**。
+String底层实现数组也被声明为 final，意味着数组初始化后地址不能改变，且内部不提供改变数组的方法，保证了**String不可变**。（其实也不是绝对的，通过反射机制也能修改）
 
 #### 底层实现
 
@@ -642,19 +644,19 @@ System.out.println(end-start);
 
 1.创建时若不初始化，则必须指定长度。元素值为该类型默认值
 
-```
+```java
 int [] intArray0 = new int [3];  // 创建长度为3的整数数组，每个元素都是0
 ```
 
 2.若初始化（赋初值），则不能指定长度（因为长度由初始化元素个数决定）
 
-```
+```java
 int intArray1 [] = new int []{20, 21, 22};
 ```
 
 可以省略new:
 
-```
+```java
 int intArray2 [] = {23, 24, 25};
 ```
 
@@ -739,16 +741,16 @@ Number numArray [] = {23, 0.1f, 0.2d};
 
 3. 如果数组下标位置桶不为空，则分情况：
 
-    - jdk1.7：先判断是否需要扩容
+    - jdk1.7：**先判断**是否需要扩容
 
-     若不用则生成Entry，并用头插法加入桶。
+     若不用扩容，则生成Entry，并用**头插法**加入桶。
    
    - jdk1.8：先判断当前位置桶类型是红黑树还是链表
    
      - 若是红黑树Node，则封装节点并插入红黑树，判断红黑树是否存在当前key，存在则直接更新value
      - 若是链表Node，则封装节点并用尾插法，遍历链表过程中判断是否存在当前key，存在则直接更新value。插入后统计链表长度，**若>=8则转红黑树**
    
-     - 插入之后再判断是否扩容
+     - **插入之后再判断**是否扩容
    
 
 ##### Q：链表转红黑树的阈值被设置为8的原因？
@@ -772,7 +774,7 @@ Number numArray [] = {23, 0.1f, 0.2d};
 
 #### 3.扩容
 
-注意：这里的扩容指table扩容，而不是桶（因为桶是链表，没有上限）。
+注意：这里的扩容指table扩容，而不是桶（因为桶是链表，没有上限），操作是table**翻倍**，Entry数组长度 * 2
 
 相关参数主要有3个：
 
@@ -780,21 +782,21 @@ Number numArray [] = {23, 0.1f, 0.2d};
 
 - size：键值对数量。
 
-- loadFactor：加载因子，表示table数组填满的程度，取0~1之间的值，默认0.75
+- loadFactor：加载因子，取0~1之间的值，默认0.75
 
-扩容时机：由扩容临界值决定，Threshold = loadFactor * capacity。当HashMap中的元素个数超过该值时，就会进行Entry数组扩容（**翻倍**，capacity * 2）
+扩容时机：由扩容临界值**Threshold = loadFactor * capacity**决定。当HashMap中的元素个数超过该值**Threshold** 时，就会进行Entry数组扩容
 
-**Q：capacity = 2^n 的原因？**
+##### Q：capacity = 2^n 的原因？
 
 前面已经解释过，求元素放几号桶时用&运算代替取模，前提是要求capacity = 2^n 。
 
-这是一种非常规的设计，常规设计是把桶大小设为**素数**（hashTable初始化桶大小就是11），相对来说素数的hash冲突概率小于合数
+> 这是一种非常规的设计，常规设计是把桶大小设为**素数**（hashTable初始化桶大小就是11），相对来说素数的hash冲突概率小于合数
 
 
 
 扩容操作：
 
-1. 扩容：创建新的Entry空数组，长度是原数组2倍
+1. 扩容：创建新的Entry空数组，长度是原数组**翻倍**。
 
 2. ReHash：遍历原Entry数组，把所有Entry重写Hash到新数组
 
@@ -806,7 +808,7 @@ jdk1.7：由于ReHash，可能导致原来在一个桶的结点分散到不同�
 
 jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，或链表进化为红黑树
 
-![image-20220322102957906](images\Java基础\image-20220322102957906.png)
+<img src="images\Java基础\image-20220322102957906.png" alt="image-20220322102957906" style="zoom:50%;" />
 
 #### hashMap线程不安全分析
 
@@ -831,7 +833,7 @@ jdk1.8虽然用尾插法不会出现循环链表，但还是会有某个桶**覆
 
 ### 4.ConcurrentHashMap
 
-![image-20191209001038024](images\Java基础\image-20191209001038024.png)
+<img src="images\Java基础\image-20191209001038024.png" alt="image-20191209001038024" style="zoom:50%;" />
 
 和 HashMap 实现上类似，主要差别是 ConcurrentHashMap 使用**两级数组**：
 
@@ -1183,7 +1185,26 @@ class Test1{
 
 重载的目的：功能类似的方法使用同一名字，更容易记住，因此，调用起来更简单。
 
+## main方法
+
+```java
+public static void main(String[] args) {
+}
+```
+
+定义在某个类中，必须是static。
+
+一个Java程序中不一定只有一个main函数，但至少有一个。java程序运行时，以某个main方法为入口。
+
+web应用中可以不写main方法，因为web容器已经自带入口。
+
+### Q：main方法为什么必须加static？
+
+已知在类加载时无法创建对象，因为静态方法可以不通过对象调用，所以在类的main方法所在在类加载时就可以通过main方法入口来运行程序。
+
 # 面向对象
+
+面向对象三大特征：封装、继承和多态。
 
 ## Object
 
@@ -1314,6 +1335,67 @@ B的构造函数
 
 ## 继承
 
+### super关键字
+
+表示父类（超类）。
+
+- 子类引用父类的字段时，可以用super.fieldName;
+- 调用父类方法可以用super.function();
+
+#### super的局部性
+
+可以看到尽管在实例b中获取了父类的变量num并进行修改，但只是实例b的局部变量，并不会影响父类实例a的num
+
+```java
+public class A {public int num = 1;}
+public class B extends A {
+    public int num = 2;
+    public void test() {
+        System.out.println(num);  // 2 ->覆盖了父类的num=1
+        System.out.println(super.num);  // 1
+        super.num += 10;
+        System.out.println(super.num);  // 11
+    }
+}
+ 
+public class Test {
+    public static void main(String[] args) {
+        A a = new A();B b = new B();
+        b.test();
+        System.out.println(a.num);  // 1 -> 不会受b影响
+    }
+}
+```
+
+super只是一个标志，仅表示可以通过它调用父类方法和访问属性。
+子类实例调用super不依赖父类实例，**super地址还是子类实例自身，并不指向父类对象**
+
+可以输出他们的地址来验证：
+
+```java
+public class A {
+    public int num = 1;
+    public void hash() {System.out.println("hash " + this.hashCode());}
+}
+public class B extends A{
+    public int num = 2;
+    public void test() {
+        System.out.println(super.hashCode()); // 621009875
+        System.out.println(this.hashCode());  // 621009875
+        super.hash();  // hash 621009875
+    }
+}
+public class Test {
+    public static void main(String[] args) {
+        A a = new A(); B b = new B();
+        b.test();
+        a.hash();  // hash 1265094477
+    }
+}
+```
+
+
+
 ### instanceof操作符
 
 java关键字，判断一个实例是否是某个类的对象（包括继承和实现），返回布尔值。
@@ -1347,7 +1429,27 @@ Integer.class.isAssignableFrom(Number.class); // false，因为Number不能赋�
    对属性而言，子类与父类属性名相同，则称为属性覆盖（为何类型不作要求？因为访问属性时只用名字进行，不关心类型）。从父类继承的该属性被子类属性屏蔽。
 2. 方法覆盖（方法重写override）
 
-## 向上转型和向下转型
+## 多态
+
+子类对象赋值给父类对象引用，之后父类对象就可以在**运行时**根据当前赋值给它的子对象的特性，执行方法时就可以有不同的操作。
+
+多态分为编译时多态和运行时多态。**编译时多态**是静态的，主要指方法重载（overload）；**运行时多态**指方法覆盖（override），在运行时通过动态绑定实现。
+
+最常见的用法：
+
+```java
+List<Integer> list = new ArrayList();  // 用父类List对象接收一个子类 ArrayList对象
+listAdd(list);
+public void listAdd(List<Integer> list) {
+    list.add(xxx);  // 执行add方法
+}
+```
+
+listAdd的形参类型是List，而实际传参时不仅可以传List，也可以传List的其他子类LinkedList，因此第4行add方法最终执行哪个子类的覆盖方法，取决于赋给父对象哪个子类的对象。
+
+多态强大之处在于，允许添加更多类型的子类实现功能扩展，却不需要修改基于父类的代码（listAdd不用动）。
+
+### 向上转型和向下转型
 
 对象的类型在new()时刻就由构造函数指定，之后不可更改。
 
@@ -1414,65 +1516,6 @@ public static void main(String[] args) {
 
 
 
-## super关键字
-
-表示父类（超类）。
-
-- 子类引用父类的字段时，可以用super.fieldName;
-- 调用父类方法可以用super.function();
-
-### super局部性
-
-可以看到尽管在实例b中获取了父类的变量num并进行修改，但只是实例b的局部变量，并不会影响父类实例a的num
-
-```java
-public class A {public int num = 1;}
-public class B extends A {
-    public int num = 2;
-    public void test() {
-        System.out.println(num);  // 2 ->覆盖了父类的num=1
-        System.out.println(super.num);  // 1
-        super.num += 10;
-        System.out.println(super.num);  // 11
-    }
-}
- 
-public class Test {
-    public static void main(String[] args) {
-        A a = new A();B b = new B();
-        b.test();
-        System.out.println(a.num);  // 1 -> 不会受b影响
-    }
-}
-```
-
-super只是一个标志，仅表示可以通过它调用父类方法和访问属性。
-子类实例调用super不依赖父类实例，**super地址还是子类实例自身，并不指向父类对象**
-
-可以输出他们的地址来验证：
-
-```java
-public class A {
-    public int num = 1;
-    public void hash() {System.out.println("hash " + this.hashCode());}
-}
-public class B extends A{
-    public int num = 2;
-    public void test() {
-        System.out.println(super.hashCode()); // 621009875
-        System.out.println(this.hashCode());  // 621009875
-        super.hash();  // hash 621009875
-    }
-}
-public class Test {
-    public static void main(String[] args) {
-        A a = new A(); B b = new B();
-        b.test();
-        a.hash();  // hash 1265094477
-    }
-}
-```
-
 
 
 ## 访问控制
@@ -1503,7 +1546,7 @@ static修饰的变量。又称**类变量**，属于类，只能在**类内声�
 Test.var;  // 类名为Test，变量名为var
 ```
 
-
+静态变量可以修改值（而final变量不能）
 
 ### 静态方法
 
@@ -1563,15 +1606,21 @@ static修饰的内部类
 
 非静态内部类依赖于外部类的实例，也就是说需要先创建外部类实例，才能用这个实例去创建非静态内部类。而静态内部类不需要。
 
+
+
 ## final
 
 使用final修饰过的都是不可改变的：
 
 1. final修饰变量
-   表示常量，即声明创建后就恒定不变的属性，如果在程序中重新赋值则编译报错。
+   表示常量，即**声明赋初值**后就恒定不变的属性，如果在程序中重新赋值则编译报错。
+
+   或在**构造方法中初始化**。
+
 2. final修饰方法
    表示最终的方法，任何继承类**无法重写**（或叫覆盖，Override）该方法。
    但重载（Overload）不会受到限制。
+
 3. final修饰类
    表示最终的累，该类不能作为任何类的父类，即不能被继承
    类中的**方法会全部被隐式定义为final**类型。但类变量不会隐式加final，需要手动加final修饰。
@@ -1982,6 +2031,9 @@ public class Test {
 但是目标对象如果实现了接口，就用jdk动态代理；目标对象没有实现任何接口，用cglib
 
 # 反射
+
+- 优点： 运行期类型的判断，动态加载类，提高代码灵活度。
+- 缺点： 性能瓶颈：反射相当于一系列解释操作，通知 JVM 要做的事情，性能比直接的java代码要慢很多。  
 
 ## Class类
 
