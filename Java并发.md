@@ -14,14 +14,13 @@
 
    ```java
    public static void main(String[] args) {
-   
        Thread t = new Thread(() -> {
            // 方法逻辑
        });
        t.start();
    }
    ```
-
+   
 2. 继承Thread类
 
    定义一个类继承Thread，重写其run()方法（因为Thread类实现了Runnable），然后new一个该类实例：
@@ -78,10 +77,7 @@
    
      ```java
      public class MyCallable implements Callable<Integer> {
-             public Integer call() {
-                 return 123;
-             }
-         }
+         public Integer call() {  return 123;  }
          public static void main(String[] args) throws ExecutionException, InterruptedException {
              MyCallable mc = new MyCallable();
              FutureTask<Integer> ft = new FutureTask<>(mc);
@@ -89,6 +85,7 @@
              thread.start();
              System.out.println(ft.get());
          }
+     }
      ```
    
    - Future + Callable + ThreadPool
@@ -252,11 +249,11 @@ Java中线程的状态有以下几种：
 
 （参数可选，表示等待时间）
 
-在当前线程里调用其它线程Thread的join方法，会等待Thread执行结束。
+在当前线程里调用其它线程Thread1的join方法，会等待Thread1执行结束。
 
-当前线程进入**WAITING/TIMED_WAITING**状态，且**不会释放对象锁**。
+令当前线程进入**WAITING/TIMED_WAITING**状态，且**不会释放对象锁**。
 
-**当线程Thread执行完毕，或millis时间到，则当前线程一般情况下进入RUNNABLE状态，也有可能进入BLOCKED状态（因为join是基于wait实现的）。**
+> 当线程Thread执行完毕，或millis时间到，则当前线程一般情况下进入RUNNABLE状态，也有可能进入BLOCKED状态（因为join是**基于wait实现**的）。
 
 要保证n个线程按顺序执行，可以在主线程中依次调用它们的join()方法，如：
 
@@ -290,9 +287,7 @@ C.join();
 也必须在**synchronized**块或方法中使用
 
 随机唤醒一个(notify)或所有(notifyAll)正在object锁等待的线程（就是在下文例1中getTask()中位于this.wait()的线程），从而使得等待线程从this.wait()方法返回。让等待的线程被重新唤醒
-**注意**
-
-wait和notify必须对**同一个对象**使用才有效
+**注意**：wait和notify必须对**同一个对象**使用才有效
 
   例1
 
@@ -428,28 +423,82 @@ wait和notify必须对**同一个对象**使用才有效
 
 ## volatile关键字（共享变量）
 
-volatile关键字解决的是可见性问题：当一个线程修改了某个共享变量的值，其他线程能够立刻看到修改后的值。但是volatile无法保证线程安全，因为不能保证原子性，例如两个线程同时写冲突
+volatile关键字解决的是**可见性**问题：当一个线程修改了某个共享变量的值，其他线程能够立刻看到修改后的值。
 
-在 Java 内存模型中，允许编译器和处理器对指令进行重排序，重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
+但是volatile无法保证线程安全，因为不能保证原子性，例如两个线程同时写冲突
+
+> 在 Java 内存模型中，允许编译器和处理器对指令进行**重排序**，重排序不会影响单线程的执行结果，却会影响到多线程并发执行的正确性。
 
 volatile 关键字通过添加**内存屏障**的方式来**禁止指令重排**，即重排序时不能把后面的指令放到内存屏障之前。
 
-Java内存模型中定义的8种工作内存和主内存之间的原子操作
+### JMM层面实现
 
-<img src="https://cs-notes-1256109796.cos.ap-guangzhou.myqcloud.com/8b7ebbad-9604-4375-84e3-f412099d170c.png" alt="img" style="zoom:50%;" />
+一个变量加volatile后，该变量和内存的交互操作更严格，即**read-load-use** 和 **assign-store-write** 必须是原子性的
 
-  Lock unlock read load use assign store write
+> [Java内存模型](##Java内存模型)中定义的8种[内存间交互操作](###内存间交互操作)
+>
+> <img src="images/Java并发/8b7ebbad-9604-4375-84e3-f412099d170c.png" alt="img" style="zoom: 50%;" />
 
-- lock：作用于主内存的变量
-- unlock
 
-如果赋值了一个变量volatile后，该变量对对象的操作更严格 限制use之前不能被read和load，assign之后必须紧跟store和write，将read-load-use和assign-store-write成为一个原子操作
 
-  synchronized 互斥锁来保证操作的原子性。它对应的内存间交互操作为：lock 和 unlock，在虚拟机实现上对应的字节码指令为 monitorenter 和 monitorexit。
+### 汇编层面实现
+
+在原汇编代码前面加**lock指令**
+
+> lock指令解释
+>
+> 1. 将当前处理器缓存行的数据**立即**写回内存
+> 2. 将其他CPU中缓存的该数据的缓存置失效（MESI缓存一致性协议）
+> 3. **内存屏障**，使lock前后指令不能重排序
+
+
+
+### 内存屏障 
+
+JVM规范的四种内存屏障
+
+| 内存屏障类型   | 抽象场景                   | 描述                                           |
+| :------------- | :------------------------- | :--------------------------------------------- |
+| LoadLoad屏障   | Load1; LoadLoad; Load2     | 在Load2读取前，保证Load1先读操作完毕。         |
+| StoreStore屏障 | Store1; StoreStore; Store2 | 在Store2写入前，保证Store1的写操作刷新到主内存 |
+| LoadStore屏障  | Load1; LoadStore; Store2   | 在Store2写入前，保证Load1读操作完毕。          |
+| StoreLoad屏障  | Store1; StoreLoad; Load2   | 在Load2读取前，保证Store1的写操作刷新到主内存  |
+
+为了实现volatile的内存语义，JVM采取以下的保守策略：
+
+- 在每个volatile**写操作的前面**插入一个StoreStore屏障，写操作**后面**插入一个StoreLoad屏障。（保证这个写操作在其他写之后、在其他读之前）
+- 在每个volatile**读操作的后面**插入一个LoadLoad屏障和LoadStore屏障。（保证这个读操作在其他读和写之前）
+
+```
+volatile int a = 0；
+a = 1;  // 写
+#StoreStore屏障
+a = 2； // 写
+#StoreLoad屏障
+b = a; // 读
+#LoadLoad屏障
+#LoadStore屏障
+```
+
+
+
+### **缓存一致性协议**
+
+多个cpu从主内存读取同一个数据到各自的高速缓存，当其中某个cpu修改了缓存的数据，会**立刻同步到主内存**。其他cpu通过**总线嗅探机制**可以立刻感知数据变化，从而将自己缓存的数据置失效。
+
+> 缓存加锁
+>
+> 核心机制基于缓存一致性协议实现，一个处理器的缓存回写内存会导致其他cpu的缓存失效，IA-32和Intel 64处理器使用MESI实现缓存一致性协议
+
+
+
+
 
 ## 线程同步
 
 ### 1. synchronized关键字
+
+原理：与 volatile 的实现原理不同，它对应的内存间交互操作为：lock 和 unlock，在虚拟机实现上对应的字节码指令为 **monitorenter** 和 **monitorexit**。
 
 1. 用于代码块
 
@@ -1516,6 +1565,177 @@ SimpleDateFormat是继承自DateFormat类，其中的Calendar对象被多线程�
 
    
 
+
+
+
+
+# Java内存模型
+
+Java Memory Model（JMM）是一种规范，试图屏蔽各种硬件和操作系统的内存访问差异，以实现 Java 程序在各种平台都能达到一致的内存访问效果。
+
+**JMM定义了Java虚拟机（JVM）在计算机内存（RAM）中的工作方式。**规定了以下两点：
+
+1. 可见性：一个线程如何以及何时可以看到其他线程修改过后的共享变量的值；
+2. 同步：如何在需要的时候对共享变量进行同步。
+
+
+
+并发编程中的两个关键问题就是这两条标准的体现：线程之间如何**通信** 和 **同步**。
+
+在命令式的编程中，线程之间的通信和同步机制有两种：**共享内存和消息传递**。
+
+- 线程通信机制：
+
+    - 共享内存的并发模型：线程之间共享程序的公共状态，线程之间通过读-写内存中的公共状态来隐式进行通信。典型的共享内存通信方式就是通过**共享对象**进行通信。
+
+    - 消息传递的并发模型：线程之间没有公共状态，线程之间必须通过明确的发送消息来显式进行通信，在Java中典型的消息传递方式就是` wait() `和` notify() `。
+
+- 线程同步机制：
+
+  具体指程序用于控制不同线程之间操作发生相对顺序的机制。
+
+    - 在共享内存的并发模型：同步是显式进行的，必须显式指定某个方法或某段代码需要在线程之间互斥进行。
+
+    - 在消息传递的并发模型：由于消息的发送必须在消息的接受之前，因此同步是隐式进行的。
+
+Java的并发采用的是**共享内存**模型，因此Java线程之间的通信总是隐式进行的，而同步是显式。
+
+## 主内存与工作内存
+
+在JMM中，线程之间的共享变量存储在**主内存**中。每个线程都有一个私有的**工作内存**，存储了共享变量的副本，是JMM中的抽象概念，并不真实存在。线程只能直接操作工作内存中的变量，不同线程之间的变量值传递需要通过主内存来完成。
+
+<img src="images/Java并发/15851555-5abc-497d-ad34-efed10f43a6b.png" alt="img" style="zoom:50%;" />
+
+## 内存间交互操作
+
+Java 内存模型定义了 8 个操作来完成主内存和工作内存的交互操作。
+
+<img src="images/Java并发/8b7ebbad-9604-4375-84e3-f412099d170c.png" alt="img" style="zoom: 67%;" />
+
+- read：把一个变量的值从主内存传输到工作内存中
+- load：在 read 之后执行，把 read 得到的值放入工作内存的变量副本中
+- use：把工作内存中一个变量的值传递给执行引擎（Thread）
+- assign：把一个从执行引擎（Thread）接收到的值赋给工作内存的变量
+- store：把工作内存的一个变量的值传送到主内存中
+- write：在 store 之后执行，把 store 得到的值放入主内存的变量中
+- lock：对主内存的变量加锁
+- unlock：对主内存的变量解锁
+
+## 内存模型三大特性
+
+### 原子性
+
+Java 内存模型保证了 read、load、use、assign、store、write、lock 和 unlock 这8种操作具有**原子性**，例如对一个 int 类型的变量执行 assign 赋值操作，这个操作就是原子性的。
+
+【但是】 Java 内存模型允许虚拟机将**没有被 volatile 修饰**的 64 位数据（long，double）的读写操作划分为**两次 32 位**的操作来进行，即 load、store、read 和 write 操作可以不具备原子性。
+
+有一个错误认识就是，int 等原子性的类型在多线程环境中不会出现线程安全问题。如下面代码中，cnt 属于 int 类型变量，1000 个线程对它进行自增操作之后，得到的值为 997 而不是 1000。
+
+```java
+// 线程不安全示例
+public class ThreadUnsafeExample { 
+    private int cnt = 0;
+    public void add() { cnt++; }
+    public int get() { return cnt; }
+}
+public static void main(String[] args) throws InterruptedException {
+    final int threadSize = 1000;
+    ThreadUnsafeExample example = new ThreadUnsafeExample();
+    final CountDownLatch countDownLatch = new CountDownLatch(threadSize);
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    for (int i = 0; i < threadSize; i++) {
+        executorService.execute(() -> {
+            example.add();  // 用线程池对cnt执行1000次++
+            countDownLatch.countDown();
+        });
+    }
+    countDownLatch.await();
+    executorService.shutdown();
+    System.out.println(example.get()); // 997
+}
+```
+
+为了方便讨论，将内存间的交互操作简化为 3 个：**load、assign、store**。
+
+下图演示了两个线程同时对 cnt 进行操作，load、assign、store 这一系列操作整体上看不具备原子性，那么在 T1 修改 cnt 并且还没有将修改后的值写入主内存，T2 依然可以读入旧值。可以看出，这两个线程虽然执行了两次自增运算，但是主内存中 cnt 的值最后为 1 而不是 2。因此对 int 类型读写操作满足原子性只是说明 load、assign、store 这些单个操作具备原子性。
+
+<img src="images/Java并发/2797a609-68db-4d7b-8701-41ac9a34b14f.jpg" alt="img" style="zoom:67%;" />
+
+AtomicInteger 能保证多个线程修改的原子性。
+
+<img src="images/Java并发/dd563037-fcaa-4bd8-83b6-b39d93a12c77.jpg" alt="img" style="zoom:67%;" />
+
+```java
+// 用AtomicInteger 改写上面的不安全示例
+public class AtomicExample {  
+    private AtomicInteger cnt = new AtomicInteger(); // 使用AtomicInteger替换int
+    public void add() { cnt.incrementAndGet(); }
+    public int get() { return cnt.get(); }
+}
+public static void main(String[] args) throws InterruptedException {
+    final int threadSize = 1000;
+    AtomicExample example = new AtomicExample(); // 只修改这条语句
+    final CountDownLatch countDownLatch = new CountDownLatch(threadSize);
+    ExecutorService executorService = Executors.newCachedThreadPool();
+    for (int i = 0; i < threadSize; i++) {
+        executorService.execute(() -> {
+            example.add();
+            countDownLatch.countDown();
+        });
+    }
+    countDownLatch.await();
+    executorService.shutdown();
+    System.out.println(example.get()); //1000
+}
+```
+
+除了使用原子类之外，也可以使用 synchronized 互斥锁来保证操作的原子性。它对应的内存间交互操作为：lock 和 unlock，在虚拟机实现上对应的字节码指令为 monitorenter 和 monitorexit。
+
+### 可见性
+
+可见性：当一个线程修改了共享变量的值，其它线程能够立即得知这个修改。
+
+JMM 是通过在变量修改后将新值同步回主内存，在变量读取前从主内存刷新变量值来实现可见性的。
+
+主要有三种实现可见性的方式：
+
+- volatile
+- synchronized，对一个变量执行 unlock 操作之前，必须把变量值同步回主内存。
+- final，被 final 关键字修饰的字段在构造器中一旦初始化完成，并且没有发生 this 逃逸（其它线程通过 this 引用访问到初始化了一半的对象），那么其它线程就能看见 final 字段的值。
+
+> 可见性并不能保证线程安全（原子性）。
+>
+> 对前面的【线程不安全示例】中的 cnt 变量使用 volatile 修饰，并不能解决线程不安全问题，因为 volatile 不保证操作的原子性。
+
+
+
+### 有序性
+
+有序性：在本线程内观察，所有操作都是有序的。
+
+但在一个线程观察另一个线程，所有操作都是无序的，无序是因为发生了**指令重排序**。
+
+> 在 JMM 中，允许编译器和处理器对指令进行重排序，重排序过程不会影响到单线程程序的执行，却会影响到多线程并发执行的正确性。
+
+volatile 关键字通过添加**内存屏障**的方式来禁止指令重排，即重排序时不能把后面的指令放到内存屏障之前。
+
+也可以通过 synchronized 来保证有序性，它保证每个时刻只有一个线程执行同步代码，相当于是让线程顺序执行同步代码。
+
+
+
+### 先行发生原则
+
+上面提到了可以用 volatile 和 synchronized 来保证有序性。除此之外，JVM 还规定了先行发生原则，让一个操作**无需控制**就能先于另一个操作完成。
+
+1. **单一线程原则**：在一个线程内，在程序前面的操作先行发生于后面的操作。
+2. **管程锁定规则**：一个unLock操作先行发生于后面对同一个锁额lock操作。
+3. **volatile变量规则**：对一个变量的写操作先行发生于后面对这个变量的读操作（否则读到旧值）
+4. **线程启动规则**：Thread对象的start()方法先行发生于此线程的每一个动作
+5. **线程加入规则**：Thread 对象的结束先行发生于 join() 方法返回。
+6. **线程中断规则**：对线程interrupt()方法的调用先行发生于被中断线程的代码检测到中断事件的发生，可以通过 interrupted() 方法检测到是否有中断发生。
+7. **对象终结规则**：一个对象的初始化完成（构造函数执行结束）先行发生于他的finalize()方法的开始
+8. **传递性**：如果操作A先行发生于操作B，而操作B又先行发生于操作C，则可以得出操作A先行发生于操作C
+
 # Java锁机制
 
 ## synchronized原理
@@ -1538,8 +1758,8 @@ ObjectMonitor() {
     _recursions   = 0;   // 锁的重入次数
     _owner        = NULL; //【重要】指向持有ObjectMonitor对象的线程 
     _WaitSet      = NULL; // 处于wait状态的线程，会被加入到_WaitSet队列（先入先出）
-    _WaitSetLock  = 0 ;
-    _EntryList    = NULL ; //处于等待锁block状态的线程，会被加入到该列表
+    _WaitSetLock  = 0;
+    _EntryList    = NULL; //处于等待锁block状态的线程，会被加入到该列表
     _cxq          =  NULL; // 另一个争抢锁的队列
 }
 ```
