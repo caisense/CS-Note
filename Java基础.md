@@ -6,9 +6,13 @@
 
 Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12。
 
+------
+
+
+
 # 数据结构
 
-## 一、基本数据类型
+# 一、基本数据类型
 
 是CPU可以直接进行运算的类型。Java定义了以下几种基本数据类型：
 
@@ -37,12 +41,12 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 
 **表示的范围**：
 
-| `类型`  | `占据空间`       | `表示整数范围`                                | `计算方式`     |
+| 类型  | 占据空间       | 表示整数范围                                | 计算方式     |
 | ------- | ---------------- | --------------------------------------------- | -------------- |
-| `byte`  | `1Byte（8bit)`   | `-128  ~ 127`                                 | `-2^7~2^7-1`   |
-| `short` | `2Byte  (16bit)` | `-32768  ~ 32767`                             | `-2^15~2^15-1` |
-| `int`   | `4Byte  (32bit)` | `-2147483648  ~ 2147483647`                   | `-2^31~2^31-1` |
-| `long`  | `8Byte  (64bit)` | `-9223372036854775808  ~ 9223372036854775807` | `-2^63~2^63-1` |
+| byte  | 1Byte（8bit)   | -128 ~ 127                                 | `-2^7~2^7-1`   |
+| short | 2Byte | -32768 ~ 32767                             | `-2^15~2^15-1` |
+| int   | 4Byte | -2147483648 ~ 2147483647                   | `-2^31~2^31-1` |
+| long  | 8Byte | -9223372036854775808 ~ 9223372036854775807 | `-2^63~2^63-1` |
 
 整形超出范围，编译器直接报错
 
@@ -182,25 +186,25 @@ byte、char、short三种类型实际存储的数据都是整数，在实际使�
 
 2、byte、char、short三种类型参与运算时，先一律转换成int类型再进行运算。
 
-## 二、引用类型
+# 二、引用类型
 
 > [JDK12之后引入的四种引用类型](./Java高级.md#####Java中引用的类型)
 
 除了上述基本类型的变量，剩下的都是引用类型，也就是对象。例如，引用类型最常用的就是String字符串
 
-### String
+## String
 
 String 类被声明为 final，因此它不可被继承。(Integer 等包装类也不能被继承）
 
 String底层实现数组也被声明为 final，意味着数组初始化后地址不能改变，且内部不提供改变数组的方法，保证了**String不可变**。（其实也不是绝对的，通过反射机制也能修改）
 
-#### 底层实现
+### 底层实现
 
 在 jdk1.8 中，String 内部使用 **char 数组 **存储数据。
 
 jdk1.9 起，String 类的实现改用 **byte 数组** 存储字符串，同时使用 `coder` 来标识使用了哪种编码。
 
-#### 空和非空判断
+### 空和非空判断
 
 ```java
 // string为空有两种情况：1.为null；2.不为null，且长度为0
@@ -213,7 +217,7 @@ public static boolean isNotEmpty(String str) {
 }
 ```
 
-#### 判断空白
+### 判断空白
 
 ```java
 // 空白符包含：空格、tab 键、换行符
@@ -232,7 +236,7 @@ public static boolean isBlank(String str) {
 }
 ```
 
-#### Q：String s = new String("abc") 会创建几个对象？
+### Q：String s = new String("abc") 会创建几个对象？
 
 - 若String Pool 中不存在 “abc” 字符串对象：创建两个对象
 
@@ -244,7 +248,7 @@ public static boolean isBlank(String str) {
 
 
 
-#### String, StringBuffer and StringBuilder区别
+### Q：String, StringBuffer and StringBuilder区别？
 
 |          | String           | StringBuffer                     | StringBuilder            |
 | -------- | ---------------- | -------------------------------- | ------------------------ |
@@ -256,7 +260,7 @@ public static boolean isBlank(String str) {
 
 
 
-#### jdk1.8 String + 操作自动转换为StringBuilder操作
+### jdk1.8 String + 操作符自动转换为StringBuilder操作
 
 - 如果是变量拼接
 
@@ -278,7 +282,7 @@ public static boolean isBlank(String str) {
 
 如果string pool中存在字符串常量“abc”则不再新建对象。
 
-### 包装类型
+## 包装类型
 
 | 原始类型 | byte | short | char      | int     | long | float | double | boolean |
 | -------- | ---- | ----- | --------- | ------- | ---- | ----- | ------ | ------- |
@@ -288,7 +292,7 @@ public static boolean isBlank(String str) {
 
 包装类提供了多种**静态方法**，主要是parsexxx（将string转为基本类型）和valueOf（将string或基本类型转为包装类）
 
-#### parsexxx
+### parsexxx
 
 是封装类型提供的将String转换为基本类型的api，常用一个参数（默认十进制），还支持第二个参数表示进制radix
 
@@ -301,7 +305,7 @@ public static boolean isBlank(String str) {
 | `Double.parseDouble` | `String` | `double` |
 | `Long.parseLong`     | `String` | `long`   |
 
-#### valueOf
+### valueOf
 
 是封装类型提供的将String或基本类型转换为封装类型的api，常用一个参数（默认十进制），也支持第二个参数表示进制
 String.valueOf 返回其他基本类型的String形式
@@ -314,7 +318,7 @@ String.valueOf 返回其他基本类型的String形式
 | `Long.valueOf`    | String  、long            | `Long`    |
 | `String.valueOf`  | int,  float, double, long | `String`  |
 
-### 自动装箱和拆箱
+## 自动装箱和拆箱
 
 Java 1.5引入，目的是将原始类型值转自动地转换成对应的对象。该机制可以让我们在Java的变量赋值或方法调用等情况下，使用原始类型或者对象类型更加简单直接。
 
@@ -330,7 +334,7 @@ Integer n2  = 1;   // 自动装箱，直接赋值
 
 
 
-#### 规则
+### 规则
 
 以int加法为例
 
@@ -354,7 +358,7 @@ Integer n2  = 1;   // 自动装箱，直接赋值
 
 其他类型和运算同理
 
-#### 弊端
+### 弊端
 
 例如在一个循环中进行自动装箱操作的情况，自动拆装箱是消耗时间的：
 
@@ -369,7 +373,7 @@ for(int i=1000; i<5000; i++){
 
 合理声明变量类型，避免因为自动装箱引起的性能问题
 
-#### 底层实现
+### 底层实现
 
 自动装箱：编译器调用**包装类的静态方法**`valueOf()`方法将原始类型值转换成对象，如`Integer.valueOf()`
 
@@ -387,7 +391,7 @@ int b = a.intValue();  // 1
 
 
 
-#### 方法重载与自动装箱
+### 方法重载与自动装箱
 
 若同时实现了参数为基本类型和包装类型的方法，则调用时会根据参数类型选择相应方法，不发生自动装箱拆箱
 
@@ -408,7 +412,7 @@ public static void main(String[] args) {
 }
 ```
 
-#### ==运算符与自动装箱
+### ==运算符与自动装箱
 
 1. 用于初始类型的比较时，比较值是否相等
 
@@ -451,7 +455,7 @@ public static void main(String[] args) {
    
 4. 不仅是==运算符，其他比较运算符<、>等同理。
 
-### 缓存池
+## 缓存池
 
 只要不是用new显式创建包装类型，当值在一定范围内，jvm优先从缓存池中获取对象，不会另外创建
 
@@ -481,7 +485,7 @@ String和浮点数没有缓存池很好理解：String取值原本就没规律�
 用jvm命令 `-XX:AutoBoxCacheMax=<high>` 设置，high应大于127，若小于等于127则上限不变。额
 Long的范围无法设置
 
-### 字符串常量池
+## 字符串常量池
 
 字符串常量池（String Pool）保存着所有字符串字面量（literal strings），这些字面量在编译时期就确定。
 
@@ -503,7 +507,7 @@ System.out.println(s5 == s6);       // true
 
 
 
-### 常量
+## 常量
 
 定义变量的时候，如果加上final修饰符，这个变量就变成了常量
 
@@ -515,7 +519,7 @@ final double PI = 3.14; // PI是一个常量
 
 常量的作用是用有意义的变量名来避免魔术数字（Magic number）。根据习惯，常量名通常全部大写。
 
-### var关键字
+## var关键字
 
 有些时候，类型的名字太长，写起来比较麻烦。例如：
 
@@ -535,9 +539,9 @@ var sb = new StringBuilder();
 
 
 
-### 日期和时间
+## 日期和时间
 
-#### Date
+### Date
 
 `java.util.Date`是表示日期和时间的类，注意与`java.sql.Date`区分（后者用在数据库）。
 
@@ -592,7 +596,7 @@ public static String date2Str(Date date, String dateFormat) {
 
 
 
-#### Calendar
+### Calendar
 
 用于获取并设置年、月、日、时、分、秒，它和`Date`比，主要多了一个**日期和时间运算**的功能
 
@@ -609,7 +613,7 @@ public static String getLastDay() {
 }
 ```
 
-#### 计时
+### 计时
 
 都要用到System包的函数
 
@@ -630,9 +634,25 @@ System.out.println(end-start);
 
 
 
-## 三、集合
+# 三、集合
 
-### 1.数组 `[]`
+![collection](images/Java基础/collection.png)
+
+## 单一类型默认向下兼容
+
+单一类型指的是泛型，默认**向下兼容**。
+
+```java
+// 数组类型是Number，但是可以放入Number及其子类型Integer、float和double
+Number numArray [] = {23, 0.1f, 0.2d};
+// ArrayList同理
+```
+
+
+
+
+
+## 1.数组 `[]`
 
 1.是一种引用数据类型（非基本类型），实际上并不属于java集合，但功能类似
 
@@ -640,7 +660,7 @@ System.out.println(end-start);
 
 3.长度在**运行期间**不可改变，用属性`.length`获取
 
-#### 创建：
+### 创建
 
 1.创建时若不初始化，则必须指定长度。元素值为该类型默认值
 
@@ -660,7 +680,7 @@ int intArray1 [] = new int []{20, 21, 22};
 int intArray2 [] = {23, 24, 25};
 ```
 
-#### 数组的类型
+### 数组的类型
 
 由初始化时的类型type决定：[type]
 
@@ -673,15 +693,15 @@ System.out.println(intArray.getClass());    //class [I
 System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 ```
 
-### 2.ArrayList
+## 2.ArrayList
 
-#### 扩容
+### 扩容
 
 使用 ensureCapacityInternal() 方法来保证容量足够，如果不够时，需要使用 grow() 扩容
 
 新容量大小为**1.5倍**
 
-### 数组与ArrayList区别
+### Q：数组与ArrayList区别？
 
 |          | 数组                                                         | ArrayList                                     |
 | -------- | ------------------------------------------------------------ | --------------------------------------------- |
@@ -690,21 +710,9 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 | 元素类型 | 单一类型即可                                                 | 单一类型，且必须为**引用类型**                |
 | 互相转换 | Arrays.asList();返回的是**静态List**，不能进行增加和删除操作，只能对元素值修改 | list实例的toArray方法；或用stream().toArray() |
 
-#### 单一类型默认向下兼容
-
-单一类型指的是泛型，默认**向下兼容**。
-
-```java
-// 数组类型是Number，但是可以放入Number及其子类型Integer、float和double
-Number numArray [] = {23, 0.1f, 0.2d};
-// ArrayList同理
-```
 
 
-
-
-
-### ArrayList和LinkedList区别
+### Q：ArrayList和LinkedList区别？
 
 相同：都实现List接口
 
@@ -715,9 +723,9 @@ Number numArray [] = {23, 0.1f, 0.2d};
 | 插入（指定位置）：`add(index, e)`  | 慢，因为数组要整体移动。若触发扩容更慢 | 快，且不会扩容，但要遍历链表                   |
 | 插入（不指定位置，尾插）：`add(e)` | 快。若触发扩容慢                       | 快，且不会扩容                                 |
 
-### 3.HashMap
+## 3.HashMap
 
-#### 1.存储结构
+### 3.1存储结构
 
 本质是一个链表数组table。
 
@@ -725,7 +733,7 @@ Number numArray [] = {23, 0.1f, 0.2d};
 
 <img src="images\Java基础\image-20191208234948205.png" alt="img" style="zoom:50%;" />
 
-#### 2.put方法(1.7与1.8变化)
+### 3.2 put方法(1.7与1.8变化)
 
 1. 根据key和哈希算法计算数组下标：**index = hashCode(Key) & (capacity - 1)**，相当于对hashCode取模：`hashCode % capacity`，前提是 capacity = 2 ^ n 。
 
@@ -753,14 +761,14 @@ Number numArray [] = {23, 0.1f, 0.2d};
      - **插入之后再判断**是否扩容
    
 
-##### Q：链表转红黑树的阈值被设置为8的原因？
+#### Q：链表转红黑树的阈值被设置为8的原因？
 
 1. 当选用的hash算法离散性很好时，数组中同一位置出现碰撞的概率很低，几乎不会出现达到阈值的情况；然而采用随机hash算法时，离散性可能会变差，理想情况下随机hash算法计算出的位置分布遵循**泊松分布**，根据概率统计，同一位置的元素达到8个概率只有大约1亿分之6，几乎是不可能事件。**若这种小概率事件都发生了，说明HashMap的元素个数相当多，有提高查找效率的必要。**
 2. 另一种解释是链表查找的平均查找次数是n/2，而红黑树的平均查找次数是log(n)，8/2=4而log(8)=3，3<4因此有必要转换，但这种说法存在问题，如果是这个理由那应该选择在节点数达到5时就转换，5/2同样大于log(5)。
 
 树退化的阈值被设为6而不是7，主要是为了避免频繁的树结构的转换，减少系统开销。
 
-##### 使用红黑树的原因
+#### Q：使用红黑树的原因？
 
 首先二叉搜索树（BST）的查找肯定效率比链表高。
 
@@ -772,7 +780,7 @@ Number numArray [] = {23, 0.1f, 0.2d};
 
 由于TreeNodes占用空间是普通Nodes的两倍（相较于链表结构，链表只有指向下一个节点的指针，二叉树则需要左右指针，分别指向左节点和右节点），因此使用红黑树取代链表需要以**额外的空间为代价**。只有当节点较多时，才有转换的必要。
 
-#### 3.扩容
+### 3.3 扩容
 
 注意：这里的扩容指table扩容，而不是桶（因为桶是链表，没有上限），操作是table**翻倍**，Entry数组长度 * 2
 
@@ -786,7 +794,7 @@ Number numArray [] = {23, 0.1f, 0.2d};
 
 扩容时机：由扩容临界值**Threshold = loadFactor * capacity**决定。当HashMap中的元素个数超过该值**Threshold** 时，就会进行Entry数组扩容
 
-##### Q：capacity = 2^n 的原因？
+#### Q：capacity = 2^n 的原因？
 
 前面已经解释过，求元素放几号桶时用&运算代替取模，前提是要求capacity = 2^n 。
 
@@ -810,7 +818,7 @@ jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，�
 
 <img src="images\Java基础\image-20220322102957906.png" alt="image-20220322102957906" style="zoom:50%;" />
 
-#### hashMap线程不安全分析
+### hashMap线程不安全分析
 
 线程1和线程2分别将Entry1、Entry2插入同一个桶时，无论桶空还是非空，都会出现竞争问题。
 
@@ -818,7 +826,7 @@ jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，�
 
 jdk1.8虽然用尾插法不会出现循环链表，但还是会有某个桶**覆盖问题**。例如线程1和2都争抢table位置A的空桶，线程1先插入，线程2认为此时A桶仍为空，覆盖了线程1插入的Entry
 
-#### Q：为什么重写equals()方法一定要重写hashCode()方法？
+### Q：为什么重写equals()方法一定要重写hashCode()方法？
 
 如果我们要使用自定义类的对象作为Entry的key，那么就有必要重写equals()方法，确定判断key相等的规则。
 
@@ -831,7 +839,35 @@ jdk1.8虽然用尾插法不会出现循环链表，但还是会有某个桶**覆
 
 **hashCode和地址的关系**：地址相同，hashcode一定相等；hashcode相等，地址不一定相同。
 
-### 4.ConcurrentHashMap
+### Q：HashMap的key可以为null吗？value呢？
+
+key可以为null，因为源码中put方法计算null的hash=0，取模计算`hashCode % capacity`后必然落在**0号桶**
+
+```java
+static final int hash(Object key) {
+    int h;
+    return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+}
+```
+
+而value显然没有任何取值限制，因此可以为null。
+
+测试：
+
+```java
+public static void main(String[] args) {
+    HashMap<String, Integer> map = new HashMap<>();
+    map.put(null, 0);  // key为null
+    map.put("null", null); // value为null
+    System.out.println(map); // {null=0, null=null}
+    System.out.println(map.containsKey(null)); // true
+    System.out.println(map.get(null)); // 0
+}
+```
+
+
+
+## 4.ConcurrentHashMap
 
 <img src="images\Java基础\image-20191209001038024.png" alt="image-20191209001038024" style="zoom:50%;" />
 
@@ -853,13 +889,13 @@ ConcurrentHashMap 包含两个核心内部类：Segment 和 HashEntry
 
 
 
-#### 初始化的线程安全
+### 初始化的线程安全
 
 table初始化操作会延缓到第一次put操作。在ConcurrentHashMap在构造函数中只会初始化sizeCtl值，并不会直接初始化table，sizeCtl的默认初始值为0，若构造方法传入了自定义的initialCapacity值，那么sizeCtl的值默认为大于initialCapacity的最小的2的次幂。但是put操作是可以并发执行的，在put操作中进行了如下处理：
 
 尝试执行put操作的线程会判断table是否已经被初始化，若table尚未被初始化，则尝试进行初始化操作。初始化方法中，线程会执行Unsafe.compareAndSwapInt方法修改sizeCtl为-1，并且只有一个线程可以执行成功，其余的线程如果进来发现sizeCtl=-1，那么就会执行Thread.yield()让出CPU时间片等待table初始化完成。
 
-#### put操作的线程安全
+### put操作的线程安全
 
 执行put操作的线程在判断table已经初始化的前提下，还会对put操作的目标位置Node进行如下判断：
 
@@ -869,7 +905,7 @@ table初始化操作会延缓到第一次put操作。在ConcurrentHashMap在构�
 - 若目标位置的Node为ForwardingNode，表明有其他线程在进行扩容操作，当前线程会帮助扩容；
 - 若目标位置已存在普通Node，则将新的Node节点按链表或红黑树的方式插入到合适的位置，这个过程采用Synchronized实现并发；
 
-#### 数组扩容的线程安全
+### 数组扩容的线程安全
 
 当table数组的元素个数达到容量阀值sizeCtl的时候，需要对table进行扩容，扩容氛围两个阶段：
 
@@ -882,7 +918,7 @@ table初始化操作会延缓到第一次put操作。在ConcurrentHashMap在构�
 
 第二步中的逻辑则类似put操作，对每个尝试复制数据的位置进行CAS操作，若失败则说明已有别的线程对该位置进行扩容，后续使用Synchronized锁进行并发的迁移操作。
 
-#### jdk1.7和1.8变化
+### jdk1.7和1.8变化
 
 JDK 1.7 使用分段锁机制来实现并发更新操作，核心类为 Segment，它继承自重入锁 ReentrantLock充当锁。
 
@@ -890,9 +926,9 @@ JDK1.8 使用CAS 操作支持更高并发度，CAS失败时使用内置锁 synch
 
 
 
-### 5. LinkedHashMap
+## 5. LinkedHashMap
 
-继承自 HashMap，因此具有和 HashMap 一样的快速查找特性。
+继承自 HashMap，实现Map接口，因此具有和 HashMap 一样的快速查找特性。
 
   `public  class LinkedHashMap<K,V> extends HashMap<K,V> implements  Map<K,V>`  
 
@@ -902,7 +938,7 @@ JDK1.8 使用CAS 操作支持更高并发度，CAS失败时使用内置锁 synch
 
  
 
-#### 实现
+### 实现
 
 内部维护一个双向链表，用来维护插入顺序或LRU顺序
 
@@ -923,21 +959,46 @@ final  boolean accessOrder;
 //最重要的是以下用于维护顺序的函数，它们会在 put、get 等方法中调用。
 ```
 
-#### 1、afterNodeAccess()
+### 1、afterNodeAccess()
 
 
 get之后调用，如果 accessOrder 为 true，则会将该节点移到链表尾部（LRU顺序，最近使用的是尾，最久未使用是头）
 
 
-#### 2、afterNodeInsertion()
+### 2、afterNodeInsertion()
 
 put之后调用，如果removeEldestEntry() 返回true，则移除链表头
 removeEldestEntry() 默认为 false，若要返回true需要继承LinkedHashMap 并重写该方法
 
 
 
+## 6、HashSet
 
-## 四、Stream
+底层采用的是HashMap进行实现的，但是没有key-value，只有HashMap的key
+
+## 7、LinkedHashSet
+
+LinkedHashSet继承了HashSet，实现了Set
+
+## HashTable
+
+也是key-value的数据结构，继承自Dictionary类（过时），实现了Map接口。
+
+与HashMap最大的不同是，HashTable是**线程安全**的。且HashMap在java 1.8引入红黑树，而HashTable还是链表结构。
+
+## 为null总结
+
+
+
+|                   | key      | value    |
+| ----------------- | -------- | -------- |
+| HashMap           | 可以null | 可以null |
+| ConcurrentHashMap |          |          |
+| HashTable         | 不能null | 不能null |
+|                   |          |          |
+
+
+# 四、Stream
 
 是一种集合Stream<T> ，特点是无存储；适用于函数式编程；惰性执行。 
 
@@ -953,7 +1014,7 @@ removeEldestEntry() 默认为 false，若要返回true需要继承LinkedHashMap 
 
 ![图片](images/Java基础/640.png)
 
-### 1.创建
+## 1.创建
 
 | API              | 功能                                                         |
 | ---------------- | ------------------------------------------------------------ |
@@ -972,7 +1033,7 @@ Stream<String> stream = Stream.of("Hollis", "HollisChuang", "hollis", "Hello", "
 
 ```
 
-### 2.中间操作
+## 2.中间操作
 
 | API      | 功能                               | 输入                     |
 | -------- | ---------------------------------- | ------------------------ |
@@ -1027,7 +1088,7 @@ List<Record> NewRecords = Records.stream()
 
 
 
-### 3.最终操作
+## 3.最终操作
 
 Stream的中间操作得到的结果还是一个Stream，将一个Stream转换成我们需要的类型（如计算出流中元素的个数、将流转换成集合等），还需要最终操作。
 
@@ -1061,7 +1122,7 @@ Stream的中间操作得到的结果还是一个Stream，将一个Stream转换�
 
   
 
-
+------
 
 # 方法
 
@@ -1202,6 +1263,8 @@ web应用中可以不写main方法，因为web容器已经自带入口。
 
 已知在类加载时无法创建对象，因为静态方法可以不通过对象调用，所以在类的main方法所在在类加载时就可以通过main方法入口来运行程序。
 
+------
+
 # 面向对象
 
 面向对象三大特征：封装、继承和多态。
@@ -1260,6 +1323,10 @@ System.out.println(a.equals(c));  // true
 System.out.println(Objects.equals(a, c)); //false
 System.out.println(Objects.equals(a, b)); //true
 ```
+
+### null
+
+null也是一个对象，是对象就有hashCode，**null的hashCode为0**。
 
 ## 构造方法
 
@@ -1625,6 +1692,8 @@ static修饰的内部类
    表示最终的累，该类不能作为任何类的父类，即不能被继承
    类中的**方法会全部被隐式定义为final**类型。但类变量不会隐式加final，需要手动加final修饰。
 
+------
+
 # 异常
 
 ![图片](images/Java基础/640.jpeg)
@@ -1852,6 +1921,8 @@ public class HttpExceptionHandler {
 
    0
 
+------
+
 # 代理
 
 是一种常用的设计模式，其目的就是为其他对象提供一个代理以控制对某个对象的访问。代理类负责为委托类**预处理**、**后处理**等增强操作。
@@ -2029,6 +2100,8 @@ public class Test {
 代理对象不需要实现接口。
 
 但是目标对象如果实现了接口，就用jdk动态代理；目标对象没有实现任何接口，用cglib
+
+------
 
 # 反射
 
