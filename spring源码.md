@@ -963,3 +963,11 @@ UserService userService = (UserService) context.getBean("userService", new Order
 - 严格模式要精确匹配
 
 # 六、启动过程
+
+`JarLauncher` 类有一个 `main` 方法，这也是为什么 `java -jar` 命令可以进行引导的原因，毕竟 `java` 程序都是通过 `main` 方法进行运行的。在执行 `java -jar` 的时候，根据 `java` 官方规范会引导 `jar` 包里面 `MANIFEST.MF` 文件中的 `Main-Class` 属性对应的启动类，该启动类中必须包含 `main()` 方法。
+
+SpringBoot 项目构建的 jar 包，除了 `Main-Class` 属性外还会有一个 `Start-Class` 属性绑定的是我们项目的启动类，当我们在执行 `java -jar` 的时候优先引导的是 `org.springframework.boot.loader.JarLauncher#main` 方法，该方法内部会通过引导 `Start-Class` 属性来启动我们的应用代码。
+
+## Q：spring的main方法如何执行？
+
+tomcat
