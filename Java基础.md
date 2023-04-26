@@ -1496,6 +1496,25 @@ Integer.class.isAssignableFrom(Number.class); // false，因为Number不能赋�
    对属性而言，子类与父类属性名相同，则称为属性覆盖（为何类型不作要求？因为访问属性时只用名字进行，不关心类型）。从父类继承的该属性被子类属性屏蔽。
 2. 方法覆盖（方法重写override）
 
+### Q：Java为什么不支持多继承？
+
+c++的多继承会产生钻石问题”diamond problem“（见：[菱形继承](https://cloud.tencent.com/developer/article/1688467)
+
+<img src="images/Java基础/7000.png" alt="img" style="zoom:50%;" />
+
+简要说就是会产生数据冗余和二义性问题，如A继承B、C类，当B、C类中有同名方法，A调用该方法会有二义性。
+
+Java解决方法是**禁止多继承，只允许多实现**。由于接口中都是空方法，没有实现，即使A实现的多个接口B、C中有同名方法也不冲突。
+
+```java
+// 由于只能继承一个类，因此extends放前面，implements放后面
+// A类继承B类，实现C、D、E
+public class A extends B implements C, D, E { 
+}
+```
+
+
+
 ## 多态
 
 子类对象赋值给父类对象引用，之后父类对象就可以在**运行时**根据当前赋值给它的子对象的特性，执行方法时就可以有不同的操作。
