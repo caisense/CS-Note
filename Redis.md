@@ -15,9 +15,9 @@ Redis本质都是**k-v键值对**，用一个唯一的字符串key来标识存�
 - k-v对上限：**2^32-1**个。
 - Hash、List、Set、ZSet的元素上限是**2^32-1**个。
 
-基本数据结构共有5种：字符串string、列表list、字典hash、集合set、有序集合zset。
+**基本数据结构**共有5种：字符串string、列表list、字典hash、集合set、有序集合zset。
 
-此外还有3种特殊类型：
+此外还有3种**特殊类型**：
 
 - Geo：地理位置定位，用于存储地理位置信息，并对存储的信息进行操作（Redis 3.2 推出）。
 - HyperLogLog：用来做基数统计算法的数据结构，如统计网站的 UV。
@@ -104,11 +104,11 @@ Redis本质都是**k-v键值对**，用一个唯一的字符串key来标识存�
 
 - 应用场景：栈（lpush+lpop）、消息队列（lpush+rpop）、阻塞队列（lpush+brpop）
 
-  公众号文章列表（或微博信息流）：分库分表分布式的db，order by 本来就很耗时，再聚合排序更耗时。
+  **公众号文章列表（或微博信息流）**：分库分表分布式的db，order by 本来就很耗时，再聚合排序更耗时。
   
   利用redis全局一致的特性，对每个用户id，博主发布一条就 lpush msg:{用户id} 消息id，则顺序读list就是最新的消息。查看最新的5条消息列表用 lrange msg:{用户id} 0 5  
   
-  异步队列：将需要延后处理的任务结构体序列化为字符串，放入Redis列表，再用一个线程从列表中轮询处理。
+  **异步队列**：将需要延后处理的任务结构体序列化为字符串，放入Redis列表，再用一个线程从列表中轮询处理。
 
 
 
@@ -218,9 +218,21 @@ Redis本质都是**k-v键值对**，用一个唯一的字符串key来标识存�
 
 
 
+## Bitmap
 
+本质上就是一个string类型的bit数组，数组每个元素都是二进制0或1。
 
+1. **SETBIT命令** `SETBIT <key> <offset> <value>`：将指定bit数组中的offset位置（下标从0开始）置为value（0或1）
+2. **GETBIT命令** `GETBIT <key> <offset>`：读取指定bit数组中offset位置的bit
+3. **BITCOUNT命令** `BITCOUNT key`：统计指定bit数组中，1的个数。
 
+应用：统计10亿用户的在线状态
+
+用数据库肯定撑不住，因此考虑bitmap。只需要一个 key = login_status 的bit数组，存储所有用户登陆状态，长度为10亿，占用内存仅100MB。将用户id作为offset，在线置1，离线置0。
+
+例如用户id=10086，用`SETBIT login_status 10086 1`将其上线状态写入。统计时用`BITCOUNT login_status` 即可得到10亿用户的在线数。
+
+**缺点**是id必须连续或集中，否则浪费空间。可以考虑改用set存放在线的用户id。
 
 # Rehash？
 
