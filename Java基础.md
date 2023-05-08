@@ -731,6 +731,44 @@ Number numArray [] = {23, 0.1f, 0.2d};
 
 
 
+## 0.Iterator迭代器
+
+使用迭代器的好处：调用方总是以统一的方式遍历各种集合类型，而不必关心它们内部的存储结构。
+
+迭代器遍历顺序是**从前往后**，不能反向。
+
+已知Java的集合类都可以使用`for each`循环，比for循环简洁。
+
+`List`、`Set`和`Queue`会迭代每个元素，`Map`会迭代每个key。以`List`为例：
+
+```java
+List<String> list = List.of("Apple", "Orange", "Pear");
+for (String s : list) {  // for-each
+    System.out.println(s);
+}
+```
+
+for each是jdk1.5提供的语法糖，底层由编译器改写为for循环+Iterator实现：
+
+```java
+for (Iterator<String> it = list.iterator(); it.hasNext(); ) {
+     String s = it.next();
+     System.out.println(s);
+}
+```
+
+自定义的集合类，想要使用`for each`循环，只需满足以下条件：
+
+- 集合类实现`Iterable`接口，该接口要求返回一个`Iterator`对象，需要实现三个基本操作：
+
+  1. next() 会返回迭代器的下一个元素，并且更新迭代器的状态。
+
+  2. hasNext() 用于检测集合中是否还有元素。
+
+  3. remove() 将迭代器返回的元素删除。
+
+- 用`Iterator`对象迭代集合内部数据。
+
 ## 1.数组 `[]`
 
 1.是一种引用数据类型（非基本类型），实际上并不属于java集合，但功能类似
@@ -1139,12 +1177,69 @@ private static class Entry<K,V> extends WeakReference<Object> implements Map.Ent
 
 基于红黑树。按元素值排序。
 
+## Fail-fast机制
+
+就是在做系统设计的时候先考虑异常情况，一旦发生异常，直接停止并上报。在Java中默认指的是集合的一种错误检测机制。当多个线程对部分集合进行结构上的改变的操作时，有可能会产生fail-fast机制，这个时候就会抛出ConcurrentModificationException（后文用CME代替）。
+
+> ConcurrentModificationException：当方法检测到对象的并发修改，但不允许这种修改时，就抛出该异常。
+
+**异常复现**
+
+在Java中， 如果在foreach 循环里对某些集合元素进行元素的 **remove/add** 操作的时候，就会触发fail-fast机制，进而抛出CME。如以下代码：
+
+```java
+List<String> userNames = new ArrayList<String>() {{
+    add("Hollis");
+    add("hollis");
+    add("HollisChuang");
+    add("H");
+}};
+for (String userName : userNames) {  // 报错CME
+    if (userName.equals("Hollis")) {
+        userNames.remove(userName);
+    }
+}
+System.out.println(userNames);
+```
+
+同样，在foreach中对userNames执行add方法，也会抛CME
+
+**原理**
+
+foreach中，集合遍历通过iterator进行，但是元素的add/remove却是直接使用的集合类自己的方法。这就导致iterator在遍历的时候，会发现有一个元素在自己不知不觉的情况下就被删除/添加了，就会抛出一个异常，用来提示用户，可能发生了并发修改！
+
+**解决办法**
+
+1. 直接用普通for循环操作
+
+2. 直接用Iterator操作
+
+   ```java
+   Iterator iterator = userNames.iterator();
+   while (iterator.hasNext()) {
+       if (iterator.next().equals("Hollis")) {
+           iterator.remove();
+       }
+   }
+   ```
+
+   
+
+3. for-each执行remove后break
+
+   > 立刻结束循环，也就是说不让代码执行到下一次的next方法
+
+4. 直接使用fail-safe的集合类
+
+   > java.util.concurrent包下的容器都是fail-safe的，如CopyOnWriteArrayList、ConcurrentLinkedDeque
+   >
+   > 这样的集合容器在遍历时不是直接在集合内容上访问的，而是先复制原有集合内容，在拷贝的集合上进行遍历。
 
 
 
 # 四、Stream
 
-是一种集合Stream<T> ，特点是无存储；适用于函数式编程；惰性执行。 
+是一种集合`Stream<T>` ，特点是无存储；适用于函数式编程；惰性执行。 
 
 - 无存储：Stream不是一种数据结构，它只是某种数据源的一个视图，数据源可以是一个数组，Java容器或I/O channel等。Stream只能被使用一次，一旦遍历过就会失效，就像容器的迭代器那样，想要再次遍历必须重新生成。
 - 函数式编程：对Stream的任何修改都不会修改背后的数据源，比如对Stream执行过滤操作并不会删除被过滤的元素，而是会产生一个不包含被过滤元素的新Stream。

@@ -175,7 +175,9 @@ Thread-3	3
 Thread-2	2
 Thread-0	0
 
-## 线程的生命周期（状态）
+## 线程的生命周期（线程状态）
+
+<img src="images/Java并发/640 (1).png" alt="图片"  />
 
 Java中线程的状态有以下几种：
 
@@ -185,29 +187,29 @@ Java中线程的状态有以下几种：
 
 2. **RUNNABLE**：可运行。
 
-   就绪（ready）和运行中（running）两种状态统称为“运行态RUNNABLE”。线程对象创建后，其他线程(比如main线程）调用了该线程的start()方法，线程进入运行态。
+   就绪（ready）和运行中（running）两种状态统称为“RUNNABLE可运行”。
 
-   该状态的线程位于可运行线程池中，等待被线程调度选中，获取CPU的使用权，此时处于就绪状态（ready）。
+   - running：线程对象创建后，其他线程(比如main线程）调用了该线程的start()方法，线程进入运行中状态。
 
-   就绪状态的线程在获得CPU时间片后变为运行中状态（running）；
+   - ready：该状态的线程位于可运行线程池中，等待被线程调度选中，获取CPU的使用权，此时处于就绪状态。ready状态的线程在获得CPU时间片后变为running。
 
 3. **BLOCKED**：阻塞状态。
 
-   表示线程阻塞在进入synchronized关键字修饰的方法或代码块（获取锁）时的状态。
+   表示线程阻塞于锁（synchronized等）。
 
 4. **WAITING**：无限期等待状态。
 
-   进入该状态的线程不会被分配CPU时间片，需要等待其他线程**显式唤醒**（通知或中断）；
+   线程不会被分配CPU时间片，需要等待其他线程**显式唤醒**（通知或中断）；
 
 5. **TIMED_WAITING**：限期等待。
 
-   进入该状态的线程不会被分配CPU时间片，但不同于WAITING，线程可以在**指定的时间后自动唤醒**；
+   线程不会被分配CPU时间片，但不同于WAITING，线程可以在**指定的时间后自动唤醒**；
 
 6. **TERMINATED**：终止。
 
    - 该线程已经执行完毕（当线程的run()方法return，或者主线程的main()方法return），则线程终止。
 
-   - 若抛出异常未捕获，也导致线程终止。
+   - 若抛出**异常未捕获**，也导致线程终止。
 
    调用一个终止状态的线程会报出java.lang.IllegalThreadStateException异常。
 
@@ -746,7 +748,19 @@ class TaskQueue {
 }
 ```
 
+### 3.管道输入/输出流
 
+管道输入/输出流和普通的文件输入/输出流或者网络输入/输出流不同之处在于，它主要用于线程之间的数据传输，而传输的媒介为内存。
+
+管道输入/输出流主要包括了如下4种具体实现：PipedOutputStream、PipedInputStream、 PipedReader和PipedWriter，前两种面向字节，而后两种面向字符。
+
+## 守护线程
+
+Java中的线程分为两类： daemon 线程（守护线程）和 user 线程（用户线程）。
+
+main函数就是由用户线程执行的。 JVM 内部同时还启动了很多守护线程， 比如垃圾回收线程。
+
+守护线程和用户线程区别：当**最后一个用户线程**束时， JVM才会正常退出，而不管当前是否存在守护线程，也就是说守护线程是否结束并不影响 JVM退出。换而言之，只要有一个用户线程还没结束，正常情况下JVM就不会退出。
 
 ## 线程池
 
@@ -1394,6 +1408,8 @@ $$
 
 ## ThreadLocal
 
+线程本地变量。如果你创建了一个ThreadLocal变量，那么访问这个变量的每个线程都会有这个变量的一个本地拷贝，多个线程操作这个变量的时候，实际是操作自己本地内存里面的变量，从而起到线程隔离的作用，避免了线程安全问题。
+
 ### **场景和用法**
 
 使用事务时，需要保证数据库连接`conn`是同一个，因此最简单方法是将conn在需要函数间传递（service层--dao层）
@@ -1475,7 +1491,7 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 
 
 
-#### Q：什么情况会造成内存泄露？
+### Q：什么情况会造成内存泄露？
 
 在**线程池**中使用ThreadLocal。因为当ThreadLocal对象使用完后，应把设置的<key, value>回收，即回收Entry。
 
@@ -1524,6 +1540,48 @@ try (var ctx = new UserContext()) {
 
 这样就在`ConnContext`中完全封装了`ThreadLocal`，外部代码在`try (resource) {...}`内部可以随时调用`ConnContext.currentConn()`获取当前线程绑定的数据库连接
 
+### Q：父子线程怎么共享数据？
+
+父线程能用ThreadLocal来给子线程传值吗？毫无疑问，不能。那该怎么办？
+
+这时候可以用到另外一个类——`InheritableThreadLocal`。
+
+使用起来很简单，在主线程的InheritableThreadLocal实例设置值，在子线程中就可以拿到了。
+
+```java
+public class InheritableThreadLocalTest {
+    public static void main(String[] args) {
+        final ThreadLocal threadLocal = new InheritableThreadLocal();
+        // 主线程
+        threadLocal.set("不擅技术");
+        //子线程
+        Thread t = new Thread() {
+            @Override
+            public void run() {
+                super.run();
+                System.out.println("鄙人三某 ，" + threadLocal.get());
+            }
+        };
+        t.start();
+    }
+}
+```
+
+原理
+
+在Thread类里还有另外一个变量：
+
+```
+ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+```
+
+在Thread.init的时候，如果父线程的`inheritableThreadLocals`不为空，就把它赋给当前线程（子线程）的`inheritableThreadLocals`。
+
+```java
+if (inheritThreadLocals && parent.inheritableThreadLocals != null)
+    this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
+```
+
 ## 线程安全
 
 ### Q：SimpleDateFormat类为何不是线程安全的？
@@ -1563,7 +1621,8 @@ SimpleDateFormat是继承自DateFormat类，其中的Calendar对象被多线程�
     private static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
    ```
 
-   
+
+集合的线程安全见《Java基础》
 
 
 
@@ -1602,7 +1661,11 @@ Java的并发采用的是**共享内存**模型，因此Java线程之间的通�
 
 ## 主内存与工作内存
 
-在JMM中，线程之间的共享变量存储在**主内存**中。每个线程都有一个私有的**工作内存**，存储了共享变量的副本，是JMM中的抽象概念，并不真实存在。线程只能直接操作工作内存中的变量，不同线程之间的变量值传递需要通过主内存来完成。
+在JMM中，线程之间的共享变量存储在**主内存**中。每个线程都有一个私有的**工作内存**，存储了共享变量的**副本**。
+
+> 工作内存是JMM中的抽象概念，并不真实存在。
+
+线程只能直接操作自己工作内存中的变量，不同线程之间的变量值传递需要通过主内存来完成。
 
 <img src="images/Java并发/15851555-5abc-497d-ad34-efed10f43a6b.png" alt="img" style="zoom:50%;" />
 
@@ -1723,7 +1786,7 @@ volatile 关键字通过添加**内存屏障**的方式来禁止指令重排，�
 
 
 
-### 先行发生原则
+### 先行发生原则（happens-before）
 
 上面提到了可以用 volatile 和 synchronized 来保证有序性。除此之外，JVM 还规定了先行发生原则，让一个操作**无需控制**就能先于另一个操作完成。
 
@@ -1735,6 +1798,20 @@ volatile 关键字通过添加**内存屏障**的方式来禁止指令重排，�
 6. **线程中断规则**：对线程interrupt()方法的调用先行发生于被中断线程的代码检测到中断事件的发生，可以通过 interrupted() 方法检测到是否有中断发生。
 7. **对象终结规则**：一个对象的初始化完成（构造函数执行结束）先行发生于他的finalize()方法的开始
 8. **传递性**：如果操作A先行发生于操作B，而操作B又先行发生于操作C，则可以得出操作A先行发生于操作C
+
+## as-if-serial原则
+
+> 不管怎么重排序（编译器和处理器为了提高并行度），**单线程程序的执行结果不能被改变**。
+
+编译器、runtime和处理器都必须遵守as-if-serial语义。为了遵守as-if-serial语义，编译器和处理器不会对存在数据依赖关系的操作做重排序。但是不存在依赖关系的操作，可能会被重排序。例如
+
+```
+double pi = 3.14;   // A
+double r = 1.0;   // B 
+double area = pi * r * r;   // C
+```
+
+显然C依赖A和B，因此A和B必须在C之前准备好。但A和B直接不存在依赖，因此A和B的执行顺序可以互换。
 
 # Java锁机制
 
