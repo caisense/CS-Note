@@ -1577,7 +1577,9 @@ Spring首先会通过下面两种方式查找作为异步方法的默认线程�
 1. 查找唯一的一个TaskExecutor类型的bean
 2. 或者是一个名称为“taskExecutor”的Executor类型的Bean。
 
-如果上面两种方式都没有查找到，则使用SimpleAsyncTaskExecutor作为异步方法的默认线程池
+如果上面两种方式都没有查找到，则使用SimpleAsyncTaskExecutor作为异步方法的默认线程池。
+
+> 不建议使用SimpleAsyncTaskExecutor，因为默认每次执行异步任务的时候都会创建一个新的线程，本质上不能叫线程池
 
 如果要配置自定义线程池，有多种方式：
 

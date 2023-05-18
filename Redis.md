@@ -234,9 +234,70 @@ Redis本质都是**k-v键值对**，用一个唯一的字符串key来标识存�
 
 **缺点**是id必须连续或集中，否则浪费空间。可以考虑改用set存放在线的用户id。
 
-# Rehash？
+# 存储结构
 
-- Redis采用渐进式rehash，同时保留新旧两个hash结构，在后续的定时任务和hash操作中，逐渐将旧hash的内容转移到新hash中。
+dict是一个用于维护key和value映射关系的数据结构，与很多语言中的Map或dictionary类似。Redis的一个database中所有key到value的映射，就是使用一个dict来维护的。dict本质上是为了解决查找问题(Searching)。
+
+```c
+//dict字典的数据结构
+typedef struct dict{
+    dictType *type; //直线dictType结构，dictType结构中包含自定义的函数，这些函数使得key和value能够存储任何类型的数据
+    void *privdata; //私有数据，保存着dictType结构中函数的 参数
+    dictht ht[2]; //两张哈希表
+    long rehashidx; //rehash的标记，rehashidx=-1表示没有进行rehash，rehash时每迁移一个桶就对rehashidx加一
+    int itreators;  //正在迭代的迭代器数量
+}
+ 
+//dict结构中ht[0]、ht[1]哈希表的数据结构
+typedef struct dictht{
+    dictEntry[] table;        //数组中存放哈希节点dictEntry的地址
+    unsingned long size;      //哈希表table的大小，出始大小为4
+    unsingned long  sizemask; //用于将hash值映射到table位置的索引，大小为（size-1）
+    unsingned long  used;     //记录哈希表已有节点（键值对）的数量
+}
+```
+
+redis存储k-v使用哈希表，求key的hash值以确定放数组哪个位置（桶），对hash冲突的k-v，使用拉链法解决。
+
+dict维护两张哈希表，只有在重哈希的过程中，ht[0]和ht[1]才都有效。平常情况下只有ht[0]有效。
+
+
+
+# Rehash（扩容/收缩）原理？
+
+背景：当数据增多超过负载因子后，为降低冲突概率需要扩容哈希表，原有的k-v需要rehash。
+
+> 扩容：table直接翻倍，原理与HashMap类似，因为取模使用位运算
+>
+> 负载因子 = 哈希表已保存节点数量 / 哈希表大小，`load_factor = ht[0].used / ht[0].size`
+>
+> **渐进式**rehash：同时保留新旧两个hash结构，在后续的定时任务和hash操作中，逐渐将旧hash的内容转移到新hash中。原因是，如果哈希表里保存的键值对数量很大时，集中rehash可能会导致服务器在一段时间内停止服务（redis单线程）。
+
+在rehash进行期间，每次对字典执行添加、删除、查找或者更新操作时，程序除了执行指定的操作以外，还会顺带将ht[0]下标rehashidx的元素（桶）上的链表移动到扩容后的ht[1]上，然后将rehashidx++，表示下一次要迁移链表所在桶的位置。
+
+当 ht[0] 包含的所有键值对都迁移到了 ht[1] 之后 （ht[0] 变为空表），释放 ht[0] 。 将 ht[1] 设置为 ht[0] ， 并在 ht[1] 新创建一个空白哈希表， rehashidx置为-1，为下一次 rehash 做准备。
+
+
+
+触发扩容：满足以下两种情况
+
+- 当redis没有执行 BGSAVE 命令或者 BGREWRITEAOF 命令，且负载因子>=1
+
+- 当redis执行 BGSAVE 命令或者 BGREWRITEAOF 命令，且负载因子>=5
+
+  > 两种情况判断的负载因子不同，是因为在执行 BGSAVE 命令或 BGREWRITEAOF命令的过程中， Redis会fork一个子进程，而大多数操作系统都采用写时复制（copy-on-write）技术来优化子进程的使用效率，所以在子进程存在期间，服务器会提高执行扩展操作所需的负载因子，从而尽可能地避免在**子进程存在期间进行扩容**操作，这可以避免不必要的内存写入操作， 最大限度地节约内存。
+
+触发收缩：当负载因子<0.1。
+
+Rehash进行期间的添加、删除和查询操作：
+
+1. 添加：如果正在Rehash，会把数据插入到ht[1]（平常情况插入到ht[0]），这样时为了保证ht[0]不再新增数据，随着rehash操作最终变空。
+2. 查询：先在ht[0]上进行查找，再判断当前是否正在Rehash，如果没有，那么在ht[0]上的查找结果就是最终结果。否则，在ht[1]上进行查找。查询时会先根据key计算出桶的位置，在到桶里的链表上寻找key。
+3. 删除：判断当前是不是在重哈希过程中，如果是只在ht[0]中查找要删除的key；否则ht[0]和ht[1]它都要查找删除。
+
+
+
+
 
 # Redis为何高效？
 
@@ -269,6 +330,8 @@ Redis本质都是**k-v键值对**，用一个唯一的字符串key来标识存�
 1. AOF 日志（Append Only File，文件追加方式）：记录所有的操作命令，并以文本的形式追加到文件中。
 2. RDB 快照（Redis DataBase）：将某一个时刻的内存数据，以二进制的方式写入磁盘。
 3. 混合持久化方式：Redis 4.0 新增了混合持久化的方式，集成了 RDB 和 AOF 的优点。
+
+
 
 # 持久化
 

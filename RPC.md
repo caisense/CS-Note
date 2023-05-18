@@ -28,6 +28,10 @@ feign之前JAVA 项目中如何实现接口http调用？
 
    是 **Spring** 提供的用于访问 Rest 服务的客户端，RestTemplate 提供了多种便捷访问远程HTTP 服务的方法，能够大大提高客户端的编写效率。  
 
+## Q：为什么feign第一次调用耗时较长？
+
+ribbon是懒加载
+
 ## 设计架构
 
 <img src="images/RPC/image-20230411235608927.png" alt="image-20230411235608927" style="zoom:67%;" />

@@ -2475,3 +2475,87 @@ public static void main(String[] args) {
 ```
 
 如果用BeanUtils.copyProperties()**对List直接操作**，则无法将元素复制出来，因为spring实现这个拷贝功能用的是反射，找到对应类的get、set方法，通过invoke调用来赋值。而List没有成对的get、set方法（常用的`get(Integer index)`并没有对应的set）
+
+## 什么是深拷贝、浅拷贝？
+
+浅拷贝：对基本数据类型进行值传递，对引用数据类型进行引用传递般的拷贝
+
+![使用各类BeanUtils的时候，切记注意这个坑！_浅拷贝](images/Java基础/resize,m_fixed,w_1184.webp)
+
+深拷贝：对基本数据类型进行值传递，对引用数据类型，创建一个新的对象，并复制其内容
+
+![使用各类BeanUtils的时候，切记注意这个坑！_浅拷贝_02](images/Java基础/resize,m_fixed,w_1184-1683770132138-7.webp)
+
+常用的Spring中BeanUtils的copyProperties是浅拷贝。
+
+## 如何实现深拷贝？
+
+1、用对象的clone方法：
+
+```java
+ public static void main(String[] args) throws CloneNotSupportedException {
+        User user = new User("Hollis", "hollischuang");
+        user.setAddress(new Address("zhejiang", "hangzhou", "binjiang"));
+        User newUser = new User();
+        BeanUtils.copyProperties(user, newUser);  // 浅拷贝
+        User newUser1 = (User) user.clone();  // 深拷贝
+        System.out.println(user.getAddress() == newUser.getAddress());  // true
+        System.out.println(user.getAddress() == newUser1.getAddress()); // false
+}
+```
+
+需要重写Object.clone()，需要同时实现 Cloneable 接口（虽然这个接口内并没有定义 clone，否则在调用 clone() 时会报 CloneNotSupportedException 异常）
+
+```java
+public class Address implements Cloneable {
+    private String province;
+    private String city;
+    private String area;
+    //省略构造函数和setter/getter
+
+    @Override
+    public Object clone() throws CloneNotSupportedException {
+        return super.clone();
+    }
+}
+
+class User implements Cloneable {
+    private String name;
+    private String password;
+    private Address address;
+    //省略构造函数和setter/getter
+
+    @Override
+    protected Object clone() throws CloneNotSupportedException {
+        User user = (User)super.clone();
+        user.setAddress((Address)address.clone());
+        return user;
+    }
+}
+```
+
+这样还是有缺陷，如果我们在User中有很多个对象，那么每个对象都要clone、set，导致clone方法就写的很长；而且如果后面有修改，在User中新增属性，clone也要改。
+
+2、序列化
+
+借助序列化来实现深拷贝。先把对象序列化成流，再从流中反序列化成对象，这样就一定是新的对象了。
+
+需要修改下上面的User和Address类，使他们实现Serializable接口，否则无法序列化：
+
+```java
+class User implements Serializable
+class Address implements Serializable
+```
+
+fastjson：
+
+```java
+User newUser = JSON.parseObject(JSON.toJSONString(user), User.class);
+```
+
+使用Apache Commons Lang中提供的SerializationUtils：
+
+```java
+User newUser = (User) SerializationUtils.clone(user);
+```
+
