@@ -6,6 +6,22 @@
 
 Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12。
 
+## JDK8新特性
+
+- 支持lambda表达式，允许把函数整体作为一个方法的参数
+
+- Optional类
+
+  实际上是个容器，支持链式调用判空
+
+  ```java
+  Optional.ofNullable(a).orElse(0); // 如果a为null，返回0；否则返回a
+  ```
+
+- Stream类，引入函数式编程
+
+- 默认方法：接口支持默认的实现方法
+
 ## JDK9新特性（2017年9月）
 
 - 模块化
@@ -50,6 +66,8 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 - 对Stream、Optional、集合API进行增强
 
 **重要特性：对于JDK9和JDK10的完善，主要是对于Stream、集合等API的增强、新增ZGC垃圾收集器。**
+
+
 
 ## JDK12新特性（2019年3月）
 

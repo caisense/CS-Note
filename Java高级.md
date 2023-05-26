@@ -1077,3 +1077,15 @@ public class Query {
         logger.error("解析{}异常：{}", "db-server.conf", e); // 有几个{}，就传几个参数        
 }
 ```
+
+## 分布式日志系统
+
+ELK = Elasticsearch + Logstash  + Kibana
+
+Elasticsearch：分析和搜索引擎
+
+Logstash：服务端数据处理管道
+
+Kibana：Elasticsearch数据可视化
+
+由于Logstash重量级，可改用FileBeat收集日志
