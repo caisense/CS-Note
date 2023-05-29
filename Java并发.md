@@ -466,20 +466,20 @@ JVM规范的四种内存屏障
 | LoadStore屏障  | Load1; LoadStore; Store2   | 在Store2写入前，保证Load1读操作完毕。          |
 | StoreLoad屏障  | Store1; StoreLoad; Load2   | 在Load2读取前，保证Store1的写操作刷新到主内存  |
 
-为了实现volatile的内存语义，JVM采取以下的保守策略：
+为了实现volatile的内存语义（最终实现执行顺序与代码语义的一致性），JVM采取以下的保守策略：
 
-- 在每个volatile**写操作的前面**插入一个StoreStore屏障，写操作**后面**插入一个StoreLoad屏障。（保证这个写操作在其他写之后、在其他读之前）
-- 在每个volatile**读操作的后面**插入一个LoadLoad屏障和LoadStore屏障。（保证这个读操作在其他读和写之前）
+- 在每个volatile**写操作的前面**插入一个StoreStore屏障，写操作**后面**插入一个StoreLoad屏障。（保证这个volatile写操作在其他并发线程的写之后、在其他读之前）
+- 在每个volatile**读操作的后面**插入一个LoadLoad屏障和LoadStore屏障。（保证这个volatile读操作在其他并发线程的读和写之前）
 
 ```
 volatile int a = 0；
 a = 1;  // 写
-#StoreStore屏障
+#StoreStore屏障，保证第4行a=2之后没有其他修改a的操作，否则执行结果不符合代码语义
 a = 2； // 写
 #StoreLoad屏障
 b = a; // 读
 #LoadLoad屏障
-#LoadStore屏障
+#LoadStore屏障，保证第6行读出的a就是2，不会再赋其他值，否则执行结果不符合语义
 ```
 
 
@@ -1365,7 +1365,7 @@ public interface RejectedExecutionHandler {
 
 因为LinkedBlockingQueue的capacity是被final修饰的，所以不允许动态修改
 
-```
+```java
 /** The capacity bound, or Integer.MAX_VALUE if none */
 private final int capacity;
 ```
@@ -1430,7 +1430,7 @@ $$
 
    ```java
    private static ThreadLocal<DateFormat> threadLocal = new ThreadLocal<>(){
-       @Override
+       @Override // 重写初始化方法
        protected DateFormat initialValue() { 
            return new SimpleDateFormat("yyyy-MM-dd"); // 给ThreadLocal设初始值
        }
@@ -1467,7 +1467,9 @@ ThreadLocalMap 是 ThreadLocal 的 **内部类**，没有实现 Map 接口，用
 
 <img src="images\Java并发\image-20220329110107310.png" alt="image-20220329110107310" style="zoom:50%;" />
 
-Entry 中的 key 只能是 **ThreadLocal 对象**，value可以是任意类型。设计目的是只能通过 ThreadLocal 索引存储的数据。
+Entry 中的 key 只能是 **ThreadLocal 对象**，value可以是任意类型。
+
+设计目的是只能通过 ThreadLocal 索引存储的数据。
 
 Entry 使用**弱引用**WeakReference，目的是将ThreadLocal 对象的生命周期和线程的生命周期解绑
 
@@ -1489,7 +1491,7 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 
 但是在没有手动删除这个 Entry 以及 CurrentThread 依然运行的前提下，考虑情况：CurrentThread 也使用了这个threadlocal ，因此也存在有强引用链 CurrentThreadRef->CurrentThread -> threadLocalMap -> Entry -> value，因此**value** 不会被回收，只是由于key为null，这块 value 永远不会被访问到了，导致 value 内存泄漏。
 
-
+简而言之：线程内部 threadLocalMap 的Entry中，key是弱引用会被回收，则只剩value但无法访问，造成内存泄漏。
 
 ### Q：什么情况会造成内存泄露？
 
@@ -1501,7 +1503,7 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 
 **上面两种问题的解决方法**
 
-手动调用remove。优化：通过AutoCloseable接口配合try-with-resource语句，见下面例子
+手动调用**remove**。优化：通过AutoCloseable接口配合try-with-resource语句，见下面例子
 
 上面场景的实现：
 
@@ -2276,8 +2278,8 @@ public static void main(String[] args) {
                 }
                 // 最后无论如何都notifyAll
                 lock.notifyAll();
-            }
-        }
+            } // end synchronized
+        } // end for
     });
     // 另外两个线程实现略，只有打印不同
     t0.start();
@@ -2822,3 +2824,245 @@ public class ForkJoinExample extends RecursiveTask<Integer> {
     }
 }
 ```
+
+# Atomic
+
+原子操作的封装类，位于java.util.concurrent.atomic包。
+
+Atomic类是通过无锁（lock-free）的方式实现的线程安全（thread-safe）访问。
+
+基本包装类对应的原子类：
+
+| 包装类     | Boolean       | Integer       | Long       | Array                               |
+| ---------- | ------------- | ------------- | ---------- | ----------------------------------- |
+| 原子操作类 | AtomicBoolean | AtomicInteger | AtomicLong | AtomicIntegerArray、AtomicLongArray |
+
+## AtomicInteger
+
+提供的主要操作有：
+
+1. 增加值并返回新值：`int addAndGet(int delta)`
+2. 加1后返回新值：`int incrementAndGet()`
+3. 获取当前值：`int get()`
+4. 用CAS方式设置：`int compareAndSet(int expect, int update)`，expect是旧值，update是新值
+
+> CAS：Compare and Set（也称compare and swap），即先比较再赋值。
+
+**定义**
+
+```java
+public class AtomicInteger extends Number implements java.io.Serializable {
+    private static final long serialVersionUID = 6214790243416807050L;
+    // setup to use Unsafe.compareAndSwapInt for updates
+    private static final Unsafe unsafe = Unsafe.getUnsafe();
+    private static final long valueOffset;
+    static {
+        try {
+            valueOffset = unsafe.objectFieldOffset
+                (AtomicInteger.class.getDeclaredField("value"));
+        } catch (Exception ex) { throw new Error(ex); }
+    }
+    private volatile int value;
+}
+```
+
+unsafe： 获取并操作内存的数据。
+
+valueOffset： 存储value在AtomicInteger中的偏移量。
+
+value： 存储AtomicInteger的int值，该属性需要借助volatile关键字保证其在线程间是可见的。
+
+##  CAS算法
+
+涉及三个操作数：
+
+- 需要读写的内存值 V。
+- 进行比较的值 A。
+- 要写入的新值 B。
+
+当且仅当 V 的值等于 A 时，CAS通过原子方式用新值B来更新V的值（“比较+更新”整体是一个**原子操作**），否则不会执行任何操作。一般情况下，“更新”是一个**不断重试**的操作。
+
+### 问题
+
+1. ABA问题
+
+   内存值原来是A，后来变成了B，然后又变成了A，则CAS无法检测值变化。
+
+   - 解决：给值加版本号：1A 2B 3A
+
+2. 循环时间长开销大
+
+   CAS操作如果长时间不成功，会导致其一直自旋，给CPU带来非常大的开销。
+
+3. 只能保证一个共享变量的原子操作
+
+   对一个共享变量执行操作时，CAS能够保证原子操作，但是对多个共享变量操作时，CAS是无法保证操作的原子性的。
+
+   - 解决：Java从1.5开始JDK提供了**AtomicReference**类来保证引用对象之间的原子性，可以把多个变量放在一个对象里来进行CAS操作。
+
+ 
+
+## Q：如何实现原子操作？
+
+硬件层面：通过CPU的cmpxchg指令
+
+软件层面：例如实现incrementAndGet
+
+```java
+public int incrementAndGet(AtomicInteger var) {
+    int prev, next;
+    do {
+        prev = var.get();
+        next = prev + 1; // 如果要实现CAS，1可以改为变量
+    } while ( ! var.compareAndSet(prev, next));  // 不断重试CAS
+    return next;
+}
+```
+
+CAS是指，在这个操作中，如果`AtomicInteger`的当前值是`prev`，那么就更新为`next`，返回`true`。如果`AtomicInteger`的当前值不是`prev`，就什么也不干，返回`false`。通过CAS操作并配合`do ... while`循环，即使其他线程修改了`AtomicInteger`的值，最终的结果也是正确的。
+
+# 虚拟线程
+
+Java 19引入的一种轻量级线程，它在很多其他语言中被称为协程（GoLang）、纤程、绿色线程、用户态线程等。
+
+## 背景
+
+先回顾一下线程的特点：
+
+- 线程是由操作系统创建并调度的资源；
+- 线程切换会耗费大量CPU时间；
+- 一个系统能同时调度的线程数量是有限的，通常在几百至几千级别。
+
+因此，我们说线程是一种重量级资源。在服务器端，对用户请求，通常都实现为一个线程处理一个请求。由于用户的请求数往往远超操作系统能同时调度的线程数量，所以通常使用线程池来尽量减少频繁创建和销毁线程的成本。
+
+为了能高效执行**IO密集**型任务，Java从19开始引入了虚拟线程。
+
+> IO密集型任务
+>
+> 对于需要处理大量IO请求的任务来说，使用线程是低效的，因为一旦读写IO，线程就必须进入等待状态，直到IO数据返回。常见的IO操作包括：
+>
+> - 读写文件；
+> - 读写网络，例如HTTP请求；
+> - 读写数据库，本质上是通过JDBC实现网络调用。
+>
+> 真正由CPU执行的代码消耗的时间非常少，线程的大部分时间都在等待IO。这类任务称为**IO密集**型任务。
+
+## 原理
+
+虚拟线程的接口和普通线程是一样的，但是执行方式不一样。虚拟线程不是由操作系统调度，而是由**普通线程调度**，即成百上千个虚拟线程可以由一个普通线程调度。
+
+任何时刻，只能执行一个虚拟线程，但是，一旦该虚拟线程执行一个IO操作进入等待时，它会被立刻“挂起”，然后执行下一个虚拟线程。什么时候IO数据返回了，这个挂起的虚拟线程才会被再次调度。因此，若干个虚拟线程可以在一个普通线程中交替运行。
+
+例如：
+
+```java
+void register() {
+    config = readConfigFile("./config.json"); // #1
+    if (config.useFullName) {
+        name = req.firstName + " " + req.lastName;
+    }
+    insertInto(db, name); // #2
+    if (config.cache) {
+        redis.set(key, name); // #3
+    }
+}
+```
+
+涉及到IO读写的#1、#2、#3处，执行到这些地方的时候（进入相关的JNI方法内部时）会自动挂起，并切换到其他虚拟线程执行。等到数据返回后，当前虚拟线程会再次调度并执行，因此，代码看起来是同步执行，但实际上是异步执行的。
+
+## 使用
+
+方法一：直接创建虚拟线程并运行：
+
+```java
+// 传入Runnable实例并立刻运行:
+Thread vt = Thread.startVirtualThread(() -> {
+    System.out.println("Start virtual thread...");
+    Thread.sleep(10);
+    System.out.println("End virtual thread.");
+});
+```
+
+方法二：创建虚拟线程但不自动运行，而是手动调用`start()`开始运行：
+
+```java
+// 创建VirtualThread:
+Thread.ofVirtual().unstarted(() -> {
+    System.out.println("Start virtual thread...");
+    Thread.sleep(1000);
+    System.out.println("End virtual thread.");
+});
+// 运行:
+vt.start();
+```
+
+方法三：通过虚拟线程的ThreadFactory创建虚拟线程，然后手动调用`start()`开始运行：
+
+```java
+// 创建ThreadFactory:
+ThreadFactory tf = Thread.ofVirtual().factory();
+// 创建VirtualThread:
+Thread vt = tf.newThread(() -> {
+    System.out.println("Start virtual thread...");
+    Thread.sleep(1000);
+    System.out.println("End virtual thread.");
+});
+// 运行:
+vt.start();
+```
+
+直接调用`start()`实际上是由`ForkJoinPool`的线程来调度的。我们也可以自己创建调度线程，然后运行虚拟线程：
+
+```java
+// 创建调度器:
+ExecutorService executor = Executors.newVirtualThreadPerTaskExecutor();
+// 创建大量虚拟线程并调度:
+ThreadFactory tf = Thread.ofVirtual().factory();
+for (int i=0; i<100000; i++) {
+    Thread vt = tf.newThread(() -> { ... });
+    executor.submit(vt);
+    // 也可以直接传入Runnable或Callable:
+    executor.submit(() -> {
+        System.out.println("Start virtual thread...");
+        Thread.sleep(1000);
+        System.out.println("End virtual thread.");
+        return true;
+    });
+}
+```
+
+注意
+
+1. 由于虚拟线程属于非常轻量级的资源，因此，用时创建，用完就扔，**不要池化**虚拟线程。
+2. 虚拟线程在Java 19中是预览功能，**默认关闭**，需要添加参数`--enable-preview`启用：
+
+   ```
+   java --source 19 --enable-preview Main.java
+   ```
+
+## 限制
+
+只有以虚拟线程方式运行的代码，才会在执行IO操作时自动被挂起并切换到其他虚拟线程。
+
+普通线程的IO操作仍然会等待，例如，我们在`main()`方法中读写文件，是不会有调度和自动挂起的。
+
+可以自动引发调度切换的操作包括：
+
+- 文件IO；
+- 网络IO；
+- 使用Concurrent库引发等待；
+- Thread.sleep()操作。
+
+这是因为JDK为了实现虚拟线程，已经对底层相关操作进行了修改，这样应用层的Java代码无需修改即可使用虚拟线程。无法自动切换的语言（JavaScript）需要用户手动调用`await`来实现异步操作：
+
+```
+async function doWork() {
+    await readFile();
+    await sendNetworkData();
+}
+```
+
+无法调度的场景：
+
+1. 在虚拟线程中，如果绕过JDK的IO接口，直接通过JNI读写文件或网络
+2. 在`synchronized`块内部

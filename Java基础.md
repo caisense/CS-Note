@@ -366,16 +366,6 @@ public static boolean isBlank(String str) {
 }
 ```
 
-### Q：String s = new String("abc") 会创建几个对象？
-
-- 若String Pool 中不存在 “abc” 字符串对象：创建两个对象
-
-  “abc” 属于字符串字面量（或称字符串常量），因此编译时期会检查 String Pool（运行时常量池，在**方法区**） 中是否存在“abc”，若不存在就创建一个字符串对象，指向这个 “abc” 字符串字面量；
-
-  而使用 new 的方式会在**堆**中创建一个字符串对象。
-
-- 若存在：只创建一个new
-
 
 
 ### Q：String, StringBuffer and StringBuilder区别？
@@ -634,6 +624,16 @@ String s5 = "bbb";
 String s6 = "bbb";
 System.out.println(s5 == s6);       // true
 ```
+
+### Q：String s = new String("abc") 会创建几个对象？
+
+- 若String Pool 中不存在 “abc” 字符串对象：创建两个对象
+
+  “abc” 属于字符串字面量（或称字符串常量），因此编译时期会检查 String Pool（运行时常量池，在**方法区**） 中是否存在“abc”，若不存在就创建一个字符串对象，指向这个 “abc” 字符串字面量；
+
+  而使用 new 的方式会在**堆**中创建一个字符串对象。
+
+- 若存在：只创建一个new
 
 
 
