@@ -2144,9 +2144,19 @@ public static String concatString(String s1, String s2, String s3) {
 当尝试获取一个锁对象（要锁住的对象）时，如果锁对象标记为 0 01，说明锁对象处于无锁（unlocked）状态。此时虚拟机：
 
 1. 在**当前线程的虚拟机栈**中创建 Lock Record，拷贝对象头中的Mark Word到此处
-2. 使用 CAS 操作将对象的 Mark Word 更新为 Lock Record 指针，并将Lock Record里的owner指针指向对象的Mark Word。
+
+   > 锁记录（`lock record`），用于存放：
+   >
+   > - `displaced mark word`（置换标记字）：存放锁对象当前的`mark word`的拷贝
+   > - `owner`指针：指向当前的锁对象的指针，在拷贝`mark word`阶段暂时不会处理它
+   >
+   > ![图片](images/Java并发/640-1686502171338-8.png)
+
+2. 使用 CAS 操作将对象的 Mark Word 更新为指向 Lock Record 的指针，并将Lock Record里的owner指针指向对象的Mark Word。
 
 如果 **CAS 成功**，线程获得该对象上的锁，将对象的 Mark Word 的锁标记变为 00，表示该对象锁**升级为轻量级锁**。
+
+![图片](images/Java并发/640-1686501984470-6.png)
 
 如果 CAS 失败，jvm首先会检查对象的 Mark Word 是否指向当前线程的虚拟机栈：
 
@@ -2157,7 +2167,36 @@ public static String concatString(String s1, String s2, String s3) {
   
   - 若自旋时又来一个竞争线程（3个以上竞争），则轻量级锁要膨胀为重量级锁。
   
-    
+
+#### 轻量级锁重入
+
+`synchronized`是可以锁重入的，在轻量级锁的情况下重入也是依赖于栈上的`lock record`完成的。例如
+
+```java
+synchronized (user){
+    synchronized (user){
+        synchronized (user){
+            //TODO
+        }
+    }
+}
+```
+
+轻量级锁的每次重入，都会在栈中生成一个`lock record`，但是保存的数据不同：
+
+- 首次分配的`lock record`，`displaced mark word`复制了锁对象的`mark word`，`owner`指针指向锁对象
+- 之后重入时在栈中分配的`lock record`中的`displaced mark word`为`null`，只存储了指向对象的`owner`指针
+
+![图片](images/Java并发/640-1686502384591-13.png)
+
+重入的次数等于该锁对象在栈帧中`lock record`的数量，这个数量隐式地充当了锁重入机制的计数器。这里需要计数的原因是每次解锁都需要对应一次加锁，只有最后解锁次数等于加锁次数时，锁对象才会被真正释放。在释放锁的过程中，如果是重入则删除栈中的`lock record`，直到没有重入时则使用CAS替换锁对象的`mark word`。
+
+#### 轻量级锁释放
+
+同样使用了CAS操作，尝试将`displaced mark word` 替换回`mark word`，这时需要检查锁对象的`mark word`中`lock record`指针是否指向当前线程的锁记录：
+
+- 如果替换成功，则表示没有竞争发生，整个同步过程就完成了
+- 如果替换失败，则表示当前锁资源存在竞争，有可能其他线程在这段时间里尝试过获取锁失败，导致自身被挂起，并修改了锁对象的`mark word`升级为重量级锁，最后在执行重量级锁的解锁流程后唤醒被挂起的线程
 
 ### 重量级锁
 
