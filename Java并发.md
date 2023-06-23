@@ -701,14 +701,15 @@ lock()方法和unlock()方法间的代码块即为加锁的代码块。Lock只�
 
 ### Q：synchronized和ReentrantLock区别？
 
-|      | synchronized       | ReentrantLock                    |
-| ---- | ------------------ | -------------------------------- |
-|      | 能锁方法和代码块   | 只能锁代码块                     |
-|      | 是关键字           | 是实现类                         |
-|      | jvm层面            | api层面                          |
-|      | 非公平锁           | 公平或非公平                     |
-|      | 锁信息保存在对象头 | 通过代码中int类型state标识锁状态 |
-|      | 有锁升级过程       |                                  |
+|            | synchronized                                   | ReentrantLock                                      |
+| ---------- | ---------------------------------------------- | -------------------------------------------------- |
+| 作用域     | 能锁方法和代码块                               | 只能锁代码块                                       |
+| 语法       | 是关键字                                       | 是实现类                                           |
+| 实现机制   | jvm层面，对象头monitor模式，锁信息保存在对象头 | api层面，依赖AQS，通过代码中int类型state标识锁状态 |
+| 支持锁类型 | 非公平锁                                       | 公平或非公平                                       |
+| 条件队列   | 单条件队列                                     | 多条件队列                                         |
+| 是否可重入 | 可重入                                         | 可重入                                             |
+| 锁升级     | 有锁升级过程                                   | 无                                                 |
 
 
 
@@ -791,7 +792,17 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
 5. `BlockingQueue workQueue`： 工作队列
 
-   以下这几种选择：ArrayBlockingQueue、LinkedBlockingQueue、SynchronousQueue。
+   cmp项目用的是
+
+   |                                       | 排序                       | 容量                                                         |
+   | ------------------------------------- | -------------------------- | ------------------------------------------------------------ |
+   | ArrayBlockingQueue（有界队列）        | FIFO                       |                                                              |
+   | LinkedBlockingQueue（可设置容量队列） | FIFO                       | 默认Integer.MAX_VALUE，吞吐量高于ArrayBlockingQueue          |
+   | DelayQueue（延迟队列）                | 根据指定的执行时间从小到大 |                                                              |
+   | PriorityBlockingQueue（优先级队列）   | 优先级                     |                                                              |
+   | SynchronousQueue（同步队列）          |                            | 不存储元素，每个插入操作必须等到另一个线程调用移除操作，否则插入一直阻塞。吞吐量通常要高于LinkedBlockingQuene |
+
+   
 
 6. `ThreadFactory threadFactory`： 线程工厂，主要用来创建线程。
 
@@ -799,13 +810,16 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
    有以下四种策略：
 
-   - ThreadPoolExecutor.AbortPolicy：丢弃任务并抛出 RejectedExecutionException 异常；
+   - ThreadPoolExecutor.AbortPolicy：**默认策略**，丢弃任务并抛异常（RejectedExecutionException）；
 
    - ThreadPoolExecutor.DiscardPolicy：也是丢弃任务，但是不抛出异常；
 
    - ThreadPoolExecutor.DiscardOldestPolicy：丢弃队列最前面的任务，然后重新尝试执行任务（重复此过程）；
 
    - ThreadPoolExecutor.CallerRunsPolicy：由调用线程处理该任务。
+
+
+   想实现自己的拒绝策略，实现RejectedExecutionHandler接口即可。
 
 ### 任务调度
 
@@ -822,8 +836,8 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 ![在这里插入图片描述](images/Java并发/watermark,type_d3F5LXplbmhlaQ,shadow_50,text_Q1NETiBA5aW95aW9546pX3R5cmFudA==,size_20,color_FFFFFF,t_70,g_se,x_16.png)
 
 1. **RUNNING**：正常运行，既接受新任务，也处理队列中任务
-2. **SHUTDOWN**：正常状态调用`shutdown()`方法，就进入SHUTDOWN状态，不再接受新任务【拒绝策略】，但会继续处理队列中任务
-3. **STOP**：正常状态调用`shutdownNow()`方法，就进入STOP状态，不接受新任务，也不处理队列中的任务，正在运行的线程也会中断
+2. **SHUTDOWN**：正常状态调用`shutdown()`方法，就进入SHUTDOWN状态，不再接受新任务【拒绝策略】，等待的任务也会放弃，但会继续处理队列中任务直到结束。
+3. **STOP**：正常状态调用`shutdownNow()`方法，就进入STOP状态，不接受新任务，也不处理队列中的任务，**正在运行的线程也会中断**。
 4. **TIDYING**：过渡状态，表示线程池即将结束。由两种状态转变而来：1）SHUTDOWN状态处理完队列中的任务，且没有线程在运行；2）或者STOP状态的工作线程为空（必然为空，因为线程全中断）
 5. **TERMINATED**：终止状态，TIDYING状态调用`tryTerminate()`方法，就进入TERMINATED状态。该方法是一个空方法，留给用户扩展。
 
@@ -831,9 +845,11 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
 ### 使用
 
-execute：提交一个任务给线程池执行，如果线程异常直接抛出
+- execute：提交一个任务给线程池执行，如果线程异常直接抛出。只能提交Runnable
 
-submit：提交一个任务给线程池执行，如果线程异常并不会直接抛出，而要用Futrue的get方法获取（前提是线程未捕获异常）
+- submit：提交一个任务给线程池执行，如果线程异常并不会直接抛出，而要用Futrue的get方法获取（前提是线程未捕获异常）。可以提交Runnable和Callable。
+
+cmp中，在CRMThreadPoolManager类，用静态map存<名称，线程池>以复用，工作队列用LinkedBlockingQueue。
 
 ### 动态设置参数
 
@@ -1355,7 +1371,7 @@ public interface RejectedExecutionHandler {
 }
 ```
 
-
+### 
 
 ### Q：为什么核心线程满后，先放阻塞队列，而不是创建非核心线程？
 
@@ -1375,6 +1391,14 @@ private final int capacity;
 ```
 
 所以要想动态修改只能自己实现一个BlockingQueue：复制LinkedBlockingQueue源码，将capacity的final修饰去掉，添加set方法，保存为ResizableCapacityLinkedBlockingQueue.java即可
+
+### Q：线程池如何实现参数的动态修改？
+
+自己实现线程池，重写ThreadPoolExecutor的`setCorePoolSize`方法，接收入参来动态设置核心线程数，同理还有
+
+setMaximumPoolSize、setKeepAliveTime、setThreadFactory、setRejectedExecutionHandler
+
+
 
 ### Q：为什么一般不建议使用JDK提供的线程池？
 
@@ -1933,17 +1957,32 @@ Synchronized不论是修饰方法还是代码块，都是通过持有修饰对�
 
 ## 公平锁 VS 非公平锁
 
-公平锁是指多个线程按照申请锁的顺序来获取锁，线程直接进入队列中排队，队列中的第一个线程才能获得锁。公平锁的优点是等待锁的线程不会饿死。缺点是整体吞吐效率相对非公平锁要低，等待队列中除第一个线程以外的所有线程都会阻塞，CPU唤醒阻塞线程的开销比非公平锁大。
+公平锁是指多个线程按照申请锁的顺序来获取锁，线程直接**进入队列中排队**，队列中的第一个线程才能获得锁。
 
-非公平锁是多个线程加锁时直接尝试获取锁，获取不到才会到等待队列的队尾等待。但如果此时锁刚好可用，那么这个线程可以无需阻塞直接获取到锁，所以非公平锁有可能出现后申请锁的线程先获取锁的场景。非公平锁的优点是可以减少唤起线程的开销，整体的吞吐效率高，因为线程有几率不阻塞直接获得锁，CPU不必唤醒所有线程。缺点是处于等待队列中的线程可能会饿死，或者等很久才会获得锁。
+- 优点是等待锁的线程不会饿死。
+- 缺点是整体吞吐效率相对非公平锁要低，等待队列中除第一个线程以外的所有线程都会阻塞，CPU唤醒阻塞线程的开销比非公平锁大。
 
-ReentrantLock里面有一个内部类Sync，Sync继承AQS（AbstractQueuedSynchronizer），添加锁和释放锁的大部分操作实际上都是在Sync中实现的。它有公平锁FairSync和非公平锁NonfairSync两个子类。ReentrantLock默认使用非公平锁，也可以通过构造器来显示的指定使用公平锁。
+非公平锁是多个线程加锁时**直接尝试获取锁**，获取不到才会到等待队列的队尾等待。但如果此时锁刚好可用，那么这个线程可以无需阻塞直接获取到锁，所以非公平锁有可能出现后申请锁的线程先获取锁的场景。
+
+- 优点是可以减少唤起线程的开销，整体的吞吐效率高，因为线程有几率不阻塞直接获得锁，CPU不必唤醒所有线程。
+- 缺点是处于等待队列中的线程可能会饿死，或者等很久才会获得锁。
+
+非公平锁加锁流程：
+
+1. 首先就会调用 CAS 进行一次抢锁，如果这个时候恰巧锁没有被占用，直接拿到锁。
+2. 非公平锁在 CAS 失败后，和公平锁一样都会进入到 tryAcquire 方法，在 tryAcquire 方法中，如果发现锁这个时候被释放了（state == 0），非公平锁会直接 CAS 抢锁。但是公平锁会判断等待队列是否有线程处于等待状态，如果有则不去抢锁，乖乖排到后面。
+
+![图片](images/Java并发/640-1686638892798-6.png)
+
+源码
+
+ReentrantLock里面有一个内部类Sync，Sync继承AQS，添加锁和释放锁的大部分操作实际上都是在Sync中实现的。它有公平锁FairSync和非公平锁NonfairSync两个子类。**ReentrantLock默认使用非公平锁**，也可以通过构造器来显示的指定使用公平锁。
 
 <img src="images\Java并发\6edea205.png" alt="img" style="zoom:50%;" />
 
 公平锁与非公平锁的lock()方法
 
-<img src="images\Java并发\bc6fe583.png" alt="img" style="zoom:33%;" />
+<img src="images\Java并发\bc6fe583.png" alt="img" style="zoom: 50%;" />
 
 唯一的区别就在于公平锁在获取同步状态时多了一个限制条件：hasQueuedPredecessors()。该方法主要做一件事情：主要是判断当前线程是否位于同步队列中的第一个。如果是则返回true，否则返回false。
 
@@ -2583,17 +2622,43 @@ C101。原因是count=98时，t1线程已经进入while循环，来到26行的�
 
 改进方式是在占用信号量之后，打印和count++操作之前加一个判断`if (count < 100)` 。这样的话while循环条件也可以改成`while (true)`。
 
-# JUC（java.util.concurrent）
+# JUC（并发包java.util.concurrent）
 
 ## AQS
 
-java.util.concurrent（J.U.C）大大提高了并发性能，AQS 被认为是 J.U.C 的核心。
+AQS（AbstractQueuedSynchronizer，抽象队列同步器） 是 J.U.C 的核心，JUC中的锁（如ReetrantLock、CountDownLatch和Semaphore）基于AQS实现。此外还可以基于AQS定制
+
+<img src="images/Java并发/AQS.png" alt="AQS" style="zoom: 67%;" />
+
+AQS内部维护一个**FIFO队列**和一个volatile int 的变量**state**：
+
+- state=1表示当前对象锁被占有，state的修改通过CAS操作保证修改的原子性。
+
+- FIFO队列用于实现多线程排队工作，当线程加锁失败时，该线程被封装成**Node节点**加入队列尾部。
+
+  > 本质上说，AQS提供排它锁和共享锁。**排它锁**是指多线程竞争同一资源时，同一时刻只允许一个线程获得锁；**共享锁**同一时刻允许多个线程获得锁。
+  >
+  > 排它锁：ReetrantLock重入锁用的是排它锁。放入AQS的Node标记为SHARED 
+  >
+  > 共享锁：CountDownLatch和Semaphore用的是共享锁。放入AQS的Node标记为EXCLUSIVE
+  >
+  > 
+
+![图片](images/Java并发/640-1686624831180-4.png)
+
+AQS 中的队列是 CLH 变体的虚拟双向队列，有以下特性
+
+- AQS 中队列是个双向链表，也是 FIFO 先进先出的特性，通过 Head、Tail 头尾两个节点来维护队列。通过 volatile 修饰保证可见性
+- Head 指向节点为已获得锁的节点，是一个虚拟节点，节点本身不持有具体线程
+- 获取不到同步状态，会将节点进行自旋获取锁。但自旋失败一定次数后会将线程阻塞，相对于 CLH 队列性能较好
+
+> CLH：Craig、Landin and Hagersten 队列，是 **单向链表实现的队列**。申请线程只在本地变量上自旋，**它不断轮询前驱的状态**，如果发现 **前驱节点释放了锁就结束自旋**
 
 ### CountDownLatch
 
 用来控制一个或者多个线程等待多个线程。
 
-维护了一个计数器 cnt，每次调用 `countDown()` 方法会让计数器的值减 1，减到 0 的时候，那些因为调用 `await()` 方法而在等待的线程就会被唤醒。
+维护了一个**计数器** cnt，每次调用 `countDown()` 方法会让计数器的值减 1，减到 0 的时候，那些因为调用 `await()` 方法而在等待的线程就会被唤醒。
 
 ```java
 public class CountdownLatchExample {
@@ -2636,9 +2701,12 @@ executorService.execute(() -> {
 
 和 CountdownLatch 相似，都是通过维护计数器来实现的。线程执行 `await()` 方法之后计数器会减 1，并进行等待，直到计数器为 0，所有调用 await() 方法而在等待的线程才能继续执行。
 
-CyclicBarrier 和 CountdownLatch 的一个区别是，CyclicBarrier 的计数器通过调用 `reset()` 方法可以循环使用，所以它才叫做循环屏障。另外await()等于countDown() + await()的功能，如果在线程之外await，则无法起到线程间互相等待的作用
+CyclicBarrier 和 CountdownLatch 的一个区别是，CyclicBarrier 的计数器通过调用 `reset()` 方法可以**循环使用**，所以它才叫做循环屏障。另外await()等于countDown() + await()的功能，如果在线程之外await，则无法起到线程间互相等待的作用
 
-CyclicBarrier 有两个构造函数，其中 parties 指示计数器的初始值，barrierAction 在所有线程都到达屏障的时候会执行一次。
+> CyclicBarrier 有两个构造函数 
+>
+> - parties 指示计数器的初始值
+> - barrierAction 在所有线程都到达屏障的时候会执行一次，但默认为null。
 
 ```java
 public class CyclicBarrierExample {
@@ -2661,6 +2729,7 @@ public class CyclicBarrierExample {
     }
 }
 // before..before..before..before..before..before..before..before..before..before..after..after..after..after..after..after..after..after..after..after..
+// 如果在主线程await，只会输出十次before，因为只countDown了一次，计数器未到达0
 ```
 
 ### Semaphore 
@@ -2676,7 +2745,7 @@ public static void main(String[] args) {
     for (int i = 0; i < 10; i++) {  // 请求总数为 10
         executorService.execute(()->{
             try {
-                semaphore.acquire();
+                semaphore.acquire(); // 或者用用tryAcquire()
                 System.out.print(semaphore.availablePermits() + " ");  // 打印此时信号量的剩余
             } catch (InterruptedException e) {
                 e.printStackTrace();
@@ -2688,6 +2757,13 @@ public static void main(String[] args) {
     executorService.shutdown();
 }
 ```
+
+### 比较
+
+|        | CyclicBarrier                                                | CountDownLatch                                               |
+| ------ | :----------------------------------------------------------- | :----------------------------------------------------------- |
+| 重用性 | CyclicBarrier是**可重用**的，其中的线程会等待所有的线程完成任务。届时，屏障将被拆除，并可以选择性地做一些特定的动作，可以重新使用。 | CountDownLatch是**一次性**的，不同的线程在同一个计数器上工作，直到计数器为0。此后CountDownLatch不能再使用 |
+| await  | 等待+CountDown                                               | 只有等待功能                                                 |
 
 ## FutureTask
 
@@ -2829,7 +2905,7 @@ public static void main(String[] args) {
 
 主要用于并行计算中，和 MapReduce 原理类似，都是把大的计算任务拆分（fork方法）成多个小任务并行计算，再汇总结果（join方法）
 
-核心代码是ForkJoinExample，继承RecursiveTask，在`compute()`方法中，关键是如何拆分出子任务并且提交子任务。
+核心代码是ForkJoinExample，继承**RecursiveTask**，在`compute()`方法中，关键是如何拆分出子任务并且提交子任务。
 
 ForkJoin 使用 ForkJoinPool 来启动，它是一个特殊的线程池，线程数量取决于 CPU 核数。
 
