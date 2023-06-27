@@ -2983,23 +2983,19 @@ Atomic类是通过无锁（lock-free）的方式实现的线程安全（thread-s
 public class AtomicInteger extends Number implements java.io.Serializable {
     private static final long serialVersionUID = 6214790243416807050L;
     // setup to use Unsafe.compareAndSwapInt for updates
-    private static final Unsafe unsafe = Unsafe.getUnsafe();
-    private static final long valueOffset;
+    private static final Unsafe unsafe = Unsafe.getUnsafe(); // 获取并操作内存的数据
+    private static final long valueOffset; // 存储value在AtomicInteger中的偏移量
+    private volatile int value;  // 存储AtomicInteger的int值，该属性需要借助volatile关键字保证其在线程间是可见的
     static {
         try {
             valueOffset = unsafe.objectFieldOffset
                 (AtomicInteger.class.getDeclaredField("value"));
         } catch (Exception ex) { throw new Error(ex); }
     }
-    private volatile int value;
 }
 ```
 
-unsafe： 获取并操作内存的数据。
 
-valueOffset： 存储value在AtomicInteger中的偏移量。
-
-value： 存储AtomicInteger的int值，该属性需要借助volatile关键字保证其在线程间是可见的。
 
 ##  CAS算法
 
