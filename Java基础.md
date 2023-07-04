@@ -1497,7 +1497,7 @@ Stream的中间操作得到的结果还是一个Stream，将一个Stream转换�
 
 ## 形参
 
-方法的参数。如果参数类型是非基本类型（例如类A），则参数只能传A类型及其子类，若传A的父类则编译报错。
+方法的参数。如果参数类型是非基本类型（例如类A），则参数只能传A类型**或其子类**，若传A的父类则编译报错。
 
 **值传递**：传基本类型，不影响方法外部的变量
 
@@ -1548,56 +1548,46 @@ public class Exam {
 
 又称方法覆盖，即子类方法覆盖父类方法 ，或a类实现b接口方法。必须加上@Override 注解。
 
-为了满足里式替换原则，重写有以下三个限制： 
+为了满足**里氏替换原则**，重写有以下三个限制： 
 
 1. 子类方法的访问权限必须大于等于父类方法；
 2. 子类方法的返回类型必须是父类方法返回类型或为其子类型。
 3. 子类方法抛出的异常类型必须是父类抛出异常类型或为其子类型。
 
-### Q：在子类实例中调用重写方法时，编译器如何判断调用子类还是父类方法？
+> 里氏替换原则：如果调用一个父类的方法可以成功，那么替换为子类调用也应当可以运行
 
-遵循“**最近原则**”。例如几个类的继承关系为A-B-C-D：
+### Q：在子类实例中调用同名方法时，编译器如何判断调用子类还是父类方法？
 
-- 子类和父类的方法参数类型相同（例如B），则无论传参为哪种类型，均调用子类方法（但有约束必须是B类及其子类。否则编译报错）
-- 子类和父类的方法参数类型不同，则看入参类型在继承链上离谁的形参类型更近，就调谁的
+- 若是重写：子类方法和父类方法的参数类型相同，则无论传参为哪种类型，均调用子类方法。
+
+  > 因为方法重写，子类覆盖了父类方法。
+  >
+  > 注意方法形参的约束：例如都是B类，则传参必须是B类或其子类。否则编译报错
+
+- 若是非重写：子类方法和父类方法的参数类型不同，就找入参类型最近似的相应方法（在继承链上最接近）。注意到由于继承，子类可以使用父类的方法，但父类用不了子类的。
 
 ```java
 // 子类和父类的方法参数类型不同的例子1
 class A {
-  public void show(B obj) {System.out.println("A.show()");}
+    public void show(A obj) {System.out.println("A.show(A)");}
+    public void show(B obj) {System.out.println("A.show(B)");}
 }
 class B extends A {
-  public void show(C obj) {System.out.println("B.show()");}
+    public void show(C obj) {System.out.println("B.show(C)");}
+    public void show(D obj) {System.out.println("B.show(D)");}
 }
 class Test1{
     public static void main(String[] args) {
-       A a = new A();B b = new B();C c = new C();D d = new D();
-        // 子类方法形参为C类型，父类方法形参为B类型，传参C、D类型，都离子类的方法形参C更近。
-        b.show(c);   // B.show()
-        b.show(d);   // B.show()
-        // 虽然创建子类实例 ，但使用父类引用，因此调用方法全是父类的
-        A ba = new B();
-        ba.show(c);   // A.show()
-        ba.show(d);   // A.show()
-    }
-}
-// 子类和父类的方法参数类型不同的例子2
-class A {
-    public void show(B obj) {System.out.println("A.show()");}
-}
-class B extends A {
-    public void show(A obj) {System.out.println("B.show()");}
-}
-class Test1{
-    public static void main(String[] args) {
-        A a = new A();B b = new B();C c = new C();D d = new D();
-        // 子类方法形参为A类型，父类方法形参为B类型，传参C、D类型，都离父类的方法形参C更近。
-        b.show(c);   // A.show()
-        b.show(d);   // A.show()
-        // 虽然创建子类实例 ，但使用父类引用，因此调用方法全是父类的
-        A ba = new B();
-        ba.show(c);   // A.show()
-        ba.show(d);   // A.show()
+        A a = new A(); B b = new B(); C c = new C(); D d = new D();
+        b.show(a);  // A.show(A)----因为子类没有参数为A类型的方法，因此只能用父类的
+        b.show(b);  // A.show(B)----同上
+        b.show(c);  // B.show(C)----B类有参数为C类型的方法
+        b.show(d);  // B.show(D)----同上
+        A ba = new B();  // 用父类引用接收一个子类对象，此时当作父类来用
+        ba.show(a);   // A.show(A)----A类有参数为A类型的方法，直接命中
+        ba.show(b);   // A.show(B)----同上
+        ba.show(c);   // A.show(B)----A类没有参数为C类型的方法，但C类型在继承链上最接近B，因此选中方法show(B obj)
+        ba.show(d);   // A.show(B)----同上
     }
 }
 ```
@@ -1631,6 +1621,104 @@ web应用中可以不写main方法，因为web容器已经自带入口。
 ### Q：main方法为什么必须加static？
 
 已知在类加载时无法创建对象，因为静态方法可以不通过对象调用，所以在类的main方法所在在类加载时就可以通过main方法入口来运行程序。
+
+## StackTraceElement
+
+异常处理中常用的堆栈打印`printStackTrace()`，打印的就是StackTraceElement数组，是一系列方法调用堆栈的列表，遍历可以观察方法的调用链路。
+
+StackTraceElement被定义为final，不允许被继承。包含当前执行方法的文件名、类名、方法名、文件行号等信息。
+
+有两种方法可以获取StackTraceElement数组：
+
+- Thread.currentThread().getStackTrace()
+- new Throwable().getStackTrace()
+
+```java
+public static void getCaller() {
+    StackTraceElement stack[] = new Throwable().getStackTrace();
+    for (int i=0; i < stack.length; i++) {
+        StackTraceElement ste=stack[i];
+        // 输出序号--类名--文件名：方法所在行号
+        System.out.println((i+"--"+ste.getClassName()+"."+ste.getMethodName()+"(...)"+"--"+ste.getFileName()+":"+ste.getLineNumber()));
+    }
+}
+```
+
+在com.eshore.cmp.corp.service.service.comPlan.impl.AreaLimitServiceTmpImpl#qryList中调用上面的getCaller()，输出如下：
+
+```
+0--com.eshore.cmp.corp.service.service.comPlan.impl.AreaLimitServiceTmpImpl.getCaller(...)--AreaLimitServiceTmpImpl.java:1126
+1--com.eshore.cmp.corp.service.service.comPlan.impl.AreaLimitServiceTmpImpl.qryList(...)--AreaLimitServiceTmpImpl.java:615
+2--com.eshore.cmp.corp.controller.comPlan.AreaLimitWebController.qryAreaLimitTempInfoList(...)--AreaLimitWebController.java:63
+3--com.eshore.cmp.corp.controller.comPlan.AreaLimitWebController$$FastClassBySpringCGLIB$$2e15eb15.invoke(...)--<generated>:-1
+4--org.springframework.cglib.proxy.MethodProxy.invoke(...)--MethodProxy.java:218
+5--org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.invokeJoinpoint(...)--CglibAopProxy.java:771
+6--org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(...)--ReflectiveMethodInvocation.java:163
+7--org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(...)--CglibAopProxy.java:749
+8--org.springframework.aop.framework.adapter.MethodBeforeAdviceInterceptor.invoke(...)--MethodBeforeAdviceInterceptor.java:56
+9--org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(...)--ReflectiveMethodInvocation.java:175
+10--org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(...)--CglibAopProxy.java:749
+11--org.springframework.aop.interceptor.ExposeInvocationInterceptor.invoke(...)--ExposeInvocationInterceptor.java:95
+12--org.springframework.aop.framework.ReflectiveMethodInvocation.proceed(...)--ReflectiveMethodInvocation.java:186
+13--org.springframework.aop.framework.CglibAopProxy$CglibMethodInvocation.proceed(...)--CglibAopProxy.java:749
+14--org.springframework.aop.framework.CglibAopProxy$DynamicAdvisedInterceptor.intercept(...)--CglibAopProxy.java:691
+15--com.eshore.cmp.corp.controller.comPlan.AreaLimitWebController$$EnhancerBySpringCGLIB$$f0ff7748.qryAreaLimitTempInfoList(...)--<generated>:-1
+16--sun.reflect.NativeMethodAccessorImpl.invoke0(...)--NativeMethodAccessorImpl.java:-2
+17--sun.reflect.NativeMethodAccessorImpl.invoke(...)--NativeMethodAccessorImpl.java:62
+18--sun.reflect.DelegatingMethodAccessorImpl.invoke(...)--DelegatingMethodAccessorImpl.java:43
+19--java.lang.reflect.Method.invoke(...)--Method.java:498
+20--org.springframework.web.method.support.InvocableHandlerMethod.doInvoke(...)--InvocableHandlerMethod.java:190
+21--org.springframework.web.method.support.InvocableHandlerMethod.invokeForRequest(...)--InvocableHandlerMethod.java:138
+22--org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(...)--ServletInvocableHandlerMethod.java:105
+23--org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(...)--RequestMappingHandlerAdapter.java:879
+24--org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.handleInternal(...)--RequestMappingHandlerAdapter.java:793
+25--org.springframework.web.servlet.mvc.method.AbstractHandlerMethodAdapter.handle(...)--AbstractHandlerMethodAdapter.java:87
+26--org.springframework.web.servlet.DispatcherServlet.doDispatch(...)--DispatcherServlet.java:1040
+27--org.springframework.web.servlet.DispatcherServlet.doService(...)--DispatcherServlet.java:943
+28--org.springframework.web.servlet.FrameworkServlet.processRequest(...)--FrameworkServlet.java:1006
+29--org.springframework.web.servlet.FrameworkServlet.doPost(...)--FrameworkServlet.java:909
+30--javax.servlet.http.HttpServlet.service(...)--HttpServlet.java:660
+31--org.springframework.web.servlet.FrameworkServlet.service(...)--FrameworkServlet.java:883
+32--javax.servlet.http.HttpServlet.service(...)--HttpServlet.java:741
+33--org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(...)--ApplicationFilterChain.java:231
+34--org.apache.catalina.core.ApplicationFilterChain.doFilter(...)--ApplicationFilterChain.java:166
+35--org.apache.tomcat.websocket.server.WsFilter.doFilter(...)--WsFilter.java:53
+36--org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(...)--ApplicationFilterChain.java:193
+37--org.apache.catalina.core.ApplicationFilterChain.doFilter(...)--ApplicationFilterChain.java:166
+38--com.alibaba.druid.support.http.WebStatFilter.doFilter(...)--WebStatFilter.java:123
+39--org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(...)--ApplicationFilterChain.java:193
+40--org.apache.catalina.core.ApplicationFilterChain.doFilter(...)--ApplicationFilterChain.java:166
+41--org.springframework.web.filter.RequestContextFilter.doFilterInternal(...)--RequestContextFilter.java:100
+42--org.springframework.web.filter.OncePerRequestFilter.doFilter(...)--OncePerRequestFilter.java:119
+43--org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(...)--ApplicationFilterChain.java:193
+44--org.apache.catalina.core.ApplicationFilterChain.doFilter(...)--ApplicationFilterChain.java:166
+45--org.springframework.web.filter.FormContentFilter.doFilterInternal(...)--FormContentFilter.java:93
+46--org.springframework.web.filter.OncePerRequestFilter.doFilter(...)--OncePerRequestFilter.java:119
+47--org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(...)--ApplicationFilterChain.java:193
+48--org.apache.catalina.core.ApplicationFilterChain.doFilter(...)--ApplicationFilterChain.java:166
+49--org.springframework.web.filter.CharacterEncodingFilter.doFilterInternal(...)--CharacterEncodingFilter.java:201
+50--org.springframework.web.filter.OncePerRequestFilter.doFilter(...)--OncePerRequestFilter.java:119
+51--org.apache.catalina.core.ApplicationFilterChain.internalDoFilter(...)--ApplicationFilterChain.java:193
+52--org.apache.catalina.core.ApplicationFilterChain.doFilter(...)--ApplicationFilterChain.java:166
+53--org.apache.catalina.core.StandardWrapperValve.invoke(...)--StandardWrapperValve.java:202
+54--org.apache.catalina.core.StandardContextValve.invoke(...)--StandardContextValve.java:96
+55--org.apache.catalina.authenticator.AuthenticatorBase.invoke(...)--AuthenticatorBase.java:541
+56--org.apache.catalina.core.StandardHostValve.invoke(...)--StandardHostValve.java:139
+57--org.apache.catalina.valves.ErrorReportValve.invoke(...)--ErrorReportValve.java:92
+58--org.apache.catalina.core.StandardEngineValve.invoke(...)--StandardEngineValve.java:74
+59--org.apache.catalina.connector.CoyoteAdapter.service(...)--CoyoteAdapter.java:343
+60--org.apache.coyote.http11.Http11Processor.service(...)--Http11Processor.java:373
+61--org.apache.coyote.AbstractProcessorLight.process(...)--AbstractProcessorLight.java:65
+62--org.apache.coyote.AbstractProtocol$ConnectionHandler.process(...)--AbstractProtocol.java:868
+63--org.apache.tomcat.util.net.NioEndpoint$SocketProcessor.doRun(...)--NioEndpoint.java:1590
+64--org.apache.tomcat.util.net.SocketProcessorBase.run(...)--SocketProcessorBase.java:49
+65--java.util.concurrent.ThreadPoolExecutor.runWorker(...)--ThreadPoolExecutor.java:1149
+66--java.util.concurrent.ThreadPoolExecutor$Worker.run(...)--ThreadPoolExecutor.java:624
+67--org.apache.tomcat.util.threads.TaskThread$WrappingRunnable.run(...)--TaskThread.java:61
+68--java.lang.Thread.run(...)--Thread.java:748
+```
+
+
 
 ------
 
@@ -2103,13 +2191,199 @@ Exception又分为两大类：
 
 ## Java异常处理机制
 
-当一个异常被抛出时，JVM会在当前的方法里寻找一个匹配的处理，如果没有找到，这个方法会**强制结束**并弹出当前栈帧，并且异常会重新抛给上层调用的方法（在调用方法帧）。如果在所有帧弹出前仍然没有找到合适的异常处理，这个线程将终止。如果这个异常在最后一个非守护线程（比如main线程）里抛出，将会导致JVM自己终止。
+**异常的向上传播**：当一个异常被抛出时，JVM会在当前的方法里寻找一个匹配的处理，如果没有找到，这个方法会**强制结束**并弹出当前栈帧，并且异常会重新抛给上层调用的方法（在调用方法帧）。如果在所有帧弹出前仍然没有找到合适的异常处理，这个线程将终止。
+
+如果这个异常在最后一个**非守护线程**（比如main线程）里抛出，将会导致JVM自己终止。
 
 ## 异常处理方式
 
-有两种，一种是 try-catch 捕获异常，另一种是通过 throw 抛出异常。
+### try-catch 捕获异常
 
-在程序中可以抛出两种类型的异常，一种是检查异常，另一种是非检查异常，应该尽量抛出非检查异常，遇到检查异常应该捕获进行处理不要抛给上层。在异常处理的时候应该尽可能晚的处理异常，最好是定义一个全局异常处理器，在全局异常处理器中处理所有抛出的异常，并将异常信息封装到 Result 对象中返回给调用者。
+在当前方法处理异常。将可能异常的代码放在try块，在catch块捕获异常并处理。
+
+可以使用**多个catch**语句，来捕获多种异常，但这些异常不能存在继承关系。每个catch分别捕获对应的Exception及其子类。且catch的顺序非常重要：子类必须写在前面。多个catch语句只有一个能被执行。
+
+例如下面，UnsupportedEncodingException异常是永远捕获不到的，因为它是IOException的子类：
+
+```java
+public static void main(String[] args) {
+    try {
+        process1();
+        process2();
+        process3();
+    } catch (IOException e) {
+        System.out.println("IO error");
+    } catch (UnsupportedEncodingException e) { // 永远捕获不到
+        System.out.println("Bad encoding");
+    } catch (Exception e) {
+        System.out.println("Unknown error");
+    }
+}
+```
+
+正确做法是UnsupportedEncodingException的捕获放前面
+
+最好使用位运算符`|`将异常合并：
+
+```java
+public static void main(String[] args) {
+    try {
+        ...
+    } catch (IOException | NumberFormatException e) { // IOException或NumberFormatException
+        System.out.println("Bad input");
+    } catch (Exception e) {
+        System.out.println("Unknown error");
+    }
+}
+```
+
+### throw 抛出异常
+
+在catch块将捕获的异常抛到上层调用方法。
+
+在程序中可以抛出两种类型的异常，一种是检查异常，另一种是非检查异常，应该尽量抛出**非检查异常**，遇到检查异常应该捕获进行处理不要抛给上层。
+
+在异常处理的时候应该**尽可能晚**的处理异常，最好定义一个全局异常处理器，在其中处理所有抛出的异常，并将异常信息封装到 Result 对象中返回给调用者。
+
+#### 异常转换
+
+如果一个方法捕获了某个异常后，又在catch子句中抛出新的异常，就相当于把抛出的异常类型“转换”了：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        try {
+            process1();
+        } catch (Exception e) {
+            e.printStackTrace();  // 打印调用栈
+        }
+    }
+
+    static void process1() {
+        try {
+            process2();
+        } catch (NullPointerException e) {  // 捕获NullPointerException
+            throw new IllegalArgumentException();  // 又抛出IllegalArgumentException
+        }
+    }
+
+    static void process2() {
+        throw new NullPointerException();
+    }
+}
+```
+
+**printStackTrace方法**可以打印方法的调用栈，上面的输出：
+
+```
+java.lang.IllegalArgumentException
+    at Main.process1(Main.java:15)
+    at Main.main(Main.java:5)
+```
+
+说明新的异常丢失了原始异常NullPointerException的信息
+
+为了能追踪到完整的异常栈，在构造异常时，把原始的Exception实例传进去，新的Exception就可以持有原始Exception信息。对上述代码改进：
+
+```java
+static void process1() {
+    try {
+        process2();
+    } catch (NullPointerException e) {  // 捕获NullPointerException
+        throw new IllegalArgumentException(e);   // 创建异常时将捕获的异常传入
+    }
+}
+```
+
+打印的异常栈：
+
+```
+java.lang.IllegalArgumentException: java.lang.NullPointerException
+    at Main.process1(Main.java:15)
+    at Main.main(Main.java:5)
+Caused by: java.lang.NullPointerException
+    at Main.process2(Main.java:20)
+    at Main.process1(Main.java:13)
+```
+
+注意到Caused by: Xxx，说明捕获的IllegalArgumentException并不是造成问题的根源，根源在于NullPointerException，是在Main.process2()方法抛出的。
+
+获取原始异常可以用继承自Throwable的`getCause()`方法，如果返回null，说明已经是“根异常”了：
+
+```java
+try {
+    process1();
+} catch (Exception e) {
+    e.printStackTrace();
+    System.out.println(e.getCause());  // java.lang.NullPointerException
+}
+```
+
+#### 异常屏蔽
+
+如果在执行`finally`语句时抛出异常，原来在catch中准备抛出的异常就“消失”了，因为只能抛出一个异常。没有被抛出的异常称为“被屏蔽”的异常（Suppressed Exception）。
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        try {
+            Integer.parseInt("abc");
+        } catch (Exception e) {
+            System.out.println("catched");
+            throw new RuntimeException(e);
+        } finally {
+            System.out.println("finally");
+            throw new IllegalArgumentException(); // 在finally块依然抛出异常
+        }
+    }
+}
+```
+
+某些场景需要获知所有的异常。先用origin变量保存原始异常，然后调Throwable的`addSuppressed()`，把原始异常添加进来，最后在finally抛出：
+
+```java
+public class Main {
+    public static void main(String[] args) throws Exception {
+        Exception origin = null;
+        try {
+            System.out.println(Integer.parseInt("abc"));
+        } catch (Exception e) {
+            origin = e;
+            throw e;
+        } finally {
+            Exception e = new IllegalArgumentException();
+            if (origin != null) { // 若不为空，就将被屏蔽的异常添加到当前异常中
+                e.addSuppressed(origin);
+            }
+            throw e;
+        }
+    }
+}
+```
+
+当catch和finally都抛出了异常时，虽然catch的异常被屏蔽了，但是，finally抛出的异常仍然包含了它，在第3行用Suppressed标明：
+
+```
+Exception in thread "main" java.lang.IllegalArgumentException
+    at Main.main(Main.java:11)
+Suppressed: java.lang.NumberFormatException: For input string: "abc"
+    at java.base/java.lang.NumberFormatException.forInputString(NumberFormatException.java:65)
+    at java.base/java.lang.Integer.parseInt(Integer.java:652)
+    at java.base/java.lang.Integer.parseInt(Integer.java:770)
+    at Main.main(Main.java:6)
+```
+
+通过`Throwable.getSuppressed()`可以获取所有的Suppressed Exception。
+
+绝大多数情况下，在finally中不要抛出异常。因此通常不需要关心Suppressed Exception。
+
+
+
+### finally块
+
+非必须，可写可不写。无论是否发生异常，都会执行。且总是最后执行（但实际执行时，throw在finally之后执行，return在finally之后执行，见 [Q：finally和return的执行顺序？](#Q：finally和return的执行顺序？)）
+
+建议：不在finally块return；不在finally块抛异常
 
 ## try-with-resources 语句
 
@@ -2131,6 +2405,49 @@ private static void autoClosable() throws IOException {
             fos.write(len);
         }
     }
+}
+```
+
+### 原理
+
+java代码：
+
+```java
+public static void main(String[] args){
+    try(MyResource myResource = new MyResource()){
+        myResource.open();
+    } catch (Exception e) {
+        e.printStackTrace();
+    }
+}
+```
+
+在编译后的字节码（.class文件）中，用反编译文件可以看到自动加上了finally块，且在里面try执行重写的**close**方法，并在catch块中多调用了**addSuppressed**方法处理异常屏蔽：
+
+```java
+try {
+    MyResource myResource = new MyResource();
+    Throwable var2 = null;
+    try {
+        myResource.open();
+    } catch (Throwable var12) {
+        var2 = var12;
+        throw var12;
+    } finally {
+        if (myResource != null) {
+            if (var2 != null) {
+                try {
+                    myResource.close();  // 调用close
+                } catch (Throwable var11) {
+                    var2.addSuppressed(var11); // 处理异常屏蔽
+                }
+            } else {
+                myResource.close();
+            }
+        }
+    }
+} catch (Exception var14) {
+    var14.printStackTrace();
 }
 ```
 
@@ -2246,6 +2563,7 @@ public class HttpExceptionHandler {
 2. catch中return
 
    ```java
+   // 以下省略main
    public static int show() {
        try {
            int a = 8/0;  // 执行到此处，然后抛异常进入catch

@@ -329,7 +329,17 @@ try (Reader reader = new StringReader("Hello")) {
 InputStream input = new FileInputStream("src/readme.txt");
 // 变换为Reader:
 Reader reader = new InputStreamReader(input, "UTF-8");
+...
+// 使用完要关闭流
+reader.close();
+input.close();
 ```
+
+> 注意流关闭的顺序，应该先关闭**最外层的**。如果先关闭input，再关闭reader，会报错IOException：Stream closed。
+>
+> 原因是reader使用了input，所以先关闭input，再关闭reader时相当于使用一个已关闭的流。
+>
+> 或者直接关闭最外层。
 
 实际上也是层层包裹的**装饰器模式**，使用完毕时只需要关闭最外层的Reader即可，因此可以通过`try (resource)`更简洁地改写如下：
 
@@ -543,7 +553,7 @@ public class Main {
             // 写入Object:
             output.writeObject(Double.valueOf(123.456));
         }
-        System.out.println(Arrays.toString(buffer.toByteArray()));
+        System.out.println(Arrays.toString(buffer.toByteArray()));// [-84, -19, 0, 5, 119, 11, 0, 0, 48, ......]
     }
 }
 
@@ -593,11 +603,55 @@ try (ObjectInputStream input = new ObjectInputStream(...)) {
 
 ## serialVersionUID
 
-如果用户没有自己声明一个serialVersionUID,接口会默认生成一个serialVersionUID
-但是强烈建议用户自定义一个serialVersionUID,因为默认的serialVersinUID对于class的细节非常敏感，反序列化时可能会导致InvalidClassException这个异常。
-（比如说先进行序列化，然后在反序列化之前修改了类，那么就会报错。因为修改了类，对应的SerialversionUID也变化了，而序列化和反序列化就是通过对比其SerialversionUID来进行的，一旦SerialversionUID不匹配，反序列化就无法成功。
+用于**验证版本一致性**。
 
+如果一个类实现了Serializable接口，就必须定义serialVersionUID，如果该类没有定义serialVersionUID，接口会默认生成一个。
 
+但是强烈建议用户自定义一个serialVersionUID，且**不能更改**，否则反序列化时报InvalidClassException异常。
+
+例如：
+
+1、先进行序列化，然后在反序列化之前修改了类，那么就会报错。因为修改了类，对应的SerialversionUID也变化了，而序列化和反序列化就是通过对比其SerialversionUID来进行的，一旦SerialversionUID不匹配，反序列化就无法成功。
+
+```java
+public static void main(String[] args)  {
+    AreaLimitInfo obj = new AreaLimitInfo();
+    obj.setAreaLimit("安徽");
+    try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream("tempFile"))){
+        oos.writeObject(obj);  // 对象写入文件
+    } catch (IOException e) {
+        e.printStackTrace();
+    }
+}
+```
+
+2.1、修改AreaLimitInfo类 的 serialVersionUID，574488211598856253L 改为 574488211598856258L，然后反序列化：
+
+```java
+public class AreaLimitInfo implements Serializable {
+    // private static final long serialVersionUID = -574488211598856253L;
+    private static final long serialVersionUID = -574488211598856258L;
+    ...
+}
+public static void main(String[] args) {
+    try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream("tempFile"))){
+        AreaLimitInfo obj = (AreaLimitInfo) ois.readObject();  // 从文件读出对象
+        System.out.println(obj);  // com.eshore.cmp.corp.dto.AreaLimitInfo@4f4a7090
+    } catch (IOException | ClassNotFoundException e ) {
+        e.printStackTrace();
+    }
+}
+```
+
+此时会报错：
+
+```
+java.io.InvalidClassException: com.eshore.cmp.corp.dto.AreaLimitInfo; local class incompatible: stream classdesc serialVersionUID = -574488211598856253, local class serialVersionUID = -574488211598856258
+```
+
+可以看到抛出InvalidClassException异常，且指出序列化前后的serialVersionUID不一致。
+
+2.2、将serialVersionUID还原为序列化时的值，才能正常反序列化
 
 # JDBC
 

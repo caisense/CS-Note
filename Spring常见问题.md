@@ -536,9 +536,14 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 
 ## Spring IoC
 
-**Inverse of Control（控制反转）**是一种设计思想，**控制**指的是对象创建（实例化、管理）的权力，**反转**是控制权交给外部环境（Spring 框架、IoC 容器），对象的创建和管理统一交给外部环境。
+**Inverse of Control（控制反转）**是一种设计思想：
 
-**IoC 容器**是 Spring 用来实现 IoC 的载体，IoC 容器 负责管理对象的整个生命周期，包括创建、装配（通过依赖注入）、销毁等。  IoC 容器实际上就是个 Map，存放各种对象。
+- **控制**指的是对象创建（实例化、管理）的权力；
+- **反转**是控制权交给外部环境（Spring 框架、IoC 容器）。
+
+> **IoC 容器**是 Spring 用来实现 IoC 的载体，IoC 容器 负责管理对象的整个生命周期，包括创建、装配（通过依赖注入）、销毁等。  IoC 容器实际上就是个 Map，存放各种对象。
+>
+> Spring实现IoC的方式，就是对象的创建和管理交给Spring负责。所有组件（对象）统称为**JavaBean**，每个对象就是一个bean。
 
 例如：现有类 A 依赖于类 B
 
@@ -549,15 +554,20 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 
 ### IoC 和 DI 
 
-IoC 最常见以及最合理的实现方式叫做**依赖注入**（Dependency Injection，简称 DI）。
+网上常把IoC和DI等同。IoC 最常见以及最合理的实现方式叫做**依赖注入**（Dependency Injection，简称 DI）。
 
-老马（Martin Fowler）在一篇文章中提到将 IoC 改名为 DI，原文如下，原文地址：https://martinfowler.com/articles/injection.html 。
+> 老马（Martin Fowler）在一篇文章中提到将 IoC 改名为 DI，原文如下，原文地址：https://martinfowler.com/articles/injection.html 。大概意思是 IoC 太普遍并且不表意，很多人会因此而迷惑，所以，使用 DI 来精确指名这个模式比较好。
 
-老马的大概意思是 IoC 太普遍并且不表意，很多人会因此而迷惑，所以，使用 DI 来精确指名这个模式比较好。
-
-### IOC实现机制
+### IoC实现机制
 
 反射+工厂模式
+
+### 无侵入容器
+
+在设计上，Spring的IoC容器是一个高度可扩展的无侵入容器。所谓无侵入，是指应用程序的组件无需实现Spring的特定接口，或者说，组件根本不知道自己在Spring的容器中运行。这种无侵入的设计有以下好处：
+
+1. 应用程序组件既可以在Spring的IoC容器中运行，也可以自己编写代码自行组装配置；
+2. 测试的时候并不依赖Spring容器，可单独进行测试，大大提高了开发效率。
 
 ## Spring AOP
 
@@ -836,11 +846,11 @@ FilterType分为：
 
 ## @Bean
 
-用于修饰方法，按**类型**装配。一般与@Configuration搭配使用，在配置类中，使用@Bean标注的方法给容器中添加组件。默认以**方法名**作为beanName（必须是唯一的，否则会冲突），返回类型就是bean类型。
+用于修饰方法，按**类型**装配。一般与@Configuration搭配使用，在配置类中，使用@Bean标注的方法给容器中添加组件。默认以**方法名**作为beanName（必须是唯一的，否则会冲突），返回类型就是bean类型。Spring对`@Bean`方法只调用一次，因此返回的Bean仍然是**单例**。
 
 参数：给bean命名，无参则默认取方法名为beanName。
 
-参数为列表，则第一个是真名，其他参数是别名：
+参数为列表，则第一个是真名，其他参数是**别名**：
 
 ```java
 @Bean({"user", "user1", "user2"})			// 名字是user，有两个别名user1和user2
@@ -1110,19 +1120,40 @@ public class Myconfig {
 
 ## @Value
 
-修饰属性。唯一参数：字符串类型。
+修饰属性。给属性注入值。可用于成员属性，或者方法参数。
 
-1. @Value("abc")
+```java
+@Configuration
+@ComponentScan
+@PropertySource("app.properties") // 表示读取classpath的app.properties
+public class AppConfig {
+    @Value("${app.zone:Z}")  // 给属性注入
+    String zoneId;
+
+    @Bean
+    ZoneId createZoneId(@Value("${app.zone:Z}") String zoneId) {  // 给方法参数注入
+        return ZoneId.of(zoneId);
+    }
+}
+```
+
+唯一参数：字符串类型，有3种写法：
+
+1. `@Value("abc")`
 
    直接将字符串”abc“赋值给属性
 
-2. @Value("${oidd.passwd}")
+2. `@Value("${oidd.passwd}")`
 
    **${}**：占位符，取Properties文件中的对应值，或Environment对应值（java启动时-D参数配置）
 
-3. @Value("#{orderService3}")
+   ${oidd.passwd:default}：取Properties的oidd.passwd，取不到则给默认值default
+
+3. `@Value("#{orderService3}")`
 
    **#{}**：Spring表达式，找容器中名为orderService3的bean
+   
+   #{orderService3.host}：找orderService3的host属性
 
 ## @Resource
 
@@ -1842,8 +1873,7 @@ DefaultListableBeanFactory的类继承实现结构来看
 
 ## FactoryBean
 
-我们可以通过BeanPostPorcessor来干涉Spring创建Bean的过程，但是如果我们想一个
-Bean完完全全由我们来创造，也是可以的，比如通过FactoryBean 
+我们可以通过BeanPostPorcessor来干涉Spring创建Bean的过程，但是如果我们想一个Bean完完全全由我们来创造，也是可以的，比如通过FactoryBean 
 
 ```java
 @Component("userService")
