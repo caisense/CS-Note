@@ -41,7 +41,7 @@ DCL：数据控制语言，如GRANT、REVOKE、COMMIT、ROLLBACK
 
 # MySQL架构
 
-<img src="images/MySQL/640.png" alt="图片" style="zoom: 67%;" />
+<img src="images/MySQL/640-1.png" alt="图片" style="zoom: 80%;" />
 
 主要分三层：
 
@@ -69,7 +69,7 @@ DCL：数据控制语言，如GRANT、REVOKE、COMMIT、ROLLBACK
 
 6. 通过执行器调用**「存储引擎」**执行该查询计划，然后返回**执行结果**
 
-   <img src="https://mmbiz.qpic.cn/mmbiz_png/9dwzhvuGc8aP3ZujaVhV3NucRZQWuMRAd82LHexY0tlTDHzVsAAtVzHKGBR08yzt3OYGHOV8kZibu6K68b7vgOQ/640?wx_fmt=png&tp=webp&wxfrom=5&wx_lazy=1&wx_co=1" alt="图片" style="zoom: 50%;" />
+   <img src="D:\CS-Note\images\MySQL\640-2.webp" alt="图片" style="zoom: 50%;" />
 
 # 索引
 
@@ -77,7 +77,7 @@ DCL：数据控制语言，如GRANT、REVOKE、COMMIT、ROLLBACK
 
 ## 索引分类
 
-<img src="images/MySQL/640.png" alt="图片" style="zoom: 67%;" />
+<img src="D:\CS-Note\images\MySQL\640-1688491669277-10.png" alt="图片" style="zoom: 67%;" />
 
 从基本使用使用的角度来讲：
 
