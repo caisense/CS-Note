@@ -625,6 +625,10 @@ public static void main(String[] args)  {
 }
 ```
 
+写入的tempFile大概如下：
+
+<img src="images/Java高级/image-20230707104956407.png" alt="image-20230707104956407" style="zoom:80%;" />
+
 2.1、修改AreaLimitInfo类 的 serialVersionUID，574488211598856253L 改为 574488211598856258L，然后反序列化：
 
 ```java

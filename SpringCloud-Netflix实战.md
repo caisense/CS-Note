@@ -419,7 +419,7 @@ IRule：根据特定算法从服务列表中选取一个要访问的服务！
 1.  IRule
 2.  ILoadBalancer
 3.  AbstractLoadBalancer
-4. bstractLoadBalancerRule：这个抽象父类十分重要！核心
+4. AbstractLoadBalancerRule：这个抽象父类十分重要！核心
 5. RoundRobinRule
 
  

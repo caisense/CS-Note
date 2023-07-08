@@ -30,7 +30,7 @@ feign之前JAVA 项目中如何实现接口http调用？
 
 ## Q：为什么feign第一次调用耗时较长？
 
-ribbon是懒加载
+内置ribbon，是懒加载
 
 ## 设计架构
 
