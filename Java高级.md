@@ -1550,7 +1550,7 @@ SafePoint 可以插入到代码的某些位置，每个线程运行到 SafePoint
 
 # 日志
 
-## SLF4j
+## SLF4J
 
 Spring Boot默认用`SLF4J + Logback`来记录日志，并用`INFO`级别输出到控制台。
 
@@ -1629,10 +1629,64 @@ public class Query {
 
 ELK = Elasticsearch + Logstash  + Kibana
 
-Elasticsearch：分析和搜索引擎
+- Elasticsearch：分析和搜索引擎
 
-Logstash：服务端数据处理管道
+- Logstash：服务端数据处理管道，能够同时从多个来源采集、转换数据，然后将数据以**JSON格式**发送到诸如 Elasticsearch 等“存储库”中。
 
-Kibana：Elasticsearch数据可视化
+- Kibana：在Elasticsearch中对数据可视化
 
-由于Logstash重量级，可改用FileBeat收集日志
+> 由于Logstash重量级，可改用FileBeat收集日志。
+>
+> FileBeat：**轻量型日志采集器**，机器配置要求极低，可直接从日志读取发送给ES、Logstash、Kafka等。支持增量续传、异常重启断点续传。			
+
+### 自带完整的日志系统
+
+在k8s集群中容器化部署完整的日志系统 
+
+- Filebeat：以DaemonSet形式部署到每个节点，挂载两个宿主机目录（应用日志目录、K8S组件日志目录)  
+- Kafka：以StatefulSet形式部署，用于**缓存Filebeat采集的日志**  
+- Logstash：以Deployment形式部署，作为Kafka的消费者，Logstash以无状态运行，可以任意扩展实例数 
+- Elasticsearch：以StatefulSet形式部署，挂载localPV存储数据，节点可扩展 
+
+- 优点：独立部署，不依赖第三方日志系统
+- 缺点：每个K8S集群都部署一套ELK，资源消耗大 
+
+<img src="images/Java高级/image-20230712111000142.png" alt="image-20230712111000142" style="zoom: 50%;" />
+
+### 对接第三方日志系统 
+
+对接第三方ELK日志系统，K8S集群节点只需部署Filebeat 
+
+- Filebeat：以DaemonSet形式部署到每个节点，挂载两个宿主机目录（应用日志目录、K8S组件日志目录) 
+
+- 优点：多个K8S集群共用日志系统，K8S集群只需部署Filebeat，节省资源消耗
+- 缺点：依赖第三方日志系统  
+
+<img src="images/Java高级/image-20230711092711728.png" alt="image-20230711092711728" style="zoom: 50%;" />
+
+### E：ELK丢失日志
+
+经排查比对，确定是Kafka到Logstash丢失了数据。查看发现Kafka的一条消息里面有多行日志，之间用空格拼接（实际上是换行符）。Logstash配置为
+
+```yaml
+input{
+  #kafka输入源配置
+  kafka{
+    #kafka集群地址
+    bootstrap_servers => "kafka-01:9092,kafka-02:9092,kafka-03:9092"
+    #从kafka中哪个topic读取数据，这里的topic名要与filebeat中使用的topic保持一致
+    topics_pattern  => "elk-.*"
+    #logstash的消费线程，一般一个线程对应kafka中的一个partition（分区），同一组logstash的consumer_threads之和应该不大于一个topic的partition，超过了就是资源的浪费，一般的建议是相等。
+    consumer_threads => 5
+    decorate_events => true
+    #由于filebeat传输数据给kafka集群的时候，会附加很多tag，默认情况下，logstash就会将这串tag也认为是message的一部分。这样不利于后期的数据处理。所有需要添加codec处理。得到原本的message数据。
+    codec => "json"
+    auto_offset_reset => "latest"
+    group_id => "logstash1" #logstash 集群需相同
+  }
+}
+```
+
+第12行配置，Kafka的一条消息视为一个JSON，拿过来直接转，这样可能会截断换行符拼接后面的内容。因此需要改为`codec => line`，即一条消息按换行符分割读取。
+
+为什么Kafka不是一行日志一条消息呢？因为kafka的“是否聚合”选项，默认“是”，会将不同行日志聚合在一条消息。
