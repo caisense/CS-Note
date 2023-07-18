@@ -1484,6 +1484,8 @@ java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
 
 标注在方法或者类上，从而可以方便的实现方法的异步调用。调用者在调用异步方法时将立即返回，方法的实际执行将提交给指定的线程池中的线程执行。
 
+对应的线程池，默认的核心线程数是 8。
+
 编写Task组件：
 
 ```java
@@ -1753,9 +1755,21 @@ public class ServletInitializer extends SpringBootServletInitializer {
 
 
 
-## SpringBoot单体应用支持的最大并发？
+## Q：SpringBoot单体应用支持的最大并发？
 
-SpringBoot内置Tomcat，在默认设置中，Tomcat的最大线程数是200，**最大连接数（并发量）是10000**。
+在默认设置中，最大并发量是**200**。
+
+原因：最大并发实际上取决于**web容器**。SpringBoot并不是web容器，而是内置了Tomcat。Tomcat的线程池参数：核心线程数10，最大线程数是200，队列长度 Integer.MAX_VALUE。
+
+而 **Tomcat 线程池机制**和JDK不太一样，先使用核心线程数配置，再使用最大线程配置，最后才使用队列长度。因此假设1000个请求同时到来，核心线程直接用完，然后启用最大线程数200，最后再放队列，所以默认支持的最大并发是200。
+
+> JDK 线程池：先使用核心线程数配置，接着使用队列长度，最后再使用最大线程配置。
+
+扩展：如果修改tomcat配置，可以提升最大并发数。
+
+再扩展：如果使用其他web容器（springboot还支持Jetty、Netty、Undertow等）
+
+> 参考原文：[面试官：一个 SpringBoot 项目能处理多少请求？（小心有坑）](https://mp.weixin.qq.com/s/PXC4pFE_ZpydBAzCJZmiqQ)
 
 ## BeanDefinition 
 
