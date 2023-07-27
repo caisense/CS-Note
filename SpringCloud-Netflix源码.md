@@ -130,7 +130,7 @@ public LoadBalancerClient loadBalancerClient() {  // 向spring注册LoadBalancer
 }
 ```
 
-回到主线，所有的微服务调用都会由RibbonLoadBalancerClient#execute方法来进行处理。接下来应该关注这个LoadBalancerClient的execute方法了。
+回到主线，所有的微服务调用都会由RibbonLoadBalancerClient#execute方法来进行处理。
 
 
 ```java
@@ -183,7 +183,7 @@ protected ILoadBalancer getLoadBalancer(String serviceId) {
 }
 ```
 
-这个 `clientFactory` 就是 `SpringClientFactory` 类型的一个实例。SpringClientFactory是一个创建客户端，负载均衡器和客户端配置实例的一个工厂。为每个客户端名称（指的就是每个被调服务的服务名称）创建一个Spring ApplicationContext（就是Spring容器），然后从工厂中提取需要的Bean，当然也包括我们需要的负载均衡组件的Bean了
+这个 `clientFactory` 就是 `SpringClientFactory` 类型的一个实例。SpringClientFactory是创建客户端、负载均衡器和客户端配置实例的一个工厂。为每个客户端名称（指的就是**每个被调服务**的服务名称）创建一个Spring ApplicationContext（就是Spring容器），然后从工厂中提取需要的Bean，当然也包括我们需要的负载均衡组件的Bean了
 
 因此可以确定`ILoadBalancer`是从Spring工厂中获取的，那么是什么时候被放进去的？只能是自动配置，RibbonClientConfiguration
 
@@ -301,9 +301,13 @@ public synchronized void start(final UpdateAction updateAction) {
 }
 ```
 
-核心是14行updateAction.doUpdate();
+核心是14行updateAction.doUpdate();把主要逻辑封装到一个 `wrapperRunnable` 的线程里，然后通过一个 `scheduledFuture` 调度器定时执行，`initialDelayMs`是第一次执行的延迟，默认1s。`refreshIntervalMs`是后续的执行间隔时间，默认30s。
 
-把主要逻辑封装到一个 `wrapperRunnable` 的线程里，然后通过一个 `scheduledFuture` 调度器定时执行，`initialDelayMs`是第一次执行的延迟，默认1s。`refreshIntervalMs`是后续的执行间隔时间，默认30s
+doUpdate();  --> com.netflix.loadbalancer.ServerListUpdater.UpdateAction#doUpdate --> updateListOfServers() --> updateAllServerList() --> setServersList()
+
+setServersList中先调用父类BaseLoadBalancer的`setServersList(List lsrv)`，如果有多Zone（机房），则对每个机房再处理。
+
+BaseLoadBalancer维护一个allServerList，当`setServersList(List lsrv)`传入的服务列表与现有allServerList不一致时，触发监听器动作更新allServerList。对下线的Server（即LoadBalancer无法使用这个Server），移除HttpClient并关闭连接。
 
 ## Server 
 
@@ -361,3 +365,210 @@ public Server chooseServer(Object key) {
 ## ribbon处理流程图
 
 ![ribbon处理流程图](images/SpringCloud-Netflix源码/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0pvc2hfc2NvdHQ=,size_16,color_FFFFFF,t_70#pic_center-1690250585520-9.png)
+
+# 发起请求
+
+ribbon通过其内置的IRule组件，使用指定的负载均衡算法（默认轮询）从ILoadBalancer组件的server list中会拿到一个真正要发送请求的server地址，那么接下来，就会调用网络通信组件发起http请求了。
+
+通过拦截器，最终到org.springframework.cloud.netflix.ribbon.RibbonLoadBalancerClient#execute方法处理：
+
+```java
+@Override
+public <T> T execute(String serviceId, ServiceInstance serviceInstance,
+                     LoadBalancerRequest<T> request) throws IOException {
+    Server server = null;
+    if (serviceInstance instanceof RibbonServer) {
+        server = ((RibbonServer) serviceInstance).getServer();
+    }
+    if (server == null) {
+        throw new IllegalStateException("No instances available for " + serviceId);
+    }
+    RibbonLoadBalancerContext context = this.clientFactory.getLoadBalancerContext(serviceId);
+    RibbonStatsRecorder statsRecorder = new RibbonStatsRecorder(context, server);
+    try {
+        T returnVal = request.apply(serviceInstance);
+        statsRecorder.recordStats(returnVal);
+        return returnVal;
+    }
+    // catch IOException and rethrow so RestTemplate behaves correctly
+    catch (IOException ex) {
+        statsRecorder.recordStats(ex);
+        throw ex;
+    }
+    catch (Exception ex) {
+        statsRecorder.recordStats(ex);
+        ReflectionUtils.rethrowRuntimeException(ex);
+    }
+    return null;
+}
+```
+
+注意11行，其实就是首先根据`serviceId`拿到这个服务对应的spring容器，再从其对应的spring容器中获取一个ribbon负载均衡的上下文（RibbonLoadBalancerContext ）这个bean
+
+> 之前提到过，ribbon的设计理念，每个下游被调服务，对应一个spring容器（ApplicationContext）
+
+继续深入，到达org.springframework.cloud.context.named.NamedContextFactory#getContext
+
+```java
+protected AnnotationConfigApplicationContext getContext(String name) {
+    if (!this.contexts.containsKey(name)) {
+        synchronized (this.contexts) {
+            if (!this.contexts.containsKey(name)) {
+                this.contexts.put(name, createContext(name));
+            }
+        }
+    }
+    return this.contexts.get(name);
+}
+```
+
+contexts是一个Map<String, AnnotationConfigApplicationContext>，第9行从map中获取一个`AnnotationConfigApplicationContext`（spring容器），这个name就是服务名称。
+
+回到execute，14行是关键，调用了一个request的apply方法，直接拿到了返回值，所以这个apply方法应该就是入口了。
+
+request是`LoadBalancerRequest`类型入参，是一个lambda表达式（回调）：
+
+```java
+public LoadBalancerRequest<ClientHttpResponse> createRequest(
+    final HttpRequest request, final byte[] body,
+    final ClientHttpRequestExecution execution) {
+    return instance -> {
+        HttpRequest serviceRequest = new ServiceRequestWrapper(request, instance, this.loadBalancer);
+        if (this.transformers != null) {
+            for (LoadBalancerRequestTransformer transformer : this.transformers) {
+                serviceRequest = transformer.transformRequest(serviceRequest, instance);
+            }
+        }
+        return execution.execute(serviceRequest, body);
+    };
+}
+```
+
+也就是说，前面execute方法 的 request.apply(serviceInstance)最终调用到这个lambda，主要功能是重写获取URI的逻辑。因为11行会调用`ClientHttpRequestExecution`去发送http请求，这是spring原生的http网络组件，该组件里面一定会去调用`getURI()`拿到一个请求地址，因为最终发起请求直接用request的uri：
+
+```java
+// org.springframework.http.client.InterceptingClientHttpRequest.InterceptingRequestExecution#execute
+ClientHttpRequest delegate = requestFactory.createRequest(request.getURI(), method);
+```
+
+> 你传进来的是类似： http://springboot-project-2/test_1/zhangopop，spring组件拿到这个地址是没办法处理的，它需要是ip，主机和port端口号，类似这种：*http://localhost:10001/test_1/zhangopop*，所以就需要这个ServiceRequestWrapper 包装类，去包装原生的request，来重写getURI()方法，把服务名称，变成实际发送的ip和port
+
+底层调org.springframework.cloud.netflix.ribbon.RibbonLoadBalancerClient#reconstructURI重写：
+
+```java
+@Override
+public URI reconstructURI(ServiceInstance instance, URI original) {
+    Assert.notNull(instance, "instance can not be null");
+    String serviceId = instance.getServiceId();
+    RibbonLoadBalancerContext context = this.clientFactory.getLoadBalancerContext(serviceId);
+
+    URI uri;
+    Server server;
+    if (instance instanceof RibbonServer) {
+        RibbonServer ribbonServer = (RibbonServer) instance;
+        server = ribbonServer.getServer();
+        uri = updateToSecureConnectionIfNeeded(original, ribbonServer);
+    }
+    else {
+        server = new Server(instance.getScheme(), instance.getHost(), instance.getPort());
+        IClientConfig clientConfig = clientFactory.getClientConfig(serviceId);
+        ServerIntrospector serverIntrospector = serverIntrospector(serviceId);
+        uri = updateToSecureConnectionIfNeeded(original, clientConfig, serverIntrospector, server);
+    }
+    return context.reconstructURIWithServer(server, uri);
+}
+```
+
+第20行将服务名称替换为ip和port
+
+**总结：Lribbon底层发送http使用的是spring原生的网络组件ClientHttpRequestExecution，只不过对原生的request进行了封装ServiceRequestWrapper，重写了getURI()方法，主要是把http uri中的服务名称替换为实际的ip和port。**
+
+# Ribbon整合ZooKeeper
+
+## 使用
+
+与euraka基本一致，不同的是主启动类加@EnableDiscoveryClient，pom要加zk依赖，yml配置：
+
+```yaml
+spring:
+  cloud:
+    zookeeper:
+      connect-string: 172.16.140.10:2181	#zk地址
+```
+
+
+
+前面都是Ribbon和Eureka的整合源码，如果是整合zk，见org.springframework.cloud.zookeeper.discovery.ZookeeperServer，实现了Server接口，该接口是服务的抽象，用Eureka、ZK等具体的服务来实现。
+
+```java
+package com.netflix.loadbalancer;
+import com.netflix.util.Pair;
+
+public class Server {
+    public static interface MetaInfo {
+        public String getAppName();
+        public String getServerGroup();
+        public String getServiceIdForDiscovery();
+        public String getInstanceId();
+    }
+    public static final String UNKNOWN_ZONE = "UNKNOWN";
+    private String host;
+    private int port = 80;
+    private String scheme;
+    private volatile String id;
+    private volatile boolean isAliveFlag;
+    private String zone = UNKNOWN_ZONE;
+    private volatile boolean readyToServe = true;
+}
+```
+
+
+
+还有org.springframework.cloud.zookeeper.discovery.ZookeeperServerList实现了ServerList接口，该接口用于维护Service列表，由注释可知默认每30s更新一次（可配置）
+
+```java
+package com.netflix.loadbalancer;
+
+import java.util.List;
+
+/**
+ * Interface that defines the methods sed to obtain the List of Servers
+ * @author stonse
+ *
+ * @param <T>
+ */
+public interface ServerList<T extends Server> {
+    public List<T> getInitialListOfServers();
+    /**
+     * Return updated list of servers. This is called say every 30 secs
+     * (configurable) by the Loadbalancer's Ping cycle
+     * 
+     */
+    public List<T> getUpdatedListOfServers();   
+}
+```
+
+getUpdatedListOfServers在我们熟悉的DynamicServerListLoadBalancer的updateListOfServers方法中调用
+
+```java
+@VisibleForTesting
+public void updateListOfServers() {
+    List<T> servers = new ArrayList<T>();
+    if (serverListImpl != null) {
+        servers = serverListImpl.getUpdatedListOfServers();  // 调用
+        LOGGER.debug("List of Servers for {} obtained from Discovery client: {}",
+                     getIdentifier(), servers);
+
+        if (filter != null) {
+            servers = filter.getFilteredListOfServers(servers);
+            LOGGER.debug("Filtered List of Servers for {} obtained from Discovery client: {}",
+                         getIdentifier(), servers);
+        }
+    }
+    updateAllServerList(servers);
+}
+```
+
+
+
+# 二、Feign

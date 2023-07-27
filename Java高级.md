@@ -657,6 +657,122 @@ java.io.InvalidClassException: com.eshore.cmp.corp.dto.AreaLimitInfo; local clas
 
 2.2、将serialVersionUID还原为序列化时的值，才能正常反序列化
 
+# JUnit单元测试
+
+JUnit是事实上的单元测试的标准框架。JUnit能给出成功和失败的测试，还可以生成测试报告，统计测试的成功率、测试的**代码覆盖率**等。高质量的代码，测试覆盖率应该在**80%以上**。
+
+好处：确保单个方法按照正确预期运行；修改代码后，只需确保对应的单元测试通过。便于组织测试代码，并随时运行。
+
+规范：
+
+1. 单元测试代码本身必须非常简单，能一下看明白，决不能再为测试代码编写测试；
+2. 每个单元测试应当互相独立，不依赖运行的顺序；
+3. 测试时不但要覆盖常用测试用例，还要特别注意测试边界条件，例如输入为`0`，`null`，空字符串`""`等情况。
+
+## 使用
+
+在要测试的方法上加`@Test`注解，方法内部调用`assertEquals(1, Factorial.fact(1))`表示，期望`Factorial.fact(1)`返回`1`。
+
+```java
+public class FactorialTest {
+    @Test
+    void testFact() {
+        assertEquals(1, Factorial.fact(1));
+        assertEquals(2, Factorial.fact(2));
+        assertEquals(6, Factorial.fact(3));
+        assertEquals(3628800, Factorial.fact(10));
+        assertEquals(2432902008176640000L, Factorial.fact(20));
+    }
+}
+```
+
+`Assertion`定义了各种断言方法：
+
+- `assertEquals(expected, actual)`：**（常用）**判断actual是否与expected相等。
+
+- `assertTrue(condition)`: **（常用）**期待condition为`true`
+
+  有重载方法`assertTrue(boolean condition, String message)`：如果condition**不为true**，输出message
+
+- `assertFalse()`: 期待结果为`false`
+
+- `assertNotNull()`: 期待结果为非`null`
+
+- `assertArrayEquals()`: 期待结果为数组并与期望数组每个元素的值均相等
+
+
+
+## 使用Fixture
+
+JUnit提供了编写测试前准备、测试后清理的固定代码，我们称之为Fixture（JUnit5 推出）。
+
+1. @BeforeEach：用于表示应在**当前类中的每个`@Test`方法之前**执行注解方法。
+2. @AfterEach：用于表示应在**当前类中的每个`@Test`方法之后**执行注解方法。
+3. @BeforeAll：在所有`@Test`方法运行前，仅运行一次。
+4. @AfterAll：在所有`@Test`方法运行后，仅运行一次。
+
+> 因为`@BeforeAll`和`@AfterAll`在所有`@Test`方法运行前后仅运行一次，因此它们只能初始化静态变量。
+
+最佳实践：
+
+- 对于实例变量，在`@BeforeEach`中初始化，在`@AfterEach`中清理，它们在各个`@Test`方法中互不影响，因为是不同的实例；
+- 对于静态变量，在`@BeforeAll`中初始化，在`@AfterAll`中清理，它们在各个`@Test`方法中均是唯一实例，会影响各个`@Test`方法。
+
+### Q：这些注解的实现原理？
+
+只能是AOP，基于动态代理。因此到每次运行一个`@Test`方法前，JUnit首先创建一个`XxxTest`实例，所以每个`@Test`方法，内部的成员变量都是独立的，无法将成员变量的状态带到其他`@Test`方法。
+
+换句话说，每个`@Test`方法各自独立，互不影响，这也体现了“单元测试”的思想。
+
+
+
+## 异常测试
+
+除了正常的输入输出，有时要针对可能导致异常的情况进行测试。
+
+例如以下方法，如果为负数，则直接抛出`IllegalArgumentException`：
+
+```java
+public class Factorial {
+    public static long fact(long n) {
+        if (n < 0) {
+            throw new IllegalArgumentException();
+        }
+        long r = 1;
+        for (long i = 1; i <= n; i++) {
+            r = r * i;
+        }
+        return r;
+    }
+}
+```
+
+现在想对这种异常情况进行测试，使用`assertThrows()`来期望捕获一个指定的异常。第二个参数`Executable`封装了我们要执行的会产生异常的代码。执行`Factorial.fact(-1)`时，必定抛出`IllegalArgumentException`。`assertThrows()`在捕获到指定异常时表示通过测试，未捕获到异常，或者捕获到的异常类型不对，均表示测试失败：
+
+```java
+@Test
+void testNegative() {
+    // Executable用lambda简化
+    assertThrows(IllegalArgumentException.class, () -> {
+        Factorial.fact(-1);  
+    });
+}
+```
+
+
+
+## Spring单元测试
+
+Spring的JUnit单元测试并不一定需要启动容器。在Spring中可以使用两种不同类型的单元测试，需要根据具体测试需求来决定是否启动容器：
+
+1. 基础JUnit测试：这种测试不需要启动容器，可以直接测试组件类（如Service、Controller等）的逻辑。
+
+   > 可以使用@Test注解标记测试方法，并使用JUnit提供的断言方法（如assertEquals、assertTrue）进行测试。
+
+2. 带有Spring容器的JUnit测试：这种测试需要启动Spring容器，以便能够测试组件类与容器中其他组件的交互。
+
+   >  可以使用@RunWith(xxx.class)和@SpringBootTest注解标记测试类
+
 # JDBC
 
 ## 基本使用

@@ -2765,6 +2765,39 @@ public static void main(String[] args) {
 | 重用性 | CyclicBarrier是**可重用**的，其中的线程会等待所有的线程完成任务。届时，屏障将被拆除，并可以选择性地做一些特定的动作，可以重新使用。 | CountDownLatch是**一次性**的，不同的线程在同一个计数器上工作，直到计数器为0。此后CountDownLatch不能再使用 |
 | await  | 等待+CountDown                                               | 只有等待功能                                                 |
 
+## ReadWriteLock
+
+ReadWriteLock适合读多写少的场景，分两种：读锁和写锁。读锁只允许一个线程写入，写锁允许多个线程在**没有写入时同时读取**。
+
+```java
+public class Counter {
+    private final ReadWriteLock rwlock = new ReentrantReadWriteLock();
+    private final Lock rlock = rwlock.readLock();  // 获取读锁
+    private final Lock wlock = rwlock.writeLock();  // 获取写锁
+    private int[] counts = new int[10];
+
+    public void inc(int index) {
+        wlock.lock(); // 加写锁
+        try {
+            counts[index] += 1;
+        } finally {
+            wlock.unlock(); // 释放写锁
+        }
+    }
+
+    public int[] get() {
+        rlock.lock(); // 加读锁
+        try {
+            return Arrays.copyOf(counts, counts.length);
+        } finally {
+            rlock.unlock(); // 释放读锁
+        }
+    }
+}
+```
+
+
+
 ## FutureTask
 
 在介绍 Callable 时我们知道它可以有返回值，返回值通过 `Future<V>` 进行封装。FutureTask 实现了 RunnableFuture 接口，该接口继承自 Runnable 和 `Future<V>` 接口，这使得 FutureTask 既可以当做一个任务执行，也可以有返回值。
