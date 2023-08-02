@@ -1771,6 +1771,43 @@ public class ServletInitializer extends SpringBootServletInitializer {
 
 > 参考原文：[面试官：一个 SpringBoot 项目能处理多少请求？（小心有坑）](https://mp.weixin.qq.com/s/PXC4pFE_ZpydBAzCJZmiqQ)
 
+
+
+## Q：Spring Boot 配置优先级？
+
+优先级由高到低：
+
+1. 命令行参数
+2. 来自 java:comp/env 的 JNDI 属性
+3. Java 系统属性（System.getProperties()）
+4. 操作系统环境变量
+5. RandomValuePropertySource 配置的 random.* 属性值
+6. 配置文件（YAML文件、Properties 文件）
+7. @Configuration 注解类上的 @PropertySource 指定的配置文件
+8. 通过SpringApplication.setDefaultProperties 指定的默认属性
+
+### 配置文件优先级
+
+Spring Boot 启动时，会自动加载 **JAR 包内部及 JAR 包所在目录**指定位置的配置文件（Properties 文件、YAML 文件），下图中展示了 Spring Boot 自动加载的配置文件的位置及其加载顺序
+
+> 说明：
+>
+> /myBoot：表示 JAR 包所在目录，目录名称自定义；
+>
+> /childDir：表示 JAR 包所在目录下 config目录的子目录，目录名自定义；
+>
+> JAR：表示 Spring Boot 项目打包生成的 JAR；
+>
+> 数字：越小优先级越高
+
+可以看到，同一位置下，Properties 文件优先级高于 YAML 文件。不同目录下，子目录的文件优先级高于父目录。
+
+![在这里插入图片描述](images/Spring常见问题/57cd461dbe9843408323b690caf6977e.png)
+
+
+
+
+
 ## BeanDefinition 
 
 表示Bean定义，BeanDefinition中存在很多属性用来描述一个Bean的特点。比如：

@@ -1409,7 +1409,6 @@ List<String> strings = Arrays.asList("Hollis", "HollisChuang", "hollis", "Hello"
 Stream<String> stream = strings.stream();
 // 静态方法
 Stream<String> stream = Stream.of("Hollis", "HollisChuang", "hollis", "Hello", "HelloWorld", "Hollis");
-
 ```
 
 ## 2.中间操作
@@ -1465,7 +1464,13 @@ List<Record> NewRecords = Records.stream()
     .collect(Collectors.toList());
 ```
 
+### Q：Stream的中间操作的执行方式？
 
+例如中间操作是filter加map，那么对Stream中所有元素，是全部先filter再map，还是每个元素filter加map？
+
+答案是后者，在中间操作加打印即可看到。
+
+总结：Stream还是很智能的，不会有几个中间操作就增加几次循环，而是只有**一轮循环**，每次完成一个元素的所有中间操作。
 
 ## 3.最终操作
 

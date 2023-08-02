@@ -4,13 +4,13 @@
 
 流程：
 
-![image-20221201010853186](D:/笔记/CS-Note/images/Spring常见问题/image-20221201010853186.png)
+![image-20221201010853186](images/Spring常见问题/image-20221201010853186.png)
 
 ## 1.生成BeanDefinition  
 
    扫描流程
 
-   ![Spring扫描底层流程](D:/笔记/CS-Note/images/Spring常见问题/Spring扫描底层流程.png)
+   ![Spring扫描底层流程](images/Spring常见问题/Spring扫描底层流程.png)
 
 实现：org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#scanCandidateComponents
 
