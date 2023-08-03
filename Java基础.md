@@ -292,7 +292,7 @@ public static void main(String[] args) {
 
 类型的转换关系如下：
 
-![92a2d60aba1ca69c33ec051a89941c1a](./images/Java基础/92a2d60aba1ca69c33ec051a89941c1a.png)
+![92a2d60aba1ca69c33ec051a89941c1a](images/Java基础/92a2d60aba1ca69c33ec051a89941c1a.png)
 
 - 自动类型转换(隐式类型转换)：从小类型到大类型可以**自动完成**。
 - 强制转换：从大类型到小类型需要加括号，但这样转换有可能会造成**精度损失或溢出**。
@@ -988,7 +988,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 内部包含一个Entry类型数组，Entry 存储着键值对，包含四个字段，next字段表示 Entry 是一个链表。即数组中的每个位置被当成一个**桶**，一个桶存放一个链表。HashMap 使用拉链法来解决冲突，同一个链表中存放**hashCode 和 桶大小 取模运算结果**相同的 Entry。
 
-<img src="images\Java基础\image-20191208234948205.png" alt="img" style="zoom:50%;" />
+<img src="images/Java基础/image-20191208234948205.png" alt="img" style="zoom:50%;" />
 
 ### 3.2 put方法(1.7与1.8变化)
 
@@ -1000,7 +1000,7 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
     **1.8中对hashCode计算还做了改进**
 
-    <img src="images\Java基础\45205ec2.png" alt="img" style="zoom:50%;" />
+    <img src="images/Java基础/45205ec2.png" alt="img" style="zoom:50%;" />
 
     优化了高位运算的算法：hash**无符号右移**16位后与自身异或，目的是当桶长度较小时，也能保证高低位的bit都参与到hash计算中，同时不会有太大开销。
 
@@ -1083,7 +1083,7 @@ jdk1.7：由于ReHash，可能导致原来在一个桶的结点分散到不同�
 
 jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，或链表进化为红黑树
 
-<img src="images\Java基础\image-20220322102957906.png" alt="image-20220322102957906" style="zoom:50%;" />
+<img src="images/Java基础/image-20220322102957906.png" alt="image-20220322102957906" style="zoom:50%;" />
 
 ### hashMap线程不安全分析
 
@@ -1142,7 +1142,7 @@ hashmap允许null值会产生**二义性问题**：get(key)返回null，表示ke
 
 ## 4.ConcurrentHashMap
 
-<img src="images\Java基础\image-20191209001038024.png" alt="image-20191209001038024" style="zoom:50%;" />
+<img src="images/Java基础/image-20191209001038024.png" alt="image-20191209001038024" style="zoom:50%;" />
 
 和 HashMap 实现上类似，主要差别是 ConcurrentHashMap 使用**两级数组**：
 
@@ -2648,7 +2648,7 @@ public class HttpExceptionHandler {
 
 是一种常用的设计模式，其目的就是为其他对象提供一个代理以控制对某个对象的访问。代理类负责为委托类**预处理**、**后处理**等增强操作。
 
-<img src="images\Java基础\Center.png" alt="img" style="zoom:50%;" />
+<img src="images/Java基础/Center.png" alt="img" style="zoom:50%;" />
 
 ## 动态代理
 
@@ -2917,7 +2917,7 @@ public static void main() {
 }
 ```
 
-拷贝得到的List<T>实际上泛型还是String，getClass()获取类型就会报转换出错，编译器认为取出的元素类型应该是Integer，如16行；也不能比较，如20行，因为比较也涉及获取类型。
+拷贝得到的`List<T>`实际上泛型还是String，getClass()获取类型就会报转换出错，编译器认为取出的元素类型应该是Integer，如16行；也不能比较，如20行，因为比较也涉及获取类型。
 
 取出元素用Integer接收将运行时报错，而用String接收会直接编译报错，如19行
 
@@ -2943,11 +2943,11 @@ public static void main(String[] args) {
 
 浅拷贝：对基本数据类型进行值传递，对引用数据类型进行引用传递般的拷贝
 
-![使用各类BeanUtils的时候，切记注意这个坑！_浅拷贝](images/Java基础/resize,m_fixed,w_1184.webp)
+![使用各类BeanUtils的时候，切记注意这个坑！_浅拷贝](images/Java基础/w_1184.webp)
 
 深拷贝：对基本数据类型进行值传递，对引用数据类型，创建一个新的对象，并复制其内容
 
-![使用各类BeanUtils的时候，切记注意这个坑！_浅拷贝_02](images/Java基础/resize,m_fixed,w_1184-1683770132138-7.webp)
+![使用各类BeanUtils的时候，切记注意这个坑！_浅拷贝_02](images/Java基础/w_1184-1683770132138-7.webp)
 
 常用的Spring中BeanUtils的copyProperties是浅拷贝。
 
