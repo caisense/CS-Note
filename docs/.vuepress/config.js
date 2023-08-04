@@ -1,10 +1,13 @@
 module.exports = {
     title: '个人主页',
     description: 'CZT的博客',
-    base: '/gh-pages/',
+    base: '/CS-Note/',
     markdown: {
         lineNumbers: true // 代码显示行号
     },
+    // 如果不想将文档的小标题移到右侧，请去掉plugins中的vuepress-theme-vdoing，注释掉theme: "vdoing",
+    plugins: ["demo-container"],
+
     lastUpdated: 'Last Updated', // string | boolean
     themeConfig: {
         nav: [
@@ -24,7 +27,7 @@ module.exports = {
                     {text: '存储', link: '/存储'}
                 ]
             }
-        ]
+        ],
         // sidebar: {
         //     '/Java/': [{
         //         title: 'Java',
@@ -36,6 +39,14 @@ module.exports = {
         //     }]
         //
         // }
-
+        logo: "https://vuejs.org/images/logo.png",
+        // 最近更新栏
+        updateBar: {
+            showToArticle: false, // 显示到文章页底部，默认true
+        },
+        sidebar: "structuring",
+        category: false,
+        tag: false,
+        archive: false,
     }
 }
