@@ -2421,7 +2421,7 @@ public boolean backtrack(char[][] board, String word, int row, int column, int d
         }
     }
     visited[row][column] = true;
-    int[][] directions = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+    //int[][] directions = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
     boolean exist = false;
     for (int i = 0; i < 4; i ++) {
         int nextRow = row + directions[i][0];
