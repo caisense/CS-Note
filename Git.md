@@ -47,6 +47,16 @@ Changes to be committed:
 
 再通过`git commit`就可以一次性把暂存区的所有修改提交到分支
 
+## Q：工作区文件不想放入暂存区，如何丢弃？
+
+```bash
+git checkout -- .
+# 等价于
+git restore .
+```
+
+
+
 # 拉取
 
 ```bash
