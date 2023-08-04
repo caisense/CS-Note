@@ -5,7 +5,12 @@ set -e
 
 # 生成静态文件
 npm run docs:build
+# 复制所有md和图片
+find . -maxdepth 1 -type f -name "*.md" | cat -n | while read n f; do
+    cp "$f" docs
+done
 
+cp -r images docs
 # 进入生成的文件夹
 cd docs/.vuepress/dist
 
