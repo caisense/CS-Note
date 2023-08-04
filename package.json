@@ -1,0 +1,13 @@
+{
+  "devDependencies": {
+    "vuepress": "^1.9.9"
+  },
+  "scripts": {
+    "docs:dev": "vuepress dev docs --temp .temp",
+    "docs:build": "vuepress build docs"
+  },
+  "dependencies": {
+    "async-validator": "^1.11.5",
+    "core-js": "^2.6.12"
+  }
+}
