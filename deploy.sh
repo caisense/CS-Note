@@ -3,6 +3,7 @@
 # 确保脚本抛出遇到的错误
 set -e
 
+cp config.js docs/.vuepress
 # 生成静态文件
 npm run docs:build
 # 复制所有md和图片
