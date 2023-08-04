@@ -1881,7 +1881,7 @@ count是锁计数器。线程执行monitorenter指令时（即线程成为owner�
 
 对象存放在jvm的堆中，大致分为三部分：对象头、对象实例和对齐填充
 
-<img src="https://img2018.cnblogs.com/blog/1090126/201812/1090126-20181203193441990-1729189612.png" alt="img" style="zoom:50%;" />
+![img](images/Java并发/1090126-20181203193441990-1729189612.png)
 
 1. 对象头：由MarkWord和KlassPoint（类型指针）组成。
 
