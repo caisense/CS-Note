@@ -1,11 +1,11 @@
 module.exports = {
-    title: '计算机',
-    description: 'CZT的博客',
+    title: '计算机面试笔记',
+    description: 'CZT的面试笔记',
     base: '/CS-Note/',
     markdown: {
         lineNumbers: true // 代码显示行号
     },
-    sidebar: true,
+    sidebar: 'auto',
     plugins: ["demo-container"],
 
     lastUpdated: 'Last Updated', // string | boolean
