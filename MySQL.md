@@ -176,7 +176,7 @@ TIMESTAMP类型有专有的自动更新特性
 
 6. 通过执行器调用**「存储引擎」**执行该查询计划，然后返回**执行结果**
 
-   <img src="D:\CS-Note\images\MySQL\640-2.webp" alt="图片" style="zoom: 50%;" />
+   <img src="images\MySQL\640-2.webp" alt="图片" style="zoom: 50%;" />
 
 # 索引
 
@@ -184,7 +184,7 @@ TIMESTAMP类型有专有的自动更新特性
 
 ## 索引分类
 
-<img src="D:\CS-Note\images\MySQL\640-1688491669277-10.png" alt="图片" style="zoom: 67%;" />
+<img src="images\MySQL\640-1688491669277-10.png" alt="图片" style="zoom: 67%;" />
 
 从基本使用使用的角度来讲：
 
@@ -504,7 +504,7 @@ Index Condition Pushdown (ICP)，MySQL5.6 添加的功能，用于优化数据�
 
 　　（2）name为KEY，普通索引，叶子节点存储PK值，即id；
 
-![img](images\MySQL\885859-20190729184808306-758660222.png)
+<img src="images\MySQL\885859-20190729184808306-758660222.png" alt="img" />
 
 执行如下语句时
 
@@ -518,7 +518,7 @@ select * from  t  where name = 'lisi';　
 
 （2）在通过聚集索引定位到行记录；
 
-![img](images\MySQL\885859-20190729184911699-676257427.png)
+<img src="images\MySQL\885859-20190729184911699-676257427.png" alt="img" />
 
 **如何避免回表**
 

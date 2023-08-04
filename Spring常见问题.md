@@ -550,7 +550,7 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 - **传统的开发方式** ：往往是在类 A 中手动通过 new 关键字来 new 一个 B 的对象出来
 - **使用 IoC 思想的开发方式** ：不通过 new 关键字来创建对象，而是通过 IoC 容器(Spring 框架) 来帮助我们实例化对象。我们需要哪个对象，直接从 IoC 容器里取即可。
 
-![图片](images/Spring常见问题/640.png)
+<img src="images/Spring常见问题/fasdibsk223.png" alt="图片" />
 
 ### IoC 和 DI 
 
@@ -575,7 +575,7 @@ Aspect-Oriented Programming（面向切面编程）能够将那些与业务无�
 
 Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某个接口，那么 Spring AOP 会使用 **JDK Proxy**，去创建代理对象，而对于没有实现接口的对象，就无法使用 JDK Proxy 去进行代理了，这时候 Spring AOP 会使用 **Cglib** 生成一个被代理对象的子类来作为代理，如下图所示：
 
-![SpringAOPProcess](images/Spring常见问题/926dfc549b06d280a37397f9fd49bf9d.jpg)
+<img src="images/Spring常见问题/926dfc549b06d280a37397f9fd49bf9d.jpg" alt="SpringAOPProcess" />
 
 ### Spring AOP创建时机？
 
@@ -613,7 +613,7 @@ EarlySingletonObjecs 完成实例化但没有初始化的 提前曝光的单例�
 
 SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级缓存）
 
-![image-20220311095851373-16469639344001](images/Spring常见问题/image-20220311095851373-16469639344001.png)
+<img src="images/Spring常见问题/image-20220311095851373-16469639344001.png" alt="image-20220311095851373-16469639344001" />
 
 
 
@@ -1802,7 +1802,7 @@ Spring Boot 启动时，会自动加载 **JAR 包内部及 JAR 包所在目录**
 
 可以看到，同一位置下，Properties 文件优先级高于 YAML 文件。不同目录下，子目录的文件优先级高于父目录。
 
-![在这里插入图片描述](images/Spring常见问题/57cd461dbe9843408323b690caf6977e.png)
+<img src="images/Spring常见问题/57cd461dbe9843408323b690caf6977e.png" alt="在这里插入图片描述" />
 
 
 
@@ -1918,7 +1918,7 @@ System.out.println(beanFactory.getBean("userService"));
 DefaultListableBeanFactory是非常强大的，支持很多功能，可以通过查看
 DefaultListableBeanFactory的类继承实现结构来看
 
-![微信截图_20221018112456](images/Spring常见问题/微信截图_20221018112456.png)
+<img src="images/Spring常见问题/微信截图_20221018112456.png" alt="微信截图_20221018112456" />
 
 
 
