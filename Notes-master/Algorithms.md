@@ -2421,7 +2421,7 @@ public boolean backtrack(char[][] board, String word, int row, int column, int d
         }
     }
     visited[row][column] = true;
-    //int[][] directions = {{0, 1}, {0, -1}, {1, 0}, {-1, 0}};
+    int[][] directions = { {0, 1}, {0, -1}, {1, 0}, {-1, 0} };
     boolean exist = false;
     for (int i = 0; i < 4; i ++) {
         int nextRow = row + directions[i][0];
@@ -3138,7 +3138,7 @@ public boolean backtrack(char[][] board, boolean[][] visited, String word, int r
     if (board[row][column] != word.charAt(index)) return false;
     if (index == word.length() - 1) return true;
     visited[row][column] = true;
-    int[][] directions = new int[][]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+    int[][] directions = new int[][]{ {1, 0}, {0, 1}, {-1, 0}, {0, -1} };
     boolean exist = false;
     for (int i = 0; i < 4; i ++) {
         int nextRow = row + directions[i][0];
@@ -3174,7 +3174,7 @@ public void backtrack(int m, int n, int k, boolean[][] visited, int row, int col
     if (sum(row, column) > k) return;
     res ++;
     visited[row][column] = true;
-    int[][] directions = new int[][]{{1, 0}, {0, 1}, {-1, 0}, {0, -1}};
+    int[][] directions = new int[][]{ {1, 0}, {0, 1}, {-1, 0}, {0, -1} };
     for (int i = 0; i < 4; i ++) {
         int nextRow = row + directions[i][0];
         int nextColumn = column + directions[i][1];
