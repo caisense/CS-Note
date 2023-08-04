@@ -100,7 +100,7 @@ eureka:
 
 eureka界面：
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-16473303533721.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-16473303533721.png" alt="未命名图片" />
 
 System Status：系统信息
 DS Replicas：服务器副本（集群）
@@ -146,7 +146,7 @@ public class DeptProvider_8001 {
 
 配置完成后启动8001，访问7001的eureka界面就能看到该服务
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-16473305920512-16473305939483.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-16473305920512-16473305939483.png" alt="未命名图片" />
 
  
 
@@ -154,7 +154,7 @@ public class DeptProvider_8001 {
 
 主机名称：服务名称修改
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-16473306170794-16473306198685.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-16473306170794-16473306198685.png" alt="未命名图片" />
 
 在8001的yaml中修改一下配置
 
@@ -200,7 +200,7 @@ info:
 
 点击xxx/actuator/info就能看到服务info
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733073006210-164733073264611.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733073006210-164733073264611.png" alt="未命名图片" />
 
 # 五、服务发现 ：Discovery
 
@@ -241,7 +241,7 @@ public Object discovery() {
 
 后台输出微服务的信息：
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733080392814-164733080522415.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733080392814-164733080522415.png" alt="未命名图片" />
 
 # 集群配置
 
@@ -249,7 +249,7 @@ public Object discovery() {
 
 结构：每个eureka各自分别注册到另外两个eureka
 
-![](images\SpringCloud-Netflix实战\未命名图片-164733084448216-164733084559617.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733084448216-164733084559617.png" />
 
 例如eureka-7001的yml：
 
@@ -338,7 +338,7 @@ public class ConfigBean {
 
 服务名即eureka界面中的Application，此处为**SPRINGCLOUD-PROVIDER-DEPT**（不区分大小写）
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733093842218-164733094003519.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733093842218-164733094003519.png" alt="未命名图片" />
 
 ```java
 @RestController
@@ -373,7 +373,7 @@ public class DeptConsumerController {
 
 ## 1、新建两个服务端项目8002、8003，分别连接不同数据库db02和db03（查询时用db_source字段区分来源)：
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733096454920-164733096562721.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733096454920-164733096562721.png" alt="未命名图片" />
 
 ## 2、修改8002/8003各自的YML文件 
 
@@ -446,7 +446,7 @@ public class DeptConsumer_80 {
 
 ## 2、在主启动类上一级新建包com.kuang.myrule，存放自定义规则类
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733113428522-164733113625923.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733113428522-164733113625923.png" alt="未命名图片" />
 
 ## 3、新建自定义规则类CssRule
 
@@ -602,7 +602,7 @@ Feign通过接口的方法调用Rest服务，更有面向对象的意思 ( 之�
 
 ## 2、修改yml：eureka实例的id
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733144436024-164733144581725.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733144436024-164733144581725.png" alt="未命名图片" />
 
 ## 3、修改控制器
 
@@ -642,7 +642,7 @@ public class DeptController {
 
 当访问http://localhost/consumer/dept/get/8，查询数据库不存在的记录时，原本应该报错，添加了服务熔断后进入自定义的错误处理函数
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733146700426-164733146923827.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733146700426-164733146923827.png" alt="未命名图片" />
 
 # 服务降级（客户端实现）：
 
@@ -712,7 +712,7 @@ feign:
 
  
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733156361628-164733156574229.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733156361628-164733156574229.png" alt="未命名图片" />
 
 7. 访问http://localhost/consumer/dept/list，
 
@@ -765,7 +765,7 @@ server:
 
 ## 5、启动dashboard项目，访问http://localhost:9001/hystrix
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733169680630-164733169880031.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733169680630-164733169880031.png" alt="未命名图片" />
 
 ## 测试
 
@@ -793,7 +793,7 @@ server:
 
 6. 多次刷新 http://localhost:8001/dept/get/1 观察监控页面变化
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733177793832-164733178014933.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733177793832-164733178014933.png" alt="未命名图片" />
 
 
 
@@ -865,7 +865,7 @@ zuul:
 
 访问eureka ：http://localhost:7001/
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733189513334-164733189651835.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733189513334-164733189651835.png" alt="未命名图片" />
 
 服务和路由都已注册上
 
@@ -946,7 +946,7 @@ Spring cloud config分为服务端和客户端
 
 用处：集中管理配置文件。运行期间动态调整配置，服务会向配置中心统一拉取配置
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733199273036-164733199415337.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733199273036-164733199415337.png" alt="未命名图片" />
 
 # 创建springcloud-config-server-3344
 
@@ -1017,7 +1017,7 @@ HTTP服务具有以下格式的资源：
 
 访问http://localhost:3344/application-dev.yml
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733212629838-164733212763839.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733212629838-164733212763839.png" alt="未命名图片" />
 
 说明config-server成功读取git上的配置
 
@@ -1091,7 +1091,7 @@ public class ConfigClientController {
 
 访问http://localhost:8202/config
 
-![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733219004540-164733219120141.png)
+<img src="images\SpringCloud-Netflix实战\未命名图片-164733219004540-164733219120141.png" alt="未命名图片" />
 
 # eureka项目使用远端配置
 
@@ -1125,7 +1125,7 @@ spring:
 
 访问http://localhost:7001/，进入eureka界面
 
- ![未命名图片](images\SpringCloud-Netflix实战\未命名图片-164733223150542-164733223268343.png)
+ <img src="images\SpringCloud-Netflix实战\未命名图片-164733223150542-164733223268343.png" alt="未命名图片" />
 
 配置成功！
 

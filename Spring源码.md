@@ -4,13 +4,13 @@
 
 流程：
 
-![image-20221201010853186](images/Spring常见问题/image-20221201010853186.png)
+<img src="images/Spring常见问题/image-20221201010853186.png" alt="image-20221201010853186" />
 
 ## 1.生成BeanDefinition  
 
    扫描流程
 
-   ![Spring扫描底层流程](images/Spring常见问题/Spring扫描底层流程.png)
+   <img src="images/Spring常见问题/Spring扫描底层流程.png" alt="Spring扫描底层流程" />
 
 实现：org.springframework.context.annotation.ClassPathScanningCandidateComponentProvider#scanCandidateComponents
 
@@ -781,11 +781,11 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 
 **流程图**
 
-![img](images/spring源码/17395320ad095cfbtplv-t2oaga2asx-zoom-in-crop-mark3024000.webp)
+<img src="images/spring源码/17395320ad095cfbtplv-t2oaga2asx-zoom-in-crop-mark3024000.webp" alt="img" />
 
 `You` and `Me` 的例子在注解注入造成循环依赖时，Spring的调用链时序图如下：
 
-![img](images/spring源码/656873-20190628213759517-954779861.png)
+<img src="images/spring源码/656873-20190628213759517-954779861.png" alt="img" />
 
 
 
@@ -902,7 +902,7 @@ spring实例化一个bean时，默认使用**默认构造方法**（未显式定
 
 实例化时（org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBeanInstance），调determineConstructorsFromBeanPostProcessors()找所有候选的构造方法，思路见下图：
 
-![image-20230221165332634](images/spring源码/image-20230221165332634.png)
+<img src="images/spring源码/image-20230221165332634.png" alt="image-20230221165332634" />
 
 候选的构造方法为null，则直接使用无参构造。否则调
 
@@ -910,9 +910,9 @@ spring实例化一个bean时，默认使用**默认构造方法**（未显式定
 
 
 
-![image-20230222090947075](images/spring源码/image-20230222090947075.png)
+<img src="images/spring源码/image-20230222090947075.png" alt="image-20230222090947075" />
 
-![image-20230222091016515](images/spring源码/image-20230222091016515.png)
+<img src="images/spring源码/image-20230222091016515.png" alt="image-20230222091016515" />
 
 
 

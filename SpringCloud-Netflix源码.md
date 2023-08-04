@@ -154,7 +154,7 @@ public <T> T execute(String serviceId, LoadBalancerRequest<T> request) throws IO
 
 ## 启动流程图
 
-![ribbon大体运行流程](images/SpringCloud-Netflix源码/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0pvc2hfc2NvdHQ=,size_16,color_FFFFFF,t_70#pic_center-1690269506679-11.png)
+<img src="images/SpringCloud-Netflix源码/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0pvc2hfc2NvdHQ=,size_16,color_FFFFFF,t_70#pic_center-1690269506679-11.png" alt="ribbon大体运行流程" />
 
 # Ribbon与Eureka整合
 
@@ -364,7 +364,7 @@ public Server chooseServer(Object key) {
 
 ## ribbon处理流程图
 
-![ribbon处理流程图](images/SpringCloud-Netflix源码/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0pvc2hfc2NvdHQ=,size_16,color_FFFFFF,t_70#pic_center-1690250585520-9.png)
+<img src="images/SpringCloud-Netflix源码/watermark,type_ZmFuZ3poZW5naGVpdGk,shadow_10,text_aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L0pvc2hfc2NvdHQ=,size_16,color_FFFFFF,t_70#pic_center-1690250585520-9.png" alt="ribbon处理流程图" />
 
 # 发起请求
 
