@@ -1881,7 +1881,7 @@ count是锁计数器。线程执行monitorenter指令时（即线程成为owner�
 
 对象存放在jvm的堆中，大致分为三部分：对象头、对象实例和对齐填充
 
-![img](images/Java并发/1090126-20181203193441990-1729189612.png)
+<img src="images/Java并发/1090126-20181203193441990-1729189612.png" alt="img" />
 
 1. 对象头：由MarkWord和KlassPoint（类型指针）组成。
 
@@ -1910,7 +1910,7 @@ count是锁计数器。线程执行monitorenter指令时（即线程成为owner�
 
 Synchronized不论是修饰方法还是代码块，都是通过持有修饰对象的锁来实现同步，原因就是Synchronized锁存在锁对象的对象头的**MarkWord**中，如下图（64位系统）
 
-![20180322153316377](images\Java并发\20180322153316377.jpg)
+<img src="images\Java并发\20180322153316377.jpg" alt="20180322153316377" />
 
 **可重入性**
 
@@ -1972,7 +1972,7 @@ Synchronized不论是修饰方法还是代码块，都是通过持有修饰对�
 1. 首先就会调用 CAS 进行一次抢锁，如果这个时候恰巧锁没有被占用，直接拿到锁。
 2. 非公平锁在 CAS 失败后，和公平锁一样都会进入到 tryAcquire 方法，在 tryAcquire 方法中，如果发现锁这个时候被释放了（state == 0），非公平锁会直接 CAS 抢锁。但是公平锁会判断等待队列是否有线程处于等待状态，如果有则不去抢锁，乖乖排到后面。
 
-![图片](images/Java并发/640-1686638892798-6.png)
+<img src="images/Java并发/640-1686638892798-6.png" alt="图片" />
 
 源码
 
@@ -1986,7 +1986,7 @@ ReentrantLock里面有一个内部类Sync，Sync继承AQS，添加锁和释放�
 
 唯一的区别就在于公平锁在获取同步状态时多了一个限制条件：hasQueuedPredecessors()。该方法主要做一件事情：主要是判断当前线程是否位于同步队列中的第一个。如果是则返回true，否则返回false。
 
-![img](images\Java并发\bd0036bb.png)
+<img src="images\Java并发\bd0036bb.png" alt="img" />
 
 
 
@@ -2039,7 +2039,7 @@ public class Widget {
 
 ReentrantReadWriteLock的部分源码
 
-![img](images\Java并发\762a042b.png)
+<img src="images\Java并发\762a042b.png" alt="img" />
 
 ReentrantReadWriteLock有两把锁：ReadLock和WriteLock，由词知意，一个读锁一个写锁，合称“读写锁”。再进一步观察可以发现ReadLock和WriteLock是靠内部类Sync实现的锁。Sync是AQS的一个子类，这种结构在CountDownLatch、ReentrantLock、Semaphore里面也都存在。
 
@@ -2049,7 +2049,7 @@ ReentrantReadWriteLock有两把锁：ReadLock和WriteLock，由词知意，一�
 
 在独享锁中这个值通常是0或者1（如果是重入锁的话state值就是重入的次数），在共享锁中state就是持有锁的数量。但是在ReentrantReadWriteLock中有读、写两把锁，所以需要在一个整型变量state上分别描述读锁和写锁的数量（或者也可以叫状态）。于是将state变量“按位切割”切分成了两个部分，高16位表示读锁状态（读锁个数），低16位表示写锁状态（写锁个数）。如下图所示：
 
-![img](images\Java并发\8793e00a.png)
+<img src="images\Java并发\8793e00a.png" alt="img" />
 
 再回头看一下互斥锁ReentrantLock中公平锁和非公平锁，它们添加的都是独享锁。根据源码所示，当某一个线程调用lock方法获取锁时，如果同步资源没有被其他线程锁住，那么当前线程在使用CAS更新state成功后就会成功抢占该资源。而如果公共资源被占用且不是被当前线程占用，那么就会加锁失败。所以可以确定ReentrantLock无论读操作还是写操作，添加的锁都是都是独享锁。
 
@@ -2146,7 +2146,7 @@ public static String concatString(String s1, String s2, String s3) {
 
 4. 自旋超过10次（或者自旋线程数超过CPU核数的一半），或自旋期间又来一个竞争线程，升级为重量级锁，向操作系统申请资源（linux mutex，互斥量），修改markword为指向互斥量的指针
 
-![img](images/Java并发/640-1686158504599-16.png)
+<img src="images/Java并发/640-1686158504599-16.png" alt="img" />
 
 
 
@@ -2189,13 +2189,13 @@ public static String concatString(String s1, String s2, String s3) {
    > - `displaced mark word`（置换标记字）：存放锁对象当前的`mark word`的拷贝
    > - `owner`指针：指向当前的锁对象的指针，在拷贝`mark word`阶段暂时不会处理它
    >
-   > ![图片](images/Java并发/640-1686502171338-8.png)
+   > <img src="images/Java并发/640-1686502171338-8.png" alt="图片" />
 
 2. 使用 CAS 操作将对象的 Mark Word 更新为指向 Lock Record 的指针，并将Lock Record里的owner指针指向对象的Mark Word。
 
 如果 **CAS 成功**，线程获得该对象上的锁，将对象的 Mark Word 的锁标记变为 00，表示该对象锁**升级为轻量级锁**。
 
-![图片](images/Java并发/640-1686501984470-6.png)
+<img src="images/Java并发/640-1686501984470-6.png" alt="图片" />
 
 如果 CAS 失败，jvm首先会检查对象的 Mark Word 是否指向当前线程的虚拟机栈：
 
@@ -2226,7 +2226,7 @@ synchronized (user){
 - 首次分配的`lock record`，`displaced mark word`复制了锁对象的`mark word`，`owner`指针指向锁对象
 - 之后重入时在栈中分配的`lock record`中的`displaced mark word`为`null`，只存储了指向对象的`owner`指针
 
-![图片](images/Java并发/640-1686502384591-13.png)
+<img src="images/Java并发/640-1686502384591-13.png" alt="图片" />
 
 重入的次数等于该锁对象在栈帧中`lock record`的数量，这个数量隐式地充当了锁重入机制的计数器。这里需要计数的原因是每次解锁都需要对应一次加锁，只有最后解锁次数等于加锁次数时，锁对象才会被真正释放。在释放锁的过程中，如果是重入则删除栈中的`lock record`，直到没有重入时则使用CAS替换锁对象的`mark word`。
 
@@ -2644,7 +2644,7 @@ AQS内部维护一个**FIFO队列**和一个volatile int 的变量**state**：
   >
   > 
 
-![图片](images/Java并发/640-1686624831180-4.png)
+<img src="images/Java并发/640-1686624831180-4.png" alt="图片" />
 
 AQS 中的队列是 CLH 变体的虚拟双向队列，有以下特性
 
