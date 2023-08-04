@@ -1,6 +1,7 @@
 module.exports = {
     title: '个人主页',
     description: 'CZT的博客',
+    base: '/gh-pages/',
     markdown: {
         lineNumbers: true // 代码显示行号
     },
