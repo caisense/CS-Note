@@ -105,6 +105,14 @@ git rm <文件路径>
 git commit -m "init"
 ```
 
+# Q：如何给文件重命名？
+
+先将文件a.png改名为b.png，此时git status显示a.png 状态为deleted
+
+再用git add将b.png加入暂存区，此时git status显示状态为renamed，提交即可。
+
+
+
 # 撤销修改
 
 将文件从工作区或暂存区撤回
