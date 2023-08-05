@@ -5,7 +5,6 @@ module.exports = {
     markdown: {
         lineNumbers: true // 代码显示行号
     },
-    sidebar: 'auto',
     plugins: ["demo-container"],
 
     lastUpdated: 'Last Updated', // string | boolean
