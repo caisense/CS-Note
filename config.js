@@ -7,7 +7,6 @@ module.exports = {
     },
     plugins: ["demo-container"],
 
-    lastUpdated: 'Last Updated', // string | boolean
     themeConfig: {
         nav: [
             {text: 'Home', link: '/'},
@@ -59,23 +58,14 @@ module.exports = {
                 ]
             },
         ],
-        // sidebar: {
-        //     '/Java/': [{
-        //         title: 'Java',
-        //         collapsable: false,  // 是否可折叠，默认可折叠true
-        //         children: [
-        //             '/Java/Java基础',
-        //             '/Java/Java并发'
-        //         ]
-        //     }]
-        //
-        // }
+        sidebar: 'auto',
         logo: "https://vuejs.org/images/logo.png",
         // 最近更新栏
         updateBar: {
             showToArticle: false, // 显示到文章页底部，默认true
         },
-        sidebar: "structuring",
+        lastUpdated: 'Last Updated', // string | boolean
+
         category: false,
         tag: false,
         archive: false,

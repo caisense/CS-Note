@@ -1,6 +1,3 @@
----
-sidebar: auto
----
 
 # JDK新特性
 
