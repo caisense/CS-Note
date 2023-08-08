@@ -1,6 +1,7 @@
 {
   "devDependencies": {
-    "vuepress": "^1.9.9"
+    "vuepress": "^1.9.9",
+    "vuepress-plugin-container": "^2.1.5"
   },
   "scripts": {
     "docs:dev": "vuepress dev docs --temp .temp",

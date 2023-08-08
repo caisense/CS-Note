@@ -1,11 +1,11 @@
 module.exports = {
     title: '计算机面试笔记',
-    description: 'CZT的面试笔记',
+    description: '计算机面试指北',
     base: '/CS-Note/',
     markdown: {
         lineNumbers: true // 代码显示行号
     },
-    plugins: ["demo-container"],
+    // plugins: ["demo-container"],
 
     themeConfig: {
         nav: [
@@ -59,15 +59,8 @@ module.exports = {
             },
         ],
         sidebar: 'auto',
-        logo: "https://vuejs.org/images/logo.png",
-        // 最近更新栏
-        updateBar: {
-            showToArticle: false, // 显示到文章页底部，默认true
-        },
+        logo: "images/hero.png",
         lastUpdated: 'Last Updated', // string | boolean
 
-        category: false,
-        tag: false,
-        archive: false,
     }
 }
