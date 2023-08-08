@@ -1,5 +1,5 @@
 module.exports = {
-    title: '计算机面试笔记',
+    title: '计算机面试指北',
     description: '计算机面试指北',
     base: '/CS-Note/',
     markdown: {

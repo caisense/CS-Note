@@ -2,7 +2,7 @@
 home: true
 lang: zh-CN
 heroText: Caisense Blog
-heroImage: /hero.png
+heroImage: images/hero.png
 actionText: 开始 →
 actionLink: /Java基础.html
 features:
