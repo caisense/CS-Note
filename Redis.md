@@ -190,7 +190,7 @@ Redis本质都是**k-v键值对**，用一个唯一的字符串key来标识存�
   
      下标为负数则从最后排名开始，-1为倒数第一，以此类推
   
-  5. **zrevrange** key start stop [withscores]：倒序
+  5. **zrevrange** key start stop [withscores]：倒序，带withscores则带上分值
   
   2. **zrangebyscore** key min max [WITHSCORES] [LIMIT offset count] ：返回score介于`[min, max]`区间的元素，顺序根据分值排名（从小到大）。可选的 LIMIT 参数指定返回结果的数量及区间（就像 SQL 中的 SELECT LIMIT offset,  count )
   
@@ -212,9 +212,9 @@ Redis本质都是**k-v键值对**，用一个唯一的字符串key来标识存�
 
   1. 热门排行榜
 
-     点击新闻：zincrby hotNews:20220419 1 总理记者会
+     点击新闻：`zincrby hotNews:20220419 1 总理记者会` // 给hotNews:20220419这个zset中”总理记者会”元素的score++
 
-     展示当日排行前十：zrevrange hotNews:20220419 0 9 withscores
+     展示当日排行前十：`zrevrange hotNews:20220419 0 9 withscores`  // 对hotNews:20220419 按score倒序排列，取前10个
 
 
 
@@ -598,6 +598,19 @@ Redis集群系统满足**CAP理论中的CP**，cp系统还有zookeeper。
 因为网络问题，导致 Redis master 节点跟 slave 节点和 sentinel 集群处于不同的网络分区，因为 sentinel 集群无法感知到 master 的存在，所以将 slave 节点提升为 master 节点，此时存在**两个**不同的 master 节点。Redis Cluster 集群部署方式同理。
 
 <img src="images/Redis/redis-lock-08.png" alt="img" style="zoom: 67%;" />
+
+# 发布订阅
+
+Redis 发布订阅 (pub/sub) 是一种消息通信模式：发送者 (pub) 发送消息，订阅者 (sub) 接收消息。
+
+Redis 客户端可以订阅任意数量的频道。
+
+- `SUBSCRIBE channel [channel ...]` ：订阅给定的一个或多个频道的信息。
+- `PUBLISH channel message`：将信息发送到指定的频道。
+
+例如三个客户端 —— client2 、 client5 和 client1 都订阅了频道 -- channel1 ，当有新消息通过 PUBLISH 命令发送给频道 channel1 时， 这个消息就会被发送给订阅它的三个客户端：
+
+<img src="images/Redis/pubsub2.png" alt="img" />
 
 # 淘汰策略
 
