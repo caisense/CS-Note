@@ -550,7 +550,36 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 - **传统的开发方式** ：往往是在类 A 中手动通过 new 关键字来 new 一个 B 的对象出来
 - **使用 IoC 思想的开发方式** ：不通过 new 关键字来创建对象，而是通过 IoC 容器(Spring 框架) 来帮助我们实例化对象。我们需要哪个对象，直接从 IoC 容器里取即可。
 
-<img src="images/Spring常见问题/fasdibsk223.png" alt="图片" />
+```java
+// 传统方式
+Class A {}
+Class B {
+    // B需要将A的实例new出来，也就是我们说的控制
+    private A a = new A();
+    public void use() {
+        System.out.print(a);
+    }
+}
+// IoC
+@Component // 说明A自己控制自己，把自己初始化出来，注入给了容器
+Class A {}
+Class B {
+  	// B不需要控制a，直接使用。如果A没有把自己注入给容器，B就不能使用
+    @Resource
+    private A a;
+    public void use() {
+        System.out.print(a);
+    }
+}
+```
+
+### IoC的优点
+
+1. 使用者无需关心引用bean的实现细节。例如对B b = new A(c, d, e, f);来说，如果B要使用A，还需要把c, d, e, f多个类全都感知一遍，显然麻烦且不合理
+2. 使用者无需关心bean的修改。
+3. 单例模式，不用创建多个相同的bean导致浪费
+
+
 
 ### IoC 和 DI 
 
@@ -562,6 +591,16 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 
 反射+工厂模式
 
+1. 从**配置元数据**中获取要DI的业务POJO
+
+ > 配置元数据：xml、注解、configuration类等
+ >
+ > POJO：Plain Old Java Object，普通java对象。注意与JavaBean区分
+
+2. 通过反射，将业务POJO形成BeanDefinition注入Spring容器
+
+3. 使用方通过ApplicationContext从Spring容器直接获取
+
 ### 无侵入容器
 
 在设计上，Spring的IoC容器是一个高度可扩展的无侵入容器。所谓无侵入，是指应用程序的组件无需实现Spring的特定接口，或者说，组件根本不知道自己在Spring的容器中运行。这种无侵入的设计有以下好处：
@@ -571,13 +610,47 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 
 ## Spring AOP
 
-Aspect-Oriented Programming（面向切面编程）能够将那些与业务无关，却为业务模块所**共用**的代码（成为**横切逻辑代码**）（例如事务处理、日志管理、权限控制等）封装起来，，便于减少重复代码，降低模块耦合度，增加可拓展性和可维护性。
+Aspect-Oriented Programming（面向切面编程）能够将那些与业务无关，却为业务模块所**共用**的代码（称为**横切逻辑代码**）（例如：事务处理、日志管理、权限控制等）封装起来，便于减少重复代码，降低模块耦合度，增加可拓展性和可维护性。
 
-Spring AOP 就是基于动态代理的，如果要代理的对象，实现了某个接口，那么 Spring AOP 会使用 **JDK Proxy**，去创建代理对象，而对于没有实现接口的对象，就无法使用 JDK Proxy 去进行代理了，这时候 Spring AOP 会使用 **Cglib** 生成一个被代理对象的子类来作为代理，如下图所示：
+- Aspect切面：由切入点和通知组成，既包含横切逻辑的定义，也包括切入点的定义。切面是一个横切关注点的模块化，一个切面能够包含同一个类型的不同增强方法，比如说事务处理和日志处理可以理解为两个切面。
+
+- PointCut 切入点：是对连接点进行拦截的条件定义，决定通知应该作用于截哪些方法
+
+- Advice 通知：定义了通过切入点拦截后做什么，是切面的具体行为。主要有三大类
+
+  > Before 前置通知：在方法调用前
+  >
+  > After 后置通知：在方法调用后，无论方法是否异常
+  >
+  > After-returning 后置返回通知：在方法正常返回后
+  >
+  > After-throwing 后置异常通知：在方法抛出异常时
+  >
+  > Around 环绕通知：在方法调用前后
+
+- Target 目标对象：要被增强（代理）的对象（或称：切面通知的对象），即包含主业务逻辑的类对象
+
+- JoinPoint 连接点：程序运行时的执行点，可以是正在执行的方法， 或者是正在抛出的异常。Spring只支持**方法类型**的连接点。由两个信息确定：
+  > 方法：表示程序执行点，即在哪个目标方法
+  > 相对点：目标方法的调用前、后、环绕
+  
+- Weaving 织入：将切面和业务逻辑连接起来，并创建通知代理的过程。可以在编译时、类加载时和运行时完成。
+  
+  > 编译时织入：静态代理
+  > 运行时织入：动态代理（如spring）
+
+### AOP实现原理
+
+Spring AOP 就是基于动态代理的
+
+- 如果要代理的对象实现了某个接口，那么 Spring AOP 会使用 **JDK Proxy**，去创建代理对象
+- 对于没有实现接口的对象，就无法使用 JDK Proxy 代理，这时候 Spring AOP 会使用 **Cglib** 生成一个被代理对象的子类来作为代理，如下图所示：
 
 <img src="images/Spring常见问题/926dfc549b06d280a37397f9fd49bf9d.jpg" alt="SpringAOPProcess" />
 
-### Spring AOP创建时机？
+### Q：Spring AOP创建时机？
+
+**初始化后**
 
 在BeanPostProcessor后置处理器时创建，有jdk动态代理和cglib两种实现
 
