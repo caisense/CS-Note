@@ -1806,3 +1806,63 @@ input{
 第12行配置，Kafka的一条消息视为一个JSON，拿过来直接转，这样可能会截断换行符拼接后面的内容。因此需要改为`codec => line`，即一条消息按换行符分割读取。
 
 为什么Kafka不是一行日志一条消息呢？因为kafka的“是否聚合”选项，默认“是”，会将不同行日志聚合在一条消息。
+
+# SSH
+
+SecureShell，一种网络协议，用于计算机之间的加密登录。
+
+SSH之所以能够保证安全，原因在于它采用了公钥加密**（非对称加密，公加私解）**：（1）远程主机收到用户的登录请求，把自己的公钥发给用户。（2）用户使用这个公钥，将登录密码加密后，发送回来。（3）远程主机用自己的私钥，解密登录密码，如果密码正确，就同意用户登录。
+
+> 实际上存在风险——**中间人攻击**：如果有人截获了登录请求，然后冒充远程主机，将**伪造的公钥**发给用户，那么用户很难辨别真伪，用户使用伪造的公钥加密密码后，攻击者就能顺利解密出用户的密码。
+>
+> 因为不像https协议，SSH协议的公钥是没有证书中心（CA）公证的，也就是说，都是自己签发的。
+>
+> 如何解决：远程主机必须在自己的网站上贴出公钥指纹，以便用户自行核对。
+
+SSH有两个不兼容版本：1.x和2.x。
+
+**JSch** 是SSH2的一个纯Java实现。使用该库可以在java应用中连接到一个ssh的 服务器，使用它的端口转发，X11转发，文件传输等功能。
+
+连接：
+
+```java
+public void connect() throws JSchException {
+    JSch jsch = new JSch();
+    session = jsch.getSession(username, host, port);
+    session.setPassword(password);
+
+    // 为session对象设置properties,第一次访问服务器时不用输入yes
+    java.util.Properties config = new java.util.Properties();
+    config.put("StrictHostKeyChecking", "no");
+    session.setConfig(config);
+    session.connect();
+}
+```
+
+执行命令：
+
+```java
+public String execCmd(String command) throws JSchException, IOException {
+    // 返回信息
+    final StringBuilder stringBuilder = new StringBuilder(256);
+    BufferedReader reader = null;
+    // 创建连接通道，并设置命令
+    Channel channel = null;
+    channel = session.openChannel("exec");
+    ((ChannelExec) channel).setCommand(command);
+    channel.setInputStream(null);
+    ((ChannelExec) channel).setErrStream(null);
+    // 连接以运行命令
+    channel.connect();
+    InputStream in = channel.getInputStream();
+    reader = new BufferedReader(new InputStreamReader(in, Charset.forName(String.valueOf(StandardCharsets.UTF_8))));
+    String buf;
+    while ((buf = reader.readLine()) != null) {
+        stringBuilder.append(buf);
+        stringBuilder.append(";");
+    }
+    channel.disconnect();
+    return stringBuilder.toString();
+}
+```
+

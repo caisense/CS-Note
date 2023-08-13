@@ -21,6 +21,7 @@ module.exports = {
             {
                 text: 'Spring', items: [
                     {text: 'Spring常见问题', link: '/Spring常见问题'},
+                    {text: 'Spring常用注解', link: '/Spring常用注解'},
                     {text: 'Spring源码', link: '/Spring源码'},
                     {text: 'Spring事务', link: '/Spring事务'},
                     {text: 'SpringCloud-Netflix实战', link: '/SpringCloud-Netflix实战'},

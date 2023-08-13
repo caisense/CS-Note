@@ -4,7 +4,15 @@
 
 拦截时，会在目标方法开始执行之前**创建并加入事务**，执行目标方法逻辑，最后根据执行情况是否出现异常，利用抽象事务管理器 `AbstractPlatformTransactionManager` 操作数据源 `DataSource` 来提交或回滚事务
 
-# Spring事务不生效场景
+参数：
+
+- propagation：传播类型，枚举值见[propagation参数](####propagation参数)。默认为**REQUIRED**。
+- rollbackFor：触发回滚的异常类型，可以有多种。默认为**RunTimeException**。
+- transactionManager：与value同名，指定事务管理器。默认为空。如果是数据库事务管理器，其实就是配置数据源。
+- isolation：隔离级别（对数据库而言）。mysql 默认为 **REPEATABLE_READ** 可重复读
+- timeout：超时时间。默认为**-1永不超时**。
+
+# 事务不生效场景
 
 ## 1、方法访问权限问题（非public）
 
@@ -201,10 +209,10 @@ CREATE TABLE `category` (
 使用`@Transactional`注解时，可以显式指定`propagation`参数，该参数的作用是指定事务的传播特性，spring目前支持7种传播特性：
 
 1. `REQUIRED` **（默认值）**如果当前上下文中存在事务，那么加入该事务。如果不存在事务，创建一个事务。
-2. `SUPPORTS` 如果当前上下文存在事务，则支持事务加入事务，如果不存在事务，则使用非事务的方式执行。
-3. `MANDATORY` 如果当前上下文中存在事务，否则抛出异常。
-4. `REQUIRES_NEW` 每次都会**新建**一个事务，并将**当前上下文**中的事务**挂起**。直到完成新事务后，再恢复执行上下文事务。
-5. `NOT_SUPPORTED` 如果当前上下文中存在事务，则挂起当前事务，然后新的方法在没有事务的环境中执行。
+2. `REQUIRES_NEW` 每次都会**新建**一个事务，并将**当前上下文**中的事务**挂起**。直到完成新事务后，再恢复执行上下文事务。
+3. `SUPPORTS` 如果当前上下文存在事务，则支持事务加入事务，如果不存在事务，则使用非事务的方式执行。
+4. `NOT_SUPPORTED` 如果当前上下文中存在事务，则挂起当前事务，然后新的方法在没有事务的环境中执行。
+5. `MANDATORY` 如果当前上下文中存在事务，否则抛出异常。
 6. `NEVER` 如果当前上下文中存在事务，则抛出异常，否则在无事务环境上执行代码。
 7. `NESTED` 如果当前上下文中存在事务，则嵌套创建子事务。如果不存在事务，则新建事务。
 
@@ -215,7 +223,6 @@ CREATE TABLE `category` (
 ```java
 @Service
 public class UserService {
-
     @Transactional(propagation = Propagation.NEVER)
     public void add(UserModel userModel) {
         saveData(userModel);
@@ -228,14 +235,14 @@ public class UserService {
 
 ### 嵌套事务
 
-嵌套事务的 **回滚** 不会互相影响，只要函数内有异常就回滚
-
-只在 **提交** 时会互相影响。
+> 注意：嵌套事务的 **回滚** 不会互相影响，只要函数内有异常就回滚。
+>
+> 只在 **提交** 时会互相影响。
 
 a函数带事务，调用b函数，当b的事务传播为：
 
-1. REQUIRES_NEW：新建一个事务，b的事务提交与a的事务提交独立
-2. NESTED：创建一个子事务，b执行完并不会立即提交，而是等待父事务提交（即a执行完）才提交
+1. REQUIRES_NEW：新建一个事务，b的事务提交与a的事务提交独立，各自执行完就**立即提交**。
+2. NESTED：创建一个子事务，b执行完并不会立即提交，而是等待父事务（即a执行完）**一起提交**。
 
 
 
@@ -294,7 +301,7 @@ public class UserService {
 
 即使rollbackFor有默认值，但阿里巴巴开发者规范中，还是要求开发者显式指定，建议`Exception`或`Throwable`。
 
-如果使用默认值，一旦程序抛出了Exception，事务不会回滚，
+如果使用默认值RuntimeException，一旦程序抛出了Exception，事务不会回滚，
 
 ## 5、嵌套事务回滚多了
 
