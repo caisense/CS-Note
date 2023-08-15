@@ -680,11 +680,12 @@ public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName
 
 ## Spring 用到了哪些设计模式？
 
-1. 工厂模式：BeanFactory就是简单工厂模式的体现，用来创建对象的实例；
+1. 工厂模式：**BeanFactory**就是简单工厂模式的体现，用来创建对象的实例；
 2. 单例模式：Bean默认为单例模式。
-3. 代理模式：Spring的AOP功能用到了JDK的动态代理和CGLIB字节码生成技术；4. 模板方法：用来解决代码重复的问题。比如. RestTemplate, JmsTemplate, JpaTemplate。
-5. 观察者模式：定义对象键一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的
-对象都会得到通知被制动更新，如Spring中listener的实现–ApplicationListener。
+3. 代理模式：Spring的AOP功能用到了JDK的动态代理和CGLIB字节码生成技术；
+4. 模板方法：用来解决代码重复的问题。比如. RestTemplate, JmsTemplate, JpaTemplate。
+5. 观察者模式：定义对象键一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的对象都会得到通知被制动更新，如Spring中listener的实现–ApplicationListener。
+6. 责任链模式：SpringMVC中，通过一系列的拦截器来处理请求执行前，执行后，以及结束的response，核心的类是`handlerExecutionChain`，它封装了HandlerAdapter和一系列过滤器
 
 ## Q：如何解决循环依赖？
 

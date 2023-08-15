@@ -17,6 +17,40 @@ Field sysUserApi in com.eshore.cmp.corp.service.service.base.CorpBaseService req
 - @Repository注解可以标记在任何的类上，用来表明该类是用来执行与数据库相关的操作（即dao对象），并支持自动处理数据库操作产生的异常
 - @Service修饰服务（接口实现类）。如果你不知道要在项目的业务层采用@Service还是@Component注解。那么，@Service是一个更好的选择。
 
+# Controller不能直接返回数字
+
+如下代码直接返回int
+
+```java
+@Controller
+@RequestMapping("/api/v1/authBillDetail")
+public class AuthBillDetailController extends CMPController {
+    @Autowired
+    private IAuthBillDetailService authBillDetailService;
+    
+    @ApiOperation(value = "xxx notes = "xxx")
+    @PostMapping("/insert")
+    //@ResponseBody
+    int insert(@RequestBody AuthBillDetail entity) {
+        int res = authBillDetailService.insert(entity);
+        return res;
+    }
+}
+```
+
+报错：
+
+```
+java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
+	at org.springframework.web.method.support.HandlerMethodReturnValueHandlerComposite.handleReturnValue(HandlerMethodReturnValueHandlerComposite.java:80)
+	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:123)
+	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:879)
+```
+
+若返回其他数字类型，如long等，也会报错。
+
+解决：加@ResponseBody，或者返回非整数类型，或用自定义泛型包裹数字类型
+
 # @Scope
 
 只有一个参数：value，别名scopeName
@@ -304,7 +338,7 @@ public class Myconfig {
 
    @Autowired 标注作用于 Map 类型时，spring强制要求 key **必须为 String** 类型，则并将容器中所有**类型** 为value 的 Bean 注入进来，用 Bean 的 id 或 name 作为 key：
 
-## Q：为什么spring不建议使用基于字段的依赖注入
+## Q：为什么spring不建议使用基于字段的依赖注入？
 
 如下代码IDEA会报警告：Field injection is not recommended
 
@@ -739,39 +773,7 @@ public class Prop {
 
    
 
-# Controller不能直接返回数字
 
-如下代码直接返回int
-
-```java
-@Controller
-@RequestMapping("/api/v1/authBillDetail")
-public class AuthBillDetailController extends CMPController {
-    @Autowired
-    private IAuthBillDetailService authBillDetailService;
-    
-    @ApiOperation(value = "xxx notes = "xxx")
-    @PostMapping("/insert")
-    //@ResponseBody
-    int insert(@RequestBody AuthBillDetail entity) {
-        int res = authBillDetailService.insert(entity);
-        return res;
-    }
-}
-```
-
-报错：
-
-```
-java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
-	at org.springframework.web.method.support.HandlerMethodReturnValueHandlerComposite.handleReturnValue(HandlerMethodReturnValueHandlerComposite.java:80)
-	at org.springframework.web.servlet.mvc.method.annotation.ServletInvocableHandlerMethod.invokeAndHandle(ServletInvocableHandlerMethod.java:123)
-	at org.springframework.web.servlet.mvc.method.annotation.RequestMappingHandlerAdapter.invokeHandlerMethod(RequestMappingHandlerAdapter.java:879)
-```
-
-若返回其他数字类型，如long等，也会报错。
-
-解决：加@ResponseBody，或者返回非整数类型，或用自定义泛型包裹数字类型
 
 # @Async
 
