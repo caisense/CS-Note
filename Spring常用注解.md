@@ -370,7 +370,7 @@ private Bean bean
 
 # @Primary
 
-只能修饰属性，配合@Autowired使用，当容器中同类型Bean有多个时，直接取带@Primary的
+只能修饰属性或带@Bean方法，配合@Autowired使用，当容器中同类型Bean有多个时，直接取带@Primary的
 
 # @Order
 
@@ -567,6 +567,28 @@ public class CssCondition implements Condition {
 ```
 
 spring容器就会根据CssCondition的返回布尔值决定是否加载UserService
+
+## @ConditionalOnMissingBean
+
+实现基于@Conditional，搭配@Bean使用。分为带参和无参：
+
+无参：当容器中**不存在该类型**Bean时，将这个bean注入容器。
+
+带参：当容器中**不存在名字为name**的Bean时，将这个bean注入容器。
+
+```java
+@Bean
+@ConditionalOnMissingBean(name = "user123")  // 若容器中不存在名为user123的组件
+public User user123(User user1) {
+    return user1;
+}
+```
+
+## @ConditionalOnBean
+
+与@ConditionalOnMissingBean作用相反，当容器中存在这个类型或名称的bean时，才注入当前bean。
+
+
 
 # @DependsOn
 
