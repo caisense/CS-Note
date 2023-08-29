@@ -532,6 +532,117 @@ jar包中只是用java来写的项目打包来的，里面只有编译后的clas
 
 前后端分离的项目，后端war包存放空页面
 
+# Tomcat
+
+spring内置的服务器，默认配置：
+
+- 连接等待队列长度100
+- 最大连接数 8192
+- 最小工作线程 10
+- 最大线程数 200
+- **连接超时时间 20s**
+
+配置yml：
+
+```yaml
+server:
+  tomcat:
+    # 接受队列容量。能建立连接请求的最大队列长度。与 Linux 中的系统参数 somaxconn 取较小值
+    accept-count: 100
+    # 服务器在任何给定时间接受和处理的最大连接数。一旦达到限制，操作系统仍然可以接受基于“acceptCount”属性的连接。
+    max-connections: 8192
+    threads:
+      # 工作线程的最小数量，初始化时创建的线程数
+      min-spare: 10
+      # 工作线程的最大数量 io密集型建议10倍的cpu数，cpu密集型建议cpu数+1，绝大部分应用都是io密集型
+      max: 200
+    # 连接器在接受连接后等待显示请求 URI 行的时间。
+    connection-timeout: 20000
+    # 在关闭连接之前等待另一个 HTTP 请求的时间。如果未设置，则使用 connectionTimeout。设置为 -1 时不会超时。
+    keep-alive-timeout: 20000
+    # 在连接关闭之前可以进行流水线处理的最大HTTP请求数量。当设置为0或1时，禁用keep-alive和流水线处理。当设置为-1时，允许无限数量的流水线处理或keep-alive请求。 
+    max-keep-alive-requests: 100
+```
+
+## Q：SpringBoot单体应用支持的最大并发？
+
+在默认设置中，最大并发量是**200**。
+
+原因：最大并发实际上取决于**web容器**。SpringBoot并不是web容器，而是内置了Tomcat。Tomcat的线程池参数：核心线程数10，最大线程数是200，队列长度 Integer.MAX_VALUE。
+
+而 **Tomcat 线程池机制**和JDK不太一样，先使用核心线程数配置，再使用最大线程配置，最后才使用队列长度。因此假设1000个请求同时到来，核心线程直接用完，然后启用最大线程数200，最后再放队列，所以默认支持的最大并发是200。
+
+> JDK 线程池：先使用核心线程数配置，接着使用队列长度，最后再使用最大线程配置。
+
+扩展：如果修改tomcat配置，可以提升最大并发数。
+
+再扩展：如果使用其他web容器（springboot还支持Jetty、Netty、Undertow等）
+
+> 参考原文：[面试官：一个 SpringBoot 项目能处理多少请求？（小心有坑）](https://mp.weixin.qq.com/s/PXC4pFE_ZpydBAzCJZmiqQ)
+
+### 扩展
+
+> 先上结论：spring的最大并发并不完全由tomcat的最大线程数决定，还要看tomcat的参数：**maxConnections + acceptCount + 1**
+
+上面是从线程池角度分析，以下从连接角度分析。
+
+如下图，连接首先到达操作系统的 **接受队列**，然后进入tomcat。当连接数超过接受队列容量，则等待：
+
+<img src="images/Spring常见问题/9fdcd4ed21b04413820a13250164dc1a.png" alt="img" />
+
+当tomcat最大线程用满，则进入**tomcat的队列**。
+
+当连接数大于`maxConnections + acceptCount + 1`时，新来的请求并不会被服务器拒绝，而是**不会接受**（即进行3次握手），一段时间后（客户端的超时时间或者服务端Tomcat默认的20s，取较小值）会出现请求连接超时。
+
+
+
+测试：
+
+```yaml
+server:
+  port: 8080
+  tomcat:
+    accept-count: 3
+    max-connections: 6
+    threads:
+      min-spare: 2
+      max: 3
+```
+
+
+
+使用 ss -nlt 查看连接排队队列情况：
+
+```bash
+ss -nlt|grep 8080
+```
+
+- Recv-Q表示（acceptCount）连接排队队列目前长度
+- Send-Q表示（acceptCount）连接排队队列的容量
+
+10个并发线程时，可以看到，连接排队队列有4个请求在等待，队列容量是3。
+
+<img src="images/Spring常见问题/ss-nlt.png" />
+
+解释：10个线程，tomcat最大线程数3，接受队列3，剩下4个线程等待进入接受队列。
+
+当并发线程为11个时，使用 ss -nlt 查看连接状态：
+
+```bash
+ss -nt|grep 8080
+```
+
+- Recv-Q表示客户端有多少个字节发送但还没有被服务端接收
+- Send-Q就表示为有多少个字节未被客户端接收。
+
+![](images/Spring常见问题/ss-nt.png)
+
+由于11 > maxConnections+acceptCount+1=10，因此有个连接一直停留在 SYN_RECV 状态，客户端则一直停留在 SYN-SENT，不会完成 3 次握手了。直到客户端或tomcat连接超时。
+
+其他10个建立的连接，有6个被接收，4个在排队中。
+
+
+
 # Spring
 
 ## Spring IoC
@@ -825,21 +936,7 @@ public class BService {
 
 对同一个beanName，默认只生成一次，多次调用（即使构造参数不同）返回的都是单例
 
-## Q：SpringBoot单体应用支持的最大并发？
 
-在默认设置中，最大并发量是**200**。
-
-原因：最大并发实际上取决于**web容器**。SpringBoot并不是web容器，而是内置了Tomcat。Tomcat的线程池参数：核心线程数10，最大线程数是200，队列长度 Integer.MAX_VALUE。
-
-而 **Tomcat 线程池机制**和JDK不太一样，先使用核心线程数配置，再使用最大线程配置，最后才使用队列长度。因此假设1000个请求同时到来，核心线程直接用完，然后启用最大线程数200，最后再放队列，所以默认支持的最大并发是200。
-
-> JDK 线程池：先使用核心线程数配置，接着使用队列长度，最后再使用最大线程配置。
-
-扩展：如果修改tomcat配置，可以提升最大并发数。
-
-再扩展：如果使用其他web容器（springboot还支持Jetty、Netty、Undertow等）
-
-> 参考原文：[面试官：一个 SpringBoot 项目能处理多少请求？（小心有坑）](https://mp.weixin.qq.com/s/PXC4pFE_ZpydBAzCJZmiqQ)
 
 
 
