@@ -1,3 +1,5 @@
+Spring事务
+
 # @Transacational原理
 
 根据 @Transactional 的属性配置信息，这个代理对象（AOP Proxy）决定该声明的目标方法是否由拦截器 `TransactionInterceptor` 来使用**拦截**。

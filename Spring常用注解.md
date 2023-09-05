@@ -1,3 +1,5 @@
+Spring常用注解
+
 # @Component
 
 最普通的组件，可以被注入到spring容器进行管理。等效于XML的bean配置
