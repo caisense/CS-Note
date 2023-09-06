@@ -1,5 +1,5 @@
 .node_modules
 .idea
 .temp
-.docs
+.docs/.vuepress/dist
 CS-Note.iml
