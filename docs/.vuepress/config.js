@@ -57,7 +57,8 @@ module.exports = {
                     {text: '设计模式', link: '/设计模式'},
                     {text: '系统设计', link: '/系统设计'},
                     {text: 'Git', link: '/Git'},
-                    {text: '信息安全', link: '/信息安全'}
+                    {text: '信息安全', link: '/信息安全'},
+                    {text: '编码', link: '/编码'}
                 ]
             },
             {
