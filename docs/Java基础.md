@@ -241,7 +241,7 @@ char赋值有三种方式：
 ```java
 char ch1= 'N';  // 字符赋值
 char ch2= 705;   // 整形赋值
-char ch3= '\u0031';  // unicode，【\u + 四个16进制
+char ch3= '\u0031';  // unicode，【\u + 四个16进制】
 ```
 
 注意char类型字符使用单引号`'a'`，且仅有**一个字符**，要和双引号`"a"`的String类型区分开。
