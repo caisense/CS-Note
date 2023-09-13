@@ -1743,6 +1743,80 @@ public class Query {
 }
 ```
 
+## 增加唯一标识
+
+对于常见的 web 应用，每一次请求都可以认为新开了一个线程。
+
+在并发高一点的情况，我们的日志会出现穿插的情况。所以需要一个过滤条件，可以将请求的整个生命周期（链路）连接起来，也就是我们常说的 traceId。
+
+例如，要跟踪某个线程的日志，traceId=’202009021658001’，执行如下命令：
+
+```bash
+grep 202009021658001 app.log
+```
+
+简单的思路是为每一个请求生成一个唯一标识（如UUID），然后在输入日志时附带这个标识即可。
+
+缺点是需要在调用链的线程上下文中传递这个标识，增加系统复杂性。
+
+**注意**：这个请求还可能跨系统RPC，因此考虑放在HTTP**请求头**和**响应头**
+
+请求头，使用拦截器，实现ClientHttpRequestInterceptor接口的intercept方法：
+
+```java
+class RestClientInterceptor implements ClientHttpRequestInterceptor {
+    public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
+        // 拦截所有HTTP请求，为其生成traceId，放入请求头
+        if (StringHelper.isEmpty(request.getHeaders().getFirst("X-REQUEST-ID")))
+            request.getHeaders().set("X-REQUEST-ID", LocalUser.getTraceId()); 
+    }
+```
+
+响应头，使用Advice，实现ResponseBodyAdvice接口的beforeBodyWrite方法：
+
+```java
+@ControllerAdvice
+@ConditionalOnProperty(name = {"cmp.meta.type"}, havingValue = "server", matchIfMissing = true)
+public class WebResponseBodyAdvice implements ResponseBodyAdvice {
+    public Object beforeBodyWrite(Object returnValue, MethodParameter methodParameter, MediaType mediaType, Class clazz, ServerHttpRequest serverHttpRequest, ServerHttpResponse serverHttpResponse) {
+        HttpHeaders httpHeaders = serverHttpResponse.getHeaders();
+        // 在（对外的）响应头中写入traceId
+        httpHeaders.set("X-REQUEST-ID", LocalUser.getTraceId());
+    }
+}
+```
+
+**解决方案：MDC**
+
+MDC（Mapped Diagnostic Context）顾名思义提供日志的上下文信息，通过MDC中的参数值区分输出的日志，SLF4J的MDC实质上就是一个Map。通常实现SLF4J的日志系统支持MDC，即表明该日志系统负责维护这个Map。应用就可以依赖于日志系统，直接存取key/value对到该Map中。
+
+在aop中拦截controller，在其执行前取http请求头中的traceId放入MDC
+
+```java
+@Aspect
+@Component
+@Order(1)
+public class HttpAspect {
+    @Pointcut("this(com.xxx.BaseController)")
+    public void log() {}
+
+    @Before("log()")
+    public void doBefore(JoinPoint joinPoint) {
+        String uuid = request.getHeader("X-REQUEST-ID"); // 取traceId
+        MDC.put("X-B3-TraceId", uuid);  // 存入MDC
+    }
+}
+```
+
+然后在logback.xml中设置日志输出格式，`X-B3-TraceId`就是我们存入MDC的key，对应值就是traceId：
+
+```xml
+<property name="FILE_LOG_PATTERN"
+          value="%d{yyyy-MM-dd HH:mm:ss.SSS} `%X{X-B3-TraceId:-}` [%thread] %-5level %logger{36} - %msg%n"/>
+```
+
+
+
 ## 分布式日志系统
 
 ELK = Elasticsearch + Logstash  + Kibana
