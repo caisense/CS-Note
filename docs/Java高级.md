@@ -1743,7 +1743,7 @@ public class Query {
 }
 ```
 
-## 增加唯一标识
+## 增加唯一标识（traceId）
 
 对于常见的 web 应用，每一次请求都可以认为新开了一个线程。
 
@@ -1761,15 +1761,26 @@ grep 202009021658001 app.log
 
 **注意**：这个请求还可能跨系统RPC，因此考虑放在HTTP**请求头**和**响应头**
 
-请求头，使用拦截器，实现ClientHttpRequestInterceptor接口的intercept方法：
+请求头，使用拦截器，实现HandlerInterceptorAdapter接口的preHandle方法：
 
 ```java
-class RestClientInterceptor implements ClientHttpRequestInterceptor {
-    public ClientHttpResponse intercept(HttpRequest request, byte[] body, ClientHttpRequestExecution execution) throws IOException {
-        // 拦截所有HTTP请求，为其生成traceId，放入请求头
-        if (StringHelper.isEmpty(request.getHeaders().getFirst("X-REQUEST-ID")))
-            request.getHeaders().set("X-REQUEST-ID", LocalUser.getTraceId()); 
+@Component
+@ConditionalOnProperty(name = {"cmp.meta.type"}, havingValue = "server", matchIfMissing = true)
+public class WebHandlerInterceptorAdapter extends HandlerInterceptorAdapter {
+    public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws IOException {
+        if (handler instanceof HandlerMethod) {
+            Class<?> beanType = handlerMethod.getBeanType();
+            if (beanType.getName().startsWith("com.eshore")) {  // 只拦截自己项目的类
+                // 如果请求头不存在X-REQUEST-ID，生成一个traceId给它
+                String xCtgRequestId = request.getHeader("X-REQUEST-ID");  
+                if (StringHelper.isEmpty(xCtgRequestId)) {
+                    xCtgRequestId = LocalUser.getTraceId();
+                }
+                AppContext.setAttribute("X-REQUEST-ID", xCtgRequestId);  
+            }
+        }
     }
+}
 ```
 
 响应头，使用Advice，实现ResponseBodyAdvice接口的beforeBodyWrite方法：
