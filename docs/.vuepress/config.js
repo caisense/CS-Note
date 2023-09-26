@@ -69,7 +69,7 @@ module.exports = {
         ],
         // 侧边栏：自动生成
         sidebar: 'auto',
-        sidebarDepth: 4,
+        sidebarDepth: 3,
         logo: "images/hero.png",
         lastUpdated: 'Last Updated', // string | boolean
         // ----------------------git---------------------
