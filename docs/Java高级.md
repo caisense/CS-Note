@@ -1826,7 +1826,9 @@ public class HttpAspect {
           value="%d{yyyy-MM-dd HH:mm:ss.SSS} `%X{X-B3-TraceId:-}` [%thread] %-5level %logger{36} - %msg%n"/>
 ```
 
+缺点：只能用于明确的上下文（父子线程），对于线程复用的情况（如线程池），无法传递traceId。
 
+解决：[TransmittableThreadLocal](Java并发.md###TransmittableThreadLocal)
 
 ## 分布式日志系统
 

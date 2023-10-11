@@ -2658,6 +2658,8 @@ public class HttpExceptionHandler {
 
 ### 1、jdk动态代理
 
+**目的**：对代理对象的方法进行了增强，即方法执行前后执行自定义的切面逻辑。
+
 1. 通过 Proxy.getProxyClass() 方法获取代理类 Class 对象；
 2. 通过反射 aClazz.getConstructor() 获取构造器对象；
 3. 定义InvocationHandler类并实例化，当然也可以直接使用匿名内部类；
@@ -2666,18 +2668,14 @@ public class HttpExceptionHandler {
 
 代理类所在包：java.lang.reflect.Proxy，jdk的Proxy类提供静态方法`newProxyInstance`完成上述操作
 
-#### 使用
+**使用**
 
 1. 实现一个`InvocationHandler`接口，它必须重写`invoke`方法
 2. 创建被代理的类以及接口
 3. 将1、2两步结果作为参数，传入`Proxy`的静态方法`newProxyInstance(ClassLoaderloader, Class[] interfaces, InvocationHandler h)`创建一个代理
 4. 通过代理调用方法
 
-#### 目的
-
-对代理对象的方法进行了增强，即方法执行前后执行自定义的切面逻辑。
-
-#### 例
+**例子**
 
 代理工厂类:ProxyFactory.java
 
@@ -2746,7 +2744,7 @@ jdk动态代理有限制：目标对象必须实现一个或多个接口，因�
 
 Cglib是一个强大的高性能的代码生成包，底层是通过一个小而快的字节码处理框架ASM来转换字节码并生成新的类
 
-#### 使用
+**使用**
 
 1、引入cglib的jar文件（Spring已经集成）
 
@@ -2754,7 +2752,7 @@ Cglib是一个强大的高性能的代码生成包，底层是通过一个小而
 
 3、目标对象的方法不能为final/static
 
-#### 例
+**例子**
 
 目标对象类:UserDao.java,没有实现任何接口
 
@@ -2874,7 +2872,7 @@ System.out.println(String.class.getClass());  // class java.lang.Class
 - getDeclaredConstructor(Class...)：获取某个Constructor；
 - getDeclaredConstructors()：获取所有Constructor。
 
-## new、newnewInstance() 、Constructor.newInstance()区别？
+## Q：new、newnewInstance() 、Constructor.newInstance()区别？
 
 ### 1. new和newnewInstance()
 
@@ -2887,7 +2885,7 @@ System.out.println(String.class.getClass());  // class java.lang.Class
 Class.newInstance() 只能够调用 **无参** 且**public**的构造函数，即**默认构造函数**； 
 Constructor.newInstance() 调用 **任意**构造构造函数，甚至可以调用私有的。
 
-## 如何给`List<Integer>`里面加一个String？
+## Q：如何给`List<Integer>`里面加一个String？
 
 按理说静态代码中是不允许的，考察**泛型擦除**，在执行期中操作
 
@@ -2939,7 +2937,7 @@ public static void main(String[] args) {
 
 如果用BeanUtils.copyProperties()**对List直接操作**，则无法将元素复制出来，因为spring实现这个拷贝功能用的是反射，找到对应类的get、set方法，通过invoke调用来赋值。而List没有成对的get、set方法（常用的`get(Integer index)`并没有对应的set）
 
-## 什么是深拷贝、浅拷贝？
+## Q：什么是深拷贝、浅拷贝？
 
 浅拷贝：对基本数据类型进行值传递，对引用数据类型进行引用传递般的拷贝
 
@@ -2951,7 +2949,7 @@ public static void main(String[] args) {
 
 常用的Spring中BeanUtils的copyProperties是浅拷贝。
 
-## 如何实现深拷贝？
+## Q：如何实现深拷贝？
 
 1、用对象的clone方法：
 

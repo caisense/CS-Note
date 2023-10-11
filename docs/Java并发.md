@@ -1488,7 +1488,7 @@ Thread类内部保存着类型为ThreadLocalMap 的两个变量
 public class Thread implements Runnable {
 	/***********省略N行代码*************/
 	ThreadLocal.ThreadLocalMap threadLocals = null;
-	ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
+	ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;  // 用于传值给子线程
 	/***********省略N行代码*************/
 }
 ```
@@ -1611,8 +1611,22 @@ ThreadLocal.ThreadLocalMap inheritableThreadLocals = null;
 
 ```java
 if (inheritThreadLocals && parent.inheritableThreadLocals != null)
+    //拷贝父线程的变量
     this.inheritableThreadLocals = ThreadLocal.createInheritedMap(parent.inheritableThreadLocals);
 ```
+
+## TransmittableThreadLocal
+
+ThreadLocal的set/remove的上下文传递模式 在使用线程池等异步执行组件的情况下不再是有效的。常见的典型例子：
+
+- 当线程池满了且线程池的RejectedExecutionHandler使用的是CallerRunsPolicy时，提交到线程池的任务会在提交线程中直接执行，ThreadLocal.remove操作清理提交线程的上下文导致上下文丢失。
+- 类似的，使用ForkJoinPool（包含并行执行Stream与CompletableFuture，底层使用ForkJoinPool）的场景，展开的ForkJoinTask会在任务提交线程中直接执行。同样导致上下文丢失。
+
+因此，在生产应用（几乎一定会使用线程池等异步执行组件）中，**使用ThreadLocal及其set/remove的上下文传递模式几乎一定是有问题的**，只是在等一个出Bug的机会。
+
+参考：https://tech.meituan.com/2023/04/20/traceid-google-dapper-mtrace.html
+
+https://github.com/alibaba/transmittable-thread-local#dummy
 
 ## 线程安全
 
@@ -2882,6 +2896,19 @@ try {  // futureTask的 get操作需要try
 }
 ```
 
+注意：FutureTask 的get是**阻塞的**。此外还提供了isDone方法，返回true表示任务执行结束，可以轮询调用isDone以判断能否get：
+
+```java
+while (1) {
+    if (futureTask.isDone()) {  // 任务执行结束才能get
+        futureTask.get();
+        break;
+    }
+}
+```
+
+
+
 ## BlockingQueue
 
 java.util.concurrent.BlockingQueue 接口有以下阻塞队列的实现：
@@ -2988,6 +3015,441 @@ public class ForkJoinExample extends RecursiveTask<Integer> {
     }
 }
 ```
+
+## CompletableFuture
+
+JDK1.8提供了一种更加强大的异步编程的api，实现了Future接口，此外还实现了`CompletionStage`接口，定义了**任务编排**的方法。
+
+优点：
+
+1. 相比于Future最大的改进就是**回调监听**：类似观察者模式，任务执行结束后，用回调通知，而不需要阻塞获取结果。
+2. 提供了**异常管理**机制，让你有机会抛出、管理异步任务执行中发生的异常，监听这些异常的发生；
+
+3. 拥有对**任务编排**的能力。借助这项能力，可以轻松地组织不同任务的运行顺序、规则以及方式。
+4. 异步函数式编程，实现优雅，易于维护；
+
+
+
+### 常用api
+
+**1.静态方法创建**
+
+一旦通过静态方法来构造，会立马开启异步线程执行
+
+```java
+public static <U> CompletableFuture<U> supplyAsync(Supplier<U> supplier);
+public static <U> CompletableFuture<U> supplyAsync(Supplier<U> supplier, Executor executor);
+
+public static CompletableFuture<Void> runAsync(Runnable runnable);
+public static CompletableFuture<Void> runAsync(Runnable runnable, Executor executor);
+```
+
+supplyAsync 和 runAsync 的主要区别： 前者可以有返回值，后者没有返回值。
+
+另一个参数Executor 就是用来执行异步任务的线程池，不传默认用ForkJoinPool。
+
+**2.获取任务执行结果**
+
+```java
+public T get();
+public T get(long timeout, TimeUnit unit);
+public T getNow(T valueIfAbsent);
+public T join();
+```
+
+- `get()`和`get(long timeout, TimeUnit unit)`是实现了Future接口的功能，两者主要区别就是get()会一直阻塞直到获取到结果，get(long timeout, TimeUnit unit)值可以指定超时时间，当到了指定的时间还未获取到任务，就会抛出TimeoutException异常。
+- getNow(T valueIfAbsent)：就是获取任务的执行结果，但不会产生阻塞。如果任务还没执行完成，那么就会返回你传入的 valueIfAbsent 参数值，如果执行完成了，就会返回任务执行的结果。
+- join()：跟get()的主要区别就是，get()会抛出检查时异常，join()不会。
+
+使用join阻塞例子：
+
+```java
+public static void main(String[] args) {
+    List<Integer> input = Arrays.asList(1,2,3,4);
+    // 遍历input，对每个元素创建异步任务，并执行
+    List<CompletableFuture<Integer>> completableFutures = input.stream().map(item -> CompletableFuture.supplyAsync(() -> dealAsync(item))).collect(Collectors.toList());
+    ArrayList<Integer> integers = new ArrayList<>();
+    // 对每个异步任务，等待结果，并塞入
+    for (CompletableFuture<Integer> completableFuture : completableFutures) {
+        Integer join = completableFuture.join();
+        integers.add(join);  // ****************join**************************
+    }
+    System.out.println(integers);
+}
+public static int dealAsync(int i) {  // 任务具体的执行逻辑
+    try {
+        Thread.sleep((5-i) * 1000L);
+    } catch (InterruptedException e) {
+        throw new RuntimeException(e);
+    }
+    int res = i*5;
+    System.out.println(i + "* 5 =" + res);
+    return res;
+}
+// 打印
+4* 5 =20
+3* 5 =15
+2* 5 =10
+1* 5 =5
+[5, 10, 15, 20]
+```
+
+如果用thenAccept监听任务回调（详见下文第4小节）：
+
+```java
+public static void main(String[] args) throws InterruptedException {
+    List<Integer> input = Arrays.asList(1, 2, 3, 4);
+    List<CompletableFuture<Void>> completableFutures = input.stream().map(item -> CompletableFuture.supplyAsync(() -> dealAsync(item)).thenAccept(v -> {
+        System.out.println("Accept: " + v);
+        integers.add(v);
+    })).collect(Collectors.toList());
+    // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭。应该等待所有子线程结束
+    Thread.sleep(20000);
+    System.out.println(integers);
+}
+// dealAsync方法体略
+// 打印：
+4 * 5 = 20
+Accept: 20
+3 * 5 = 15
+Accept: 15
+2 * 5 = 10
+Accept: 10
+1 * 5 = 5
+Accept: 5
+[20, 15, 10, 5]
+```
+
+可以看到用回调方式接收任务结果，当任务结束后立即接收到结果，不用阻塞。最终的结果数组中，顺序就是任务完成的顺序，是不确定的。而阻塞的join方式，结果顺序是任务创建的确定的顺序。
+
+**3、主动触发任务完成**
+
+```java
+public boolean complete(T value);
+public boolean completeExceptionally(Throwable ex);
+```
+
+- complete：主动触发当前异步任务的完成。调用此方法时如果你的任务已经完成，那么方法就会返回false；如果任务没完成，就会返回true，并且其它线程获取到的任务的结果就是complete的参数值。
+- completeExceptionally：跟complete的作用差不多，complete是正常结束任务，返回结果，而completeExceptionally就是触发任务执行的异常。
+
+**4、对任务执行结果进行下一步处理（串行编排）**
+
+4.1 只能接收**任务正常执行**后的回调：当任务正常执行完成，没有异常的时候就会回调。
+
+```java
+public <U> CompletionStage<U> thenApply(Function<? super T,? extends U> fn);
+public CompletableFuture<Void> thenRun(Runnable action);
+public CompletionStage<Void> thenAccept(Consumer<? super T> action);
+```
+
+- thenApply：可以拿到上一步任务执行的结果进行处理，并且返回处理的结果 
+
+  ```java
+  // 正常返回
+  CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> 10)
+                  .thenApply(v -> ("上一步的执行的结果为：" + v));
+  System.out.println(completableFuture.join());  // 上一步的执行的结果为：10
+  
+  //模拟异常
+  CompletableFuture<String> completableFuture = CompletableFuture.supplyAsync(() -> {    
+      int i = 1 / 0;
+      return 10;
+  }).thenApply(v -> ("上一步的执行的结果为：" + v));
+  System.out.println(completableFuture.join());  // 抛错，有异常不回调
+  ```
+
+- thenRun：拿不到上一步任务执行的结果，但会执行Runnable接口的实现 
+
+  ```java
+  CompletableFuture<Void> completableFuture = CompletableFuture.supplyAsync(() -> 10)
+        .thenRun(() -> System.out.println("上一步执行完成"));
+  ```
+
+- thenAccept：可以拿到上一步任务执行的结果进行处理，但不需要返回处理的结果
+
+  ```java
+  CompletableFuture<Void> completableFuture = CompletableFuture.supplyAsync(() -> 10)
+        .thenAccept(v -> System.out.println("上一步执行完成，结果为：" + v));
+  ```
+
+4.2 只能接收任务处理异常后的回调
+
+```java
+public CompletionStage<T> exceptionally(Function<Throwable, ? extends T> fn);
+```
+
+没有出现异常则不回调；只有当出现异常时，回调exceptionally，并返回fn的结果：
+
+```java
+CompletableFuture<Integer> completableFuture = CompletableFuture.supplyAsync(() -> {
+    int i = 1 / 0;
+    return 100;
+}).exceptionally(e -> {
+    System.out.println("出现异常了，返回默认值");
+    return 110;
+});
+System.out.println(completableFuture.join());  
+// 出现异常了，返回默认值
+// 110
+```
+
+4.3 能同时接收任务执行正常和异常的回调
+
+```java
+public <U> CompletionStage<U> handle(BiFunction<? super T, Throwable, ? extends U> fn);
+public CompletionStage<T> whenComplete(BiConsumer<? super T, ? super Throwable> actin);
+```
+
+不论前面的任务执行成功还是失败，都会回调
+
+- handle : 类似exceptionally，但是exceptionally是出现异常才会回调，两者都有返回值，都能吞了异常，但是handle正常情况下也能回调。
+
+- whenComplete：能接受正常或者异常的回调，并且不影响上个阶段的返回值，也就是主线程能获取到上个阶段的返回值；当出现异常时，whenComplete并不能吞了这个异常，也就是说主线程在获取执行异常任务的结果时，会抛出异常。
+
+**5.两个并行任务编排**
+
+```java
+public <U,V> CompletionStage<V> thenCombine (CompletionStage<? extends U> other, BiFunction<? super T, ? super U,   ? extends V> fn);
+```
+
+当前任务和other任务都执行结束后，拿到这两个任务的执行结果，回调 BiFunction ，然后返回新的结果。
+
+![图8 二元依赖](images/Java并发/fa4c8669b4cf63b7a89cfab0bcb693b216006.png)
+
+例如如上图红色链路所示，CF4同时依赖于两个CF1和CF2，这种二元依赖可以通过thenCombine等回调来实现，如下代码所示：
+
+```java
+CompletableFuture<String> cf4 = cf1.thenCombine(cf2, (result1, result2) -> {
+    //result1和result2分别为cf1和cf2的结果
+    return "result4";
+});
+```
+
+**6、多个并行任务编排**
+
+```java
+public static CompletableFuture<Object> anyOf(CompletableFuture<?>... cfs);
+public static CompletableFuture<Void> allOf(CompletableFuture<?>... cfs);
+```
+
+- anyOf：参数列表中的任务，只要有一个成功，返回一个新的任务。
+- allOf：参数列表中的任务，全都成功才返回一个新的任务。
+
+![图9 多元依赖](images/Java并发/92248abd0a5b11dd36f9ccb1f1233d4e16045.png)
+
+如上图红色链路所示，整个流程的结束依赖于三个步骤CF3、CF4、CF5，这种多元依赖可以通过`allOf`或`anyOf`方法来实现，区别是当需要多个依赖全部完成时使用`allOf`，当多个依赖中的任意一个完成即可时使用`anyOf`，如下代码所示：
+
+```java
+CompletableFuture<Void> cf6 = CompletableFuture.allOf(cf3, cf4, cf5);
+CompletableFuture<String> result = cf6.thenApply(v -> {
+    //这里的join并不会阻塞，因为传给thenApply的函数是在CF3、CF4、CF5全部完成时，才会执行 。
+    result3 = cf3.join();
+    result4 = cf4.join();
+    result5 = cf5.join();
+    //根据result3、result4、result5组装最终result;
+    return "result";
+});
+```
+
+更详细的例子见下文实战
+
+**7、以Async结尾的方法**
+
+7.1 上面说的一些方法，比如说`thenAccept`方法，他有两个对应的Async结尾的方法：
+
+```java
+public CompletionStage<Void> thenAcceptAsync(Consumer<? super T> action, Executor executor);
+public CompletionStage<Void> thenAcceptAsync(Consumer<? super T> action);
+```
+
+thenAcceptAsync跟thenAccept的主要区别：前者会重新开一个线程来执行下一阶段的任务，而后者还是用上一阶段任务执行的线程执行。
+
+带Executor参数的与不带的主要区别：前者使用指定线程池，后者用ForkJoinPool。
+
+> 建议：**强制传线程池，且根据实际情况做线程池隔离**。
+>
+> 否则多个任务都使用ForkJoinPool中的公共线程池CommonPool处理回调，产生资源竞争，容易成为系统瓶颈。
+
+7.2 同理`thenApply`也有Async版本：
+
+```java
+public <U> CompletableFuture<U> thenApplyAsync(Function<? super T,? extends U> fn, Executor executor) 
+public <U> CompletableFuture<U> thenApplyAsync(Function<? super T,? extends U> fn);
+```
+
+
+
+### 实战
+
+多个`CompletableFuture`串行编排，第一个根据证券名称查询证券代码，第二个根据证券代码查询证券价格：
+
+```java
+public class Main {
+    public static void main(String[] args) throws Exception {
+        // 第一个任务:
+        CompletableFuture<String> cfQuery = CompletableFuture.supplyAsync(() -> {
+            return queryCode("中国石油");
+        });
+        // cfQuery成功后继续执行下一个任务:
+        CompletableFuture<Double> cfFetch = cfQuery.thenApplyAsync((code) -> {
+            return fetchPrice(code);
+        });
+        // cfFetch成功后打印结果:
+        cfFetch.thenAccept((result) -> {
+            System.out.println("price: " + result);
+        });
+        // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:
+        Thread.sleep(2000);
+    }
+
+    static String queryCode(String name) {
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+        }
+        return "601857";
+    }
+
+    static Double fetchPrice(String code) {
+        try {
+            Thread.sleep(100);
+        } catch (InterruptedException e) {
+        }
+        return 5 + Math.random() * 20;
+    }
+}
+```
+
+同时从新浪和网易查询证券代码，只要任意一个返回结果，就进行下一步查询价格，查询价格也同时从新浪和网易查询，只要任意一个返回结果，就完成操作：
+
+```java
+public class Main {
+    public static void main(String[] args) throws Exception {
+        // 两个CompletableFuture执行异步查询:
+        CompletableFuture<String> cfQueryFromSina = CompletableFuture.supplyAsync(() -> {
+            return queryCode("中国石油", "https://finance.sina.com.cn/code/");
+        });
+        CompletableFuture<String> cfQueryFrom163 = CompletableFuture.supplyAsync(() -> {
+            return queryCode("中国石油", "https://money.163.com/code/");
+        });
+
+        // 用anyOf合并为一个新的CompletableFuture:
+        CompletableFuture<Object> cfQuery = CompletableFuture.anyOf(cfQueryFromSina, cfQueryFrom163);
+
+        // 两个CompletableFuture执行异步查询:
+        CompletableFuture<Double> cfFetchFromSina = cfQuery.thenApplyAsync((code) -> {
+            return fetchPrice((String) code, "https://finance.sina.com.cn/price/");
+        });
+        CompletableFuture<Double> cfFetchFrom163 = cfQuery.thenApplyAsync((code) -> {
+            return fetchPrice((String) code, "https://money.163.com/price/");
+        });
+
+        // 用anyOf合并为一个新的CompletableFuture:
+        CompletableFuture<Object> cfFetch = CompletableFuture.anyOf(cfFetchFromSina, cfFetchFrom163);
+
+        // 最终结果:
+        cfFetch.thenAccept((result) -> {
+            System.out.println("price: " + result);
+        });
+        // 主线程不要立刻结束，否则CompletableFuture默认使用的线程池会立刻关闭:
+        Thread.sleep(200);
+    }
+
+    static String queryCode(String name, String url) {
+        System.out.println("query code from " + url + "...");
+        try {
+            Thread.sleep((long) (Math.random() * 100));
+        } catch (InterruptedException e) {
+        }
+        return "601857";
+    }
+
+    static Double fetchPrice(String code, String url) {
+        System.out.println("query price from " + url + "...");
+        try {
+            Thread.sleep((long) (Math.random() * 100));
+        } catch (InterruptedException e) {
+        }
+        return 5 + Math.random() * 20;
+    }
+}
+```
+
+上述逻辑实现的异步查询规则实际上是：
+
+```ascii
+┌─────────────┐ ┌─────────────┐
+│ Query Code  │ │ Query Code  │
+│  from sina  │ │  from 163   │
+└─────────────┘ └─────────────┘
+       │               │
+       └───────┬───────┘
+               ▼
+        ┌─────────────┐
+        │    anyOf    │
+        └─────────────┘
+               │
+       ┌───────┴────────┐
+       ▼                ▼
+┌─────────────┐  ┌─────────────┐
+│ Query Price │  │ Query Price │
+│  from sina  │  │  from 163   │
+└─────────────┘  └─────────────┘
+       │                │
+       └────────┬───────┘
+                ▼
+         ┌─────────────┐
+         │    anyOf    │
+         └─────────────┘
+                │
+                ▼
+         ┌─────────────┐
+         │Display Price│
+         └─────────────┘
+```
+
+**实践总结**
+
+1. 异步回调要传线程池：thenAcceptAsync和thenApplyAsync都使用带线程池的重载方法。
+2. 异步RPC调用注意不要阻塞IO线程池
+3. 线程池不要循环引用：父子任务用不同的线程池，否则会导致死锁
+
+
+
+### 原理
+
+CompletableFuture中包含两个字段：**result**和**stack**。result用于存储当前CF的结果，stack（Completion）表示当前CF完成后需要触发的依赖动作（Dependency Actions），去触发依赖它的CF的计算，依赖动作可以有多个（表示有多个依赖它的CF），以栈（Treiber stack）的形式存储，stack表示栈顶元素。
+
+<img src="images/Java并发/82aa288ea62d74c03afcd2308d302b6910425.png" alt="图10 CF基本结构" />
+
+这种方式类似“观察者模式”，依赖动作（Dependency Action）都封装在一个单独Completion子类中。下面是Completion类关系结构图。CompletableFuture中的每个方法都对应了图中的一个Completion的子类，Completion本身是**观察者**的基类。
+
+- UniCompletion继承了Completion，是一元依赖的基类，例如thenApply的实现类UniApply就继承自UniCompletion。
+- BiCompletion继承了UniCompletion，是二元依赖的基类，同时也是多元依赖的基类。例如thenCombine的实现类BiRelay就继承自BiCompletion。
+
+<img src="images/Java并发/5a889b90d0f2c2a0f6a4f294b9094194112106.png" alt="img" />
+
+以一元依赖中的thenApply为例，不再枚举全部回调类型。如下图所示：
+
+![图12 thenApply简图](images/Java并发/f45b271b656f3ae243875fcb2af36a1141224.png)
+
+**被观察者**
+
+每个CompletableFuture都可以被看作一个被观察者，其内部有一个Completion类型的链表成员变量**stack**，用来存储注册到其中的所有观察者。当被观察者执行完成后会弹栈stack属性，依次通知注册到其中的观察者。上面例子中步骤fn2就是作为观察者被封装在UniApply中。
+
+被观察者CF中的**result**属性，用来存储返回结果数据。这里可能是一次RPC调用的返回值，也可能是任意对象，在上面的例子中对应步骤fn1的执行结果。
+
+**观察者**
+
+CompletableFuture支持很多回调方法，例如thenAccept、thenApply、exceptionally等，这些方法接收一个函数类型的参数f，生成一个Completion类型的对象（即观察者），并将入参函数f赋值给Completion的成员变量fn，然后检查当前CF是否已处于完成状态（即result != null），如果已完成直接触发fn，否则将观察者Completion加入到CF的观察者链stack中，再次尝试触发，如果被观察者未执行完则其执行完毕之后通知触发。
+
+1. dep属性：指向其对应的CompletableFuture，在上面的例子中dep指向CF2。
+2. src属性：指向其依赖的CompletableFuture，在上面的例子中src指向CF1。
+3. fn属性：用来存储具体的等待被回调的函数。这里需要注意的是不同的回调方法（thenAccept、thenApply、exceptionally等）接收的函数类型也不同，即fn的类型有很多种，在上面的例子中fn指向fn2。
+
+参考：（还包括最佳实践）https://tech.meituan.com/2022/05/12/principles-and-practices-of-completablefuture.html
+
+https://www.cnblogs.com/iwehdio/p/14285282.html
 
 # Atomic
 
