@@ -473,15 +473,28 @@ public class AppConfig {
 
 2. `@Value("${oidd.passwd}")`
 
-   **${}**：占位符，取Properties文件中的对应值，或Environment对应值（java启动时-D参数配置）
+   - **${}**：占位符，取Properties文件中的对应值，或Environment对应值（java启动时-D参数配置）
 
-   ${oidd.passwd:default}：取Properties的oidd.passwd，取不到则给默认值default
+   - ${oidd.passwd:default}：取Properties的oidd.passwd，取不到则给默认值default
 
 3. `@Value("#{orderService3}")`
 
-   **#{}**：Spring表达式，找容器中名为orderService3的bean
+   - **#{}**：Spring表达式，找容器中名为orderService3的bean
 
-   #{orderService3.host}：找orderService3的host属性
+   - #{orderService3.host}：找orderService3的host属性
+
+# yml 占位符语法
+
+`${}`的用法与@Value一样，例如：
+
+```yaml
+exchange:
+  config:
+    # ${}语法:在yml文件中或启动命令中查key【TRADING_API】，如果没有，再取默认值http://localhost:8001
+    trading-api: ${TRADING_API:http://localhost:8001}
+```
+
+
 
 # @Resource
 
@@ -702,6 +715,36 @@ public class GlobalExceptionAdvice {
 org.springframework.web.method.annotation.MethodArgumentTypeMismatchException: Failed to convert value of type 'java.lang.String' to required type 'int'; nested exception is java.lang.NumberFormatException: For input string: "2147483648"
 ```
 
+# @Responsebody 与 @RequestBody
+
+- @Responsebody：表示该方法的返回结果直接写入 HTTP response body 中
+  一般在异步获取数据时使用，在使用 @RequestMapping 后，返回值通常解析为跳转路径，加上 @Responsebody 后返回结果不会被解析为跳转路径，而是直接写入 HTTP response body 中。
+  比如：异步获取json数据，加上 @Responsebody 后，会直接返回json数据。
+- @RequestBody：将 HTTP 请求正文（body）插入方法中，使用适合的 HttpMessageConverter 将请求体写入某个对象。一般在post方法中使用。
+
+@Responsebody整合在**@RestController**中，搭配@RestController使用：
+
+```java
+@RestController
+@Api(tags = "位置服务API", value = "cmp-xxx-map-api", description = "位置服务API")
+@RequestMapping("/api/v1/map")
+public class MapController extends CMPController {
+    // get请求
+    @GetMapping(value = "qryPositionTrackForWeb")  
+    public String qryPositionTrackForWeb(@RequestParam(value = "accNum") String accNum,
+                                         @RequestParam(value = "userId") Long userId ) {
+        // 实现略
+    }
+    // post请求
+    @PostMapping("/uploadImeiOrTacs") 
+    public void uploadImeiOrTacs(@RequestBody UploadImeiTacInst uploadInfo) {
+        // 实现略
+    }
+}
+```
+
+
+
 # @PreDestroy
 
 修饰方法。容器关闭前执行。
@@ -796,6 +839,41 @@ public class Prop {
 7. @Pattern(regexp = "正则")：正则表达式校验
 
    
+
+# @ConfigurationProperties
+
+需要和@Configuration配合使用，我们通常在一个POJO里面进行配置：
+
+```java
+@Data
+@Configuration
+@ConfigurationProperties(prefix = "mail")
+public class ConfigProperties {
+
+    private String hostName;
+    private int port;
+    private String from;
+}
+```
+
+上面的例子将会读取properties文件中所有以mail开头的属性，并和bean中的字段进行匹配：
+
+```
+#Simple properties
+mail.hostname=host@mail.com
+mail.port=9000
+mail.from=mailer@mail.com
+```
+
+Spring的属性名字匹配支持很多格式，如下所示所有的格式都可以和`hostName`进行匹配：
+
+```
+mail.hostName
+mail.hostname
+mail.host_name
+mail.host-name
+mail.HOST_NAME
+```
 
 
 

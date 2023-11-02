@@ -99,7 +99,7 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 ## JDK14新特性（2020年3月）
 
 - instanceof模式匹配，instanceof类型匹配语法简化，可以直接给对象赋值，如if(obj instanceof String str),如果obj是字符串类型则直接赋值给了str变量
-- 引入Record类型，类似于Lombok 的@Data注解，可以向Lombok一样自动生成构造器、equals、getter等方法；
+- 引入Record类型（关键字`record`），类似于Lombok 的@Data注解，可以向Lombok一样自动生成构造器、equals、getter等方法；
 - Switch 表达式-标准化
 - 改进 NullPointerExceptions提示信息，打印具体哪个方法抛的空指针异常，避免同一行代码多个函数调用时无法判断具体是哪个函数抛异常的困扰，方便异常排查；
 - 删除 CMS 垃圾回收器
@@ -1299,7 +1299,9 @@ private static class Entry<K,V> extends WeakReference<Object> implements Map.Ent
 
 也是key-value的数据结构，继承自Dictionary类（过时），实现了Map接口。
 
-与HashMap最大的不同是，HashTable是**线程安全**的。且HashMap在java 1.8引入红黑树，而HashTable还是链表结构。
+与HashMap最大的不同是，HashTable是**线程安全**的，实现方法全都加synchronized。
+
+且HashMap在java 1.8引入红黑树，而HashTable还是链表结构。
 
 ## 6、HashSet
 
@@ -1485,9 +1487,33 @@ Stream的中间操作得到的结果还是一个Stream，将一个Stream转换�
 | collect | 将stream元素转换为指定类型 | Collectors.toxxx()方法，常用toList() |
 | max     | 返回最大元素               |                                      |
 
-中间操作peek和最终操作forEach的区别：只有peek并不会执行遍历，还需要加最终操作；而forEach可以单独执行遍历
+### Q：中间操作的遍历和最终操作的遍历区别？
 
+中间操作peek（以及map）和最终操作forEach的区别：只有peek（以及map）并不会执行遍历，还需要加最终操作；而forEach可以单独执行遍历（下面代码第1点分别和 2、3对比）
 
+### Q：中间操作map和peek区别？
+
+虽然都是遍历，但map将**返回值送入流中**进入下一步运算；而peek不送入返回值，只是单纯执行（下面代码第2、3点对比）
+
+```java
+//1、 foreach
+Arrays.stream(new int[]{1,2,3,4}).forEach(i -> func(i)); // 3 6 9 12
+//2、 map + collect
+List<Integer> collect = Arrays.stream(new int[]{1, 2, 3, 4}).mapToObj(i -> func(i)).collect(Collectors.toList());  // 3 6 9 12
+System.out.println(collect); // [3, 6, 9, 12]
+// *********注意，上面用初始类型int数组转stream，要想用map操作必须先包装为对象，Stream提供了api --- mapToObj()
+// 如果是List<Integer>转的stream就可直接map
+List<Integer> collect = Arrays.asList(1, 2, 3, 4).stream().map(i -> func(i)).collect(Collectors.toList());
+// 3、peek + collect
+List<Integer> collect = Stream.of(1, 2, 3, 4).peek(i -> func(i)).collect(Collectors.toList());
+System.out.println(collect);
+
+// 辅助函数
+public static int func(int i) {
+    System.out.print(i*3  + " ");
+    return i * 3;
+}
+```
 
 **异常情况**
 
@@ -2182,6 +2208,57 @@ static修饰的内部类
 3. final修饰类
    表示最终的累，该类不能作为任何类的父类，即不能被继承
    类中的**方法会全部被隐式定义为final**类型。但类变量不会隐式加final，需要手动加final修饰。
+
+
+### 记录类Record
+
+`String`、`Integer`等类型都是**不变类**，其特点为：
+
+1. 定义class时使用`final`，无法派生子类；
+2. 每个字段使用`final`，保证创建实例后无法修改任何字段。
+
+假设我们希望定义一个`Point`类，有`x`、`y`两个变量，同时它是一个不变类，可以这么写：
+
+```java
+public final class Point {
+    private final int x;
+    private final int y;
+    public Point(int x, int y) { this.x = x; this.y = y; }
+    public int x() { return this.x; }
+    public int y() { return this.y; }
+}
+```
+
+为了保证不变类的比较，还需要正确覆写`equals()`和`hashCode()`方法，这样才能在集合类中正常使用。
+
+从Java 14开始，引入了新的`Record`类。上面Point的定义改写只需要一行：
+
+```java
+record Point(int x, int y) {}
+```
+
+即一行就能定义一个不变类。和`enum`类似，我们自己不能直接从`Record`类派生，只能通过`record`关键字由编译器实现继承。
+
+原理：由编译器生成其他代码。除了用`final`修饰class以及每个字段外，编译器还自动为我们创建了构造方法，和字段名同名的方法，以及覆写`toString()`、`equals()`和`hashCode()`方法。
+
+**构造方法**
+
+编译器默认按照`record`声明的变量顺序自动创建一个构造方法，并在方法内给字段赋值，那么如果要检查参数，应该怎么办？
+
+假设`Point`类的`x`、`y`不允许负数，就得给`Point`的构造方法加上检查逻辑：
+
+```java
+public record Point(int x, int y) {
+    public Point {
+        if (x < 0 || y < 0) {
+            throw new IllegalArgumentException();
+        }
+    }
+```
+
+方法`public Point {...}`被称为Compact Constructor，目的是编写检查逻辑，编译器会将其加入生成的构造方法中。
+
+
 
 ------
 

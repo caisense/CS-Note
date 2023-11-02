@@ -1386,7 +1386,50 @@ Bean的生命周期指的就是：在Spring中，Bean是如何生成的？
 
 可以用beanName获取容器的bean。可以用别名或多重别名（最终肯定能找到对应bean），存在aliasMap中，是一个map：<别名, 真实名>
 
+## Q：bean是线程安全的吗？
 
+区分单例和多例的情况。
+
+多例Bean每次创建一个新对象，也就是线程之间并不存在Bean共享，自然没有线程安全问题。
+
+ 对于单例Bean，所有线程都共享一个单例Bean实例，因此是存在资源的竞争。
+
+- 如果单例Bean是一个**无状态**Bean，也就是线程中的操作不会对Bean的成员执行**查询**以外的操作，那么这个单例Bean是线程安全的。
+
+  > 无状态就是不会保存数据，有状态就是有数据存储功能。任何无状态单例都是线程安全的。
+
+- 对于有状态的bean，Spring官方提供的bean，一般提供了通过ThreadLocal去解决线程安全的方法，比如RequestContextHolder、TransactionSynchronizationManager、LocaleContextHolder等。
+
+## Q： Spring中的Controller ，Service，Dao是不是线程安全的？
+
+controller、service和dao层本身并不是线程安全的，如果只是调用里面的方法，而且多线程调用一个实例的方法，会在内存中复制变量，这是自己线程的工作内存，是安全的。但是对于controller中的类变量，如果只读就是线程安全，如果有读有写就会存在线程并发冲突的问题，所以类变量一般都定义成只读的常量。
+
+## Q：原型bean就一定线程安全吗？
+
+不一定，例如
+
+```java
+@RestController
+@Scope(value = "prototype") // 多实例-prototype
+public class TestController {
+    private int var = 0;
+    private static int staticVar = 0;
+ 
+    @GetMapping(value = "/test_var")
+    public String test() {
+        System.out.println("普通变量var:" + (++var)+ "---静态变量staticVar:" + (++staticVar));
+        return "普通变量var:" + var + "静态变量staticVar:" + staticVar;
+    }
+}
+```
+
+  请求API三次，得到如下结果：
+
+> 普通变量var:1---静态变量staticVar:1
+> 普通变量var:1---静态变量staticVar:2
+> 普通变量var:1---静态变量staticVar:3
+
+可以看到虽然每次都是单独创建一个Controller，但类变量在不同请求中是用的同一个。
 
 # SpringBoot是怎么启动的
 
