@@ -1530,7 +1530,25 @@ public static int func(int i) {
   
   ```
 
-  
+
+## ParallelStream
+
+并行流，故名思意流的map或forEach操作可以并行。其内部使用**ForkJoinPool**多线程操作。
+
+```java
+List<Integer> numbers = Arrays.asList(1, 2, 3, 4, 5, 6, 7, 8, 9);
+// 1、forEach
+numbers.parallelStream().forEach(i -> {
+    System.out.print(i + " ");
+});  // 6 5 7 8 9 3 4 2 1  
+// 2、map
+List<Integer> collect = numbers.parallelStream().map(i -> {
+    System.out.print(i + " ");
+    return i;
+}).collect(Collectors.toList());  // 6 4 3 7 9 1 2 8 5
+```
+
+ParallelStream适用于流元素之间没有依赖关系（保证线程安全），不要求先后顺序的场景。
 
 ------
 
