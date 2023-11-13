@@ -9,9 +9,7 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 ## JDK8新特性
 
 - 支持lambda表达式，允许把函数整体作为一个方法的参数
-
 - Optional类
-
   实际上是个容器，支持链式调用判空
 
   ```java
@@ -19,7 +17,6 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
   ```
 
 - Stream类，引入函数式编程
-
 - 默认方法：接口支持默认的实现方法
 
 ## JDK9新特性（2017年9月）
@@ -127,15 +124,10 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 ## JDK17新特性（2021年9月）（LTS版本）
 
 - Free Java License
-
 - JDK 17 将取代 JDK 11 成为下一个长期支持版本
-
 - Spring 6 和 Spring Boot 3需要JDK17
-
 - 移除实验性的 AOT 和 JIT 编译器
-
 - 恢复始终执行严格模式 (Always-Strict) 的浮点定义
-
 - 正式引入密封类sealed class，限制抽象类的实现。
 
   > 与 final 区别：sealed 提供了更细粒度的继承关系控制。密封类的主要新增关键词有`sealed`、`permits`、`non-sealed`。子类继承方式`sealed`传递了密封性，`final`确认了密封性，`non-sealed`显式声明破坏密封性。给予密封性的控制，所以要求子类必须为 permits 后声明的直接子类，所以也不支持匿名类与函数式接口。
