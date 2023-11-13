@@ -1,4 +1,4 @@
-Spring源码
+
 
 # 一、Bean生成过程
 
@@ -575,7 +575,7 @@ context.close();  // 关闭容器
 
 
 
-<img src="images/spring源码/image-20230213091743919.png" alt="image-20230213091743919" style="zoom: 50%;" />
+<img src="images/Spring源码/image-20230213091743919.png" alt="image-20230213091743919" style="zoom: 50%;" />
 
 org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#populateBean
 
@@ -622,19 +622,19 @@ org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#aut
 
 DefaultListableBeanFactory中**resolveDependency()**是上面方法的具体实现，具体流程图  :
 
-<img src="images/spring源码/image-20230214112901786.png" alt="image-20230214112901786" style="zoom:67%;" />
+<img src="images/Spring源码/image-20230214112901786.png" alt="image-20230214112901786" style="zoom:67%;" />
 
 findAutowireCandidates()  
 
 根据类型找beanName的底层流程  
 
-<img src="images/spring源码/image-20230214113440475.png" alt="image-20230214113440475"  />
+<img src="images/Spring源码/image-20230214113440475.png" alt="image-20230214113440475"  />
 
 
 
 DefaultListableBeanFactory.doResolveDependency()具体流程图为  
 
-<img src="images/spring源码/image-20230214112949038.png" alt="image-20230214112949038" style="zoom: 50%;" />
+<img src="images/Spring源码/image-20230214112949038.png" alt="image-20230214112949038" style="zoom: 50%;" />
 
 ## 3. @Resource注解
 
@@ -642,7 +642,7 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 
 底层工作流程图  
 
-<img src="images/spring源码/image-20230214113614488.png" alt="image-20230214113614488" style="zoom: 80%;" />  
+<img src="images/Spring源码/image-20230214113614488.png" alt="image-20230214113614488" style="zoom: 80%;" />  
 
 # 四、循环依赖
 
@@ -783,11 +783,11 @@ DefaultListableBeanFactory.doResolveDependency()具体流程图为
 
 **流程图**
 
-<img src="images/spring源码/17395320ad095cfbtplv-t2oaga2asx-zoom-in-crop-mark3024000.webp" alt="img" />
+<img src="images/Spring源码/17395320ad095cfbtplv-t2oaga2asx-zoom-in-crop-mark3024000.webp" alt="img" />
 
 `You` and `Me` 的例子在注解注入造成循环依赖时，Spring的调用链时序图如下：
 
-<img src="images/spring源码/656873-20190628213759517-954779861.png" alt="img" />
+<img src="images/Spring源码/656873-20190628213759517-954779861.png" alt="img" />
 
 
 
@@ -904,7 +904,7 @@ spring实例化一个bean时，默认使用**默认构造方法**（未显式定
 
 实例化时（org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#createBeanInstance），调determineConstructorsFromBeanPostProcessors()找所有候选的构造方法，思路见下图：
 
-<img src="images/spring源码/image-20230221165332634.png" alt="image-20230221165332634" />
+<img src="images/Spring源码/image-20230221165332634.png" alt="image-20230221165332634" />
 
 候选的构造方法为null，则直接使用无参构造。否则调
 
@@ -912,9 +912,9 @@ spring实例化一个bean时，默认使用**默认构造方法**（未显式定
 
 
 
-<img src="images/spring源码/image-20230222090947075.png" alt="image-20230222090947075" />
+<img src="images/Spring源码/image-20230222090947075.png" alt="image-20230222090947075" />
 
-<img src="images/spring源码/image-20230222091016515.png" alt="image-20230222091016515" />
+<img src="images/Spring源码/image-20230222091016515.png" alt="image-20230222091016515" />
 
 
 
