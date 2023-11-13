@@ -1552,6 +1552,54 @@ ParallelStream适用于流元素之间没有依赖关系（保证线程安全）
 
 ------
 
+# 五、枚举
+
+定义一个枚举类，用关键字`enum`，编译器会生成一个辅助类，自动继承`java.lang.Enum`。
+
+枚举类不能被继承。
+
+在枚举类中定义**枚举常量列表**，每个元素的类型都和枚举类相同，都通过构造方法创建。
+
+用values()方法来遍历枚举常量列表，它返回一个由所有枚举常量组成的数组，其顺序按定义的顺序排列。
+
+```java
+public enum PushTaskType {
+    // 枚举常量列表，每个成员用逗号隔开
+    FTP(0, "FTP详单推送", "/{cdr,ddr,mdr}"),
+    FLOW_ANALYSE(2, "应用流量分析", "/flow"),
+    SIM(1, "SIM卡资料推送", "/sim");
+    // 属性
+    private Integer type;
+    private String desc;
+    private String subPath;
+    // 构造方法
+    PushTaskType(Integer type, String desc, String subPath) {
+        this.type = type;
+        this.desc = desc;
+        this.subPath = subPath;
+    }
+    // 方法：通过type，遍历获取desc
+    public static String getDesc(Integer type) {
+        if (null == type) {
+            return null;
+        }
+        for (PushTaskType item : PushTaskType.values()) {  // 用values方法遍历
+            if (item == null || item.getType() == null) {
+                continue;
+            }
+            if (item.getType().compareTo(type) == 0) {
+                return item.getDesc();
+            }
+        }
+        return null;
+    }
+}
+```
+
+## values方法
+
+用于遍历常量列表，不在定义的枚举类中，也不在枚举基类Enum中，而是由**编译器给枚举类添加的静态方法**。、
+
 # 方法
 
 ## 形参
