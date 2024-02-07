@@ -1550,9 +1550,9 @@ ParallelStream适用于流元素之间没有依赖关系（保证线程安全）
 
 枚举类不能被继承。
 
-在枚举类中定义**枚举常量列表**，每个元素的类型都和枚举类相同，都通过构造方法创建。
+创建：在枚举类中定义**枚举常量列表**，每个元素的类型都和枚举类相同，都通过构造方法创建。构造方法建议声明private。
 
-用values()方法来遍历枚举常量列表，它返回一个由所有枚举常量组成的数组，其顺序按定义的顺序排列。
+属性：强烈建议声明为final，每个枚举常量定义后就不要修改。
 
 ```java
 public enum PushTaskType {
@@ -1561,11 +1561,11 @@ public enum PushTaskType {
     FLOW_ANALYSE(2, "应用流量分析", "/flow"),
     SIM(1, "SIM卡资料推送", "/sim");
     // 属性
-    private Integer type;
-    private String desc;
-    private String subPath;
+    private final Integer type;
+    private final String desc;
+    private final String subPath;
     // 构造方法
-    PushTaskType(Integer type, String desc, String subPath) {
+    private PushTaskType(Integer type, String desc, String subPath) {
         this.type = type;
         this.desc = desc;
         this.subPath = subPath;
@@ -1588,9 +1588,49 @@ public enum PushTaskType {
 }
 ```
 
+常用API：
+
+- 通过`name()`获取常量定义的字符串，注意不要使用`toString()`；
+- 通过`ordinal()`返回常量定义的顺序（无实质意义）；
+- 用`values()`方法来遍历枚举常量列表，它返回一个由所有枚举常量组成的数组，其顺序按定义的顺序排列。
+- `random()`：随机返回枚举常量列表中的一个
+
 ## values方法
 
-用于遍历常量列表，不在定义的枚举类中，也不在枚举基类Enum中，而是由**编译器给枚举类添加的静态方法**。、
+用于遍历常量列表，不在定义的枚举类中，也不在枚举基类Enum中，而是由**编译器给枚举类添加的静态方法**。
+
+## switch语句
+
+枚举类可以应用在`switch`语句中。因为枚举类天生具有类型信息和有限个枚举常量，所以比`int`、`String`类型更适合用在`switch`语句中：
+
+```java
+public class Main {
+    public static void main(String[] args) {
+        Weekday day = Weekday.SUN;
+        switch(day) {
+            case MON:  // 注意case不用写成 Weekday.MON
+            case TUE:
+            case WED:
+            case THU:
+            case FRI:
+                System.out.println("Today is " + day + ". Work at office!");
+                break;
+            case SAT:
+            case SUN:
+                System.out.println("Today is " + day + ". Work at home!");
+                break;
+            default:
+                throw new RuntimeException("cannot process " + day);
+        }
+    }
+}
+
+enum Weekday {
+    MON, TUE, WED, THU, FRI, SAT, SUN;
+}
+```
+
+
 
 # 方法
 
