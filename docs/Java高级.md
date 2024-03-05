@@ -907,7 +907,115 @@ java源码编译为字节码（用javac命令）后，还是不能直接执行�
 
 ## JIT
 
-当JVM发现某段java代码执行频繁时，认为这是热点代码，通过**JIT**（Just In Time，即时编译）将其直接翻译为机器码，并进行优化和缓存。
+当JVM发现某段java代码执行频繁时，认为这是热点代码，通过**JIT**（Just In Time，即时编译）将其直接翻译为机器码，并进行**优化**和**缓存**。
+
+JIT实现有两种：
+
+1. 基于采样：周期性检测各线程栈顶，发现某方法经常出现在栈顶，则认为是热点方法。优点是简单，缺点是无法精确计量一个方法的热度，容易受线程阻塞干扰
+2. 基于计数器：为每个方法，甚至是代码块设置计数器，统计执行次数，超过阈值就认为是热点方法。HotSpot使用该方法，有两种计数器：
+   - 方法计数器：记录方法被调用次数
+   - 回边计数器：记录方法中for或while循环执行次数
+
+
+
+JIT对代码的优化：**逃逸分析**、**锁消除**、锁膨胀、**方法内联**、空值检查消除、类型检测消除、公共子表达式消除。
+
+### 逃逸分析
+
+对象基于逃逸分析有三种状态：
+
+1. 全局逃逸：对象超出了方法或线程的范围，如存储在静态字段，或作为方法的返回值输出到方法外部
+
+   ```java
+   public class GlobalEscapeExample {
+       private static Object staticObj;
+       public void globalEscape() {
+       	staticObj = new Object(); // 这个对象赋值给静态字段，因此它是全局逃逸的
+       }
+       
+       public static StringBuffer createStringBuffer(String s1, String s2) {
+           StringBuffer sb = new StringBuffer();
+           sb.append(s1);
+           sb.append(s2);
+           return sb;  // 对象创建后作为方法返回值，也是全局逃逸
+       }
+   }
+   ```
+
+   
+
+2. 参数逃逸：对象作为参数传递，或被参数引用。但在方法调用期间不会全局逃逸
+
+   ```java
+   public class GlobalEscapeExample {
+   	public void methodA() {
+           Object localObj = new Object();
+           methodB(localObj);  // localObj作为参数从methodA方法传递到methodB方法，发生参数逃逸。
+       }
+       public void methodB(Object param) {
+           // 但不会从methodB方法中逃逸
+       }
+   }
+   ```
+
+   
+
+3. 无逃逸：对象可以被标量替换，意味着它的内存分配可以从生成的代码中移除
+
+   ```java
+   public static StringBuffer createStringBuffer(String s1, String s2) {
+           StringBuffer sb = new StringBuffer();
+           sb.append(s1);
+           sb.append(s2);
+           return sb.toString();  // 返回值不是sb对象引用，不发生逃逸
+       }
+   ```
+
+   
+
+### 锁消除
+
+### 标量替换&栈上分配
+
+标量（Scalar）指一个无法再分解成更小数据的数据。例如Java中的**原始数据类型**就是标量。
+
+相对的，那些还可以分解的数据叫聚合量（Aggregate），例如对象，可以分解为标量和聚合量。
+
+JIT阶段，如果经过逃逸分析，发现某对象不会被外界访问，则经过JIT优化，会把该对象拆解为若干
+
+### 方法内联
+
+将方法的代码直接插入调用的地方，减少方法调用的开销。适用于规模小切频繁调用的方法。
+
+```java
+public class InlineExample {
+    public int add (int a, int b) {
+        return a+b;
+    }
+    public void exampleMethod() {
+        int result = add(1, 2);  // 调用add方法
+    }
+    // 内联
+    public void inlineMethod() {
+        int result = 1 + 2;  // 调用的add方法很简单，直接将add的逻辑拿过来
+    }
+}
+```
+
+
+
+### JIT优化带来的问题
+
+问题：JIT优化之前，对Java应用的所有请求，都要经过解释执行，该过程较耗时。如果请求量大，慢的更明显，解释器对CPU资源占用更多，间接导致CPU、LOAD等飙高，进而导致引用性能进一步下降。这也就是很多应用刚重启时大量超时的原因。
+
+随着请求不断增多，JIT优化触发，后续的热点请求就可能不需要解释执行，直接运行JIT优化后缓存的机器码了。
+
+解决：
+
+1. 提升JIT优化效率，如阿里JDK：DragonWell，使用JwarmUp技术，用文件记录Java应用上一次运行时编译信息，下次Java启动时读取该文件，在流量来之前提前完成类加载、初始化和方法编译
+2. 预热。在应用刚启动时只切给部分小流量，触发JIT优化，之后再慢慢调大。
+
+
 
 ## JVM模型
 
