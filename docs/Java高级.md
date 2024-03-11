@@ -907,7 +907,7 @@ java源码编译为字节码（用javac命令）后，还是不能直接执行�
 
 ## JIT
 
-当JVM发现某段java代码执行频繁时，认为这是热点代码，通过**JIT**（Just In Time，即时编译）将其直接翻译为机器码，并进行**优化**和**缓存**。
+当JVM发现某段java代码执行频繁时，认为这是热点代码，通过**JIT**（Just In Time，即时编译）将其直接翻译为机器码，并进行**优化**和**缓存**。经过JIT优化的代码执行效率媲美C++。
 
 JIT实现有两种：
 
@@ -918,11 +918,11 @@ JIT实现有两种：
 
 
 
-JIT对代码的优化：**逃逸分析**、**锁消除**、锁膨胀、**方法内联**、空值检查消除、类型检测消除、公共子表达式消除。
+JIT对代码的优化：**逃逸分析**、**锁消除**、锁膨胀、**标量替换&栈上分配**、**方法内联**、空值检查消除、类型检测消除、公共子表达式消除。
 
 ### 逃逸分析
 
-对象基于逃逸分析有三种状态：
+对象基于逃逸分析（Escape Analysis）有三种状态：
 
 1. 全局逃逸：对象超出了方法或线程的范围，如存储在静态字段，或作为方法的返回值输出到方法外部
 
@@ -981,7 +981,89 @@ JIT对代码的优化：**逃逸分析**、**锁消除**、锁膨胀、**方法�
 
 相对的，那些还可以分解的数据叫聚合量（Aggregate），例如对象，可以分解为标量和聚合量。
 
-JIT阶段，如果经过逃逸分析，发现某对象不会被外界访问，则经过JIT优化，会把该对象拆解为若干
+**标量替换**：JIT阶段，如果经过逃逸分析，发现某对象不会被外界访问，则经过JIT优化，会把该对象拆解为若干标量。
+
+标量替换之后就便于栈上分配了。
+
+**栈上分配**：方法中创建的对象，如果是**无逃逸**[见【逃逸分析】第3点](####逃逸分析)的，则可以对其内存分配进行优化，将堆上分配改为栈上分配。
+
+例如如下代码，在alloc方法中创建100万个User对象，且该对象是无逃逸的：
+
+```java
+public class StackAllocTest {
+    public static void main(String[] args) {
+        long a1 = System.currentTimeMillis();
+        for (int i = 0; i < 1000000; i++) {
+            alloc();
+        }
+        // 查看执行时间
+        long a2 = System.currentTimeMillis();
+        System.out.println("cost " + (a2 - a1) + " ms");
+        // 为了方便查看堆内存中对象个数，线程sleep
+        try {
+            Thread.sleep(100000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+
+    }
+    private static void alloc() {
+        User user = new User();
+    }
+}
+```
+
+指定以下JVM参数运行：
+
+```java
+-Xmx4G -Xms4G -XX:+PrintGCDetails -XX:+HeapDumpOnOutOfMemoryError
+```
+
+在程序打印cost XX ms后，代码运行结束前，使用`[jmap][1]`命令查看当前堆内存情况，可以看到堆中创建了100万个`StackAllocTest$User`实例。
+
+```
+➜  ~ jps
+2809 StackAllocTest
+2810 Jps
+➜  ~ jmap -histo 2809
+
+ num     #instances         #bytes  class name
+----------------------------------------------
+   1:           524       87282184  [I
+   2:       1000000       16000000  StackAllocTest$User
+   3:          6806        2093136  [B
+   4:          8006        1320872  [C
+   5:          4188         100512  java.lang.String
+   6:           581          66304  java.lang.Class
+```
+
+则开启JVM逃逸分析后：
+
+```java
+-Xmx4G -Xms4G -XX:+DoEscapeAnalysis -XX:+PrintGCDetails -XX:+HeapDumpOnOutOfMemoryError
+```
+
+可以看到User实例数降到8万（为什么不降为0？因为线程的栈内存是有限的，-xss）：
+
+```
+➜  ~ jps  // jps命令，查看本机jvm进程
+709
+2858 Launcher
+2859 StackAllocTest  // pid=2859，进程名StackAllocTest（默认为main方法类名）
+2860 Jps
+➜  ~ jmap -histo 2859  // jmap命令， -histo：打印每个class的实例数、内存占用、类全名。2859是进程pid
+
+ num     #instances         #bytes  class name
+----------------------------------------------
+   1:           524      101944280  [I
+   2:          6806        2093136  [B
+   3:         83619        1337904  StackAllocTest$User
+   4:          8006        1320872  [C
+   5:          4188         100512  java.lang.String
+   6:           581          66304  java.lang.Class
+```
+
+
 
 ### 方法内联
 
@@ -1001,6 +1083,10 @@ public class InlineExample {
     }
 }
 ```
+
+
+
+
 
 
 
@@ -1086,35 +1172,546 @@ public class Math {
 
 图中黄色区域（堆、方法区），虽然逻辑上分区，但**物理上是连续的区域**。
 
+![img](images/Java高级/1534147-20200327123751777-1521977355.png)
+
 1. 堆 Heap
 
    存储所有对象实例。JVM的垃圾回收主要发生在该区域。（与栈具有数据结构FIFO特性不同，jvm的堆和数据结构的堆没有关系）
 
-   从结构上，堆被划分为新生代和老年代；而新生代又分为Eden区、To Survivor区（s0）、From Survivor区（s1），大小比例为8:1:1。
+   从结构上，堆被划分为新生代和老年代；而新生代又分为Eden区、To Survivor区（s0）、From Survivor区（s1），大小比例为**8:1:1**。
+
+   ![](images/Java高级/image.png)
 
    当堆中没有内存可供完成实例分配，且堆也无法再扩展时，将会抛出OutOfMemoryError异常。
 
 2. 方法区 Method Area
 
-   存储类的静态信息（.class）、常量、静态变量（指针，指向堆）、即时编译器（JIT）编译产生的代码
+   存储类的静态信息（.class）、常量、**静态变量**（存指针，指向堆）、即时编译（JIT）产生的代码
 
-   由于HotSpot虚拟机将GC算法拓展到了该区域，因此方法区有时也被称为**永久代**，1.8之后改称元空间metaspace。
+   由于HotSpot虚拟机将GC算法拓展到了该区域，因此方法区有时也被称为**永久代**（Permanent Generation），1.8之后改称**元空间**（Metaspace）。
 
-   当方法区无法满足内存分配需求时，将抛出OutOfMemoryError异常。
+   和新生代、老年代一样，永久代也是可能会发生GC的，当方法区内存分配超过限制的最大值，将抛出OutOfMemoryError异常。
 
-   **运行时常量池**
+   - **运行时常量池**
 
-   是方法区的一部分。Class 文件中的常量池（编译器生成的字面量和符号引用）会在类加载后被放入这个区域。
+     是方法区的一部分。Class 文件中的常量池（编译器生成的字面量和符号引用）会在类加载后被放入这个区域。
 
-   除了在编译期生成的常量，还允许动态生成，例如 String 类的 intern()。
+     除了在编译期生成的常量，还允许动态生成，例如 String 类的 intern()。
 
 **直接内存**
 
 JDK 1.4 中新引入了 NIO 类，它可以使用 Native 函数库直接分配**堆外内存**，然后通过 Java 堆里的 DirectByteBuffer 对象作为这块内存的引用进行操作。这样能在一些场景中显著提高性能，因为避免了在堆内存和堆外内存来回拷贝数据。
 
-## JVM版本的更新
+#### Q：Java对象一定在堆上分配吗？
 
-jdk1.7版本中，将字符串常量池从方法区移动到了堆中，避免方法区内存有限从而出现OOM错误。而jdk1.8版本则将方法区从运行时内存移动到了本地内存中，方法区不再与堆相连。
+不一定，如果没开启逃逸分析，那对象根据常识，在堆上分配内存。
+
+如果开启了逃逸分析：
+
+```java
+-Xmx4G -Xms4G -XX:+DoEscapeAnalysis -XX:+PrintGCDetails -XX:+HeapDumpOnOutOfMemoryError
+```
+
+若该对象是无逃逸的，则JIT优化后，堆内存分配的对象会大大减少，优化至栈上分配。[（见：标量替换&栈上分配）](####标量替换&栈上分配)
+
+
+
+### JVM模型的版本更新
+
+jdk1.7版本中，将字符串常量池从方法区移动到了堆中，避免方法区内存有限从而出现OOM错误。
+
+jdk1.8版本则将方法区从运行时内存移动到了本地内存中，方法区不再与堆相连。
+
+
+
+## 垃圾回收（GC）
+
+就是将没有引用的对象回收，主要是针对堆和方法区进行，这些区域是**线程共享**的。
+
+程序计数器、虚拟机栈和本地方法栈这三个区域属于**线程私有**的，只存在于线程的生命周期内，线程结束之后就会消失，因此不需要回收。
+
+<img src="images\Java高级\image-20220324020703131.png" alt="image-20220324020703131" />
+
+新生代与老年代是1：3；
+
+新生代包括eden区、s0和s1（Survivor缩写），大小比例是8：1：1。
+
+### Minor GC 和 Full GC
+
+HotSpot虚拟机中的GC可分为两种：Partial GC和Full GC。
+
+- YGC（Young GC，或minor GC）：对新生代堆gc，在eden区（也包含某个s0/s1）满时发生。使用**拷贝算法**，频率较高，性能耗费小
+
+- FGC（Full GC，或Major GC）：全堆（新生代+老年代）范围gc，在老年代满时发生。使用**标记压缩**算法，比YGC慢。需要两类垃圾收集器结合使用。
+
+  FGC触发时机：
+
+  1. 手动调用System.gc
+  2. 在Minor GC之后，若JVM判断老年代的连续内存空间已少于先前每次Minor GC结束后晋升至老年代的对象总大小的平均值，则JVM会进行Full GC（具体的判断逻辑随着收集器不同有所区别）；
+  3. 方法区（永久代）的空间不足时。
+
+  
+
+### 堆对象生命周期
+
+1. 新建对象，默认先放入eden区，此时年龄为0。
+
+   - eden区放满，触发YGC，还存活的对象放入s0，且年龄+1。
+
+   - eden区放不下（大对象，如长字符串或数组），直接放老年代。
+
+     `-XX:PretenureSizeThreshold`，大于此值的对象直接放老年代
+
+2. 下一次YGC，扫描并回收eden + s0，还存活的对象放s1，且年龄+1（也就是每次YGC，存活的交替放入s0或s1）。
+
+   YGC之后的结果放不下s区，则放入老年代[**见：空间分配担保**]()
+
+   因此YGC有三种情况，根据剩余的存活对象大小：
+
+   1. 小于Survivor区：直接进入另一个Survivor区。
+   2. 大于Survivor区并且小于老年代可用内存：去老年代。
+   3. 大于Survivor并且大于老年代：触发FullGC。
+
+3. 当**年龄到达阈值**时（一般默认15，CMS是6），放入老年代。该阈值可以用`-XX:MaxTenuringThreshold`指定
+
+   若YGC的存活对象s区装不下，不管年龄多少，**多余的**直接放入老年代。见下文[对象年龄动态判断机制](#####对象年龄动态判断机制)。
+
+4. 当老年代放满，触发FGC
+
+> 空间分配担保
+>
+> 在每一次执行YoungGC之前，JVM会检查老年代最大可用的连续空间是否大于新生代所有对象的总空间。如果大于，那么说明本次Young GC是安全的。
+>
+> 如果小于，那么虚拟机会查看HandlePromotionFailure 参数设置的值判断是否允许担保失败。如果值为true，那么会继续检查老年代最大可用连续空间是否大于历次晋升到老年代的对象的平均大小（一共有多少对象在内存回收后存活下来是不可预知的，因此只好取之前每次垃圾回收后晋升到老年代的对象大小的平均值作为参考）。如果大于，则尝试进行一次YoungGC，但这次YoungGC依然是有风险的；如果小于，或者HandlePromotionFailure=false，则会直接触发一次Full GC。
+>
+> 但是，需要注意的是HandlePromotionFailure这个参数，在JDK 7中就不再支持了。在后续的版本中， 只要检查老年代最大可用连续空间是否大于**历次晋升到老年代的对象的平均大小**，如果大于，则认为担保成功。
+
+#### 对象年龄动态判断机制
+
+当单个 Survivor 区所有**小于等于某个年龄N的对象**占用超过 50% (`-XX:TargetSurvivorRatio`)，则年龄大于等于N的对象，即使没到阈值，也直接放入老年代。例如50%的对象最大年龄为8，则年龄>8的放入老年代。
+
+```c++
+uint ageTable::compute_tenuring_threshold(size_t survivor_capacity) {
+  size_t desired_survivor_size = (size_t)((((double) survivor_capacity)*TargetSurvivorRatio)/100);
+  size_t total = 0;
+  uint age = 1;
+  while (age < table_size) {
+    total += sizes[age];
+    if (total > desired_survivor_size) break;
+    age++;
+  }
+  uint result = age < MaxTenuringThreshold ? age : MaxTenuringThreshold;
+    ...
+}
+```
+
+
+
+#### Q：JVM如何判断对象存活？
+
+1. 引用计数法
+
+   为每个对象设置一个引用计数器，每当有引用时，计数器+1，引用失效时计数器-1。当对象引用为0时，判断对象失效。
+
+   - 优点：实现简单，效率高；
+
+   - 缺点：难以解决垃圾对象间循环引用，但实际上已经无法寻址的情况。
+
+2. **根可达**分析法
+
+   从**GC Roots**出发，与之直接或间接关联的对象就是有效对象，反之就是无效对象。
+
+   可作为GC Roots的对象包括：
+
+   - 虚拟机栈中引用的对象（局部变量）
+   - 方法区中类静态属性引用的对象（静态变量）
+   - 方法区中常量引用的对象（常量）
+   - 本地方法栈中JNI引用的对象（JNI指针）
+
+#### Q：Minor GC如何避免全堆扫描？
+
+由于**老年代的对象可能引用新生代的对象**，在标记存活对象的时候，需要扫描老年代的对象，如果该对象拥有对新生代对象的引用，那么这个引用也会被作为 GC Roots。这相当于就做了**全堆扫描**。
+
+HotSpot虚拟机通过**卡表**技术避免Minor GC触发全堆扫描。具体策略是将老年代的空间分成大小为 512B的若干张卡，并且维护一个卡表。卡表本身是字节数组，数组中的每个元素对应着一张卡，本质上就是维护一个标识位，这个标识位代表对应的卡是否可能存有指向新生代对象的引用，如果可能存在，那么这张卡就是所谓的**脏卡**。
+
+在进行Minor GC的时候，只需要在卡表中寻找脏卡，并将脏卡中的老年代指向新生代的引用加入到GC Roots中，当完成所有脏卡的扫描之后，将所有脏卡的标识位清零。
+
+
+
+#### Q：yGC频繁原因？
+
+eden区设置太小；对象创建太频繁；
+
+其他情况不会单纯引起ygc，也会导致fgc
+
+
+
+#### Q：为什么需要两个Survivor区？
+
+如果只用一个s0，则一次YGC的范围是eden + s0，结果存哪里？如果用标记复制算法，则必须找一块eden + s0以外的区域存储gc后的结果。如果用标记清除算法则存在碎片问题，用标记整理会有效率问题。
+
+所以好的办法是使用标记复制算法，将gc结果存放另一块区域s1。
+
+#### 被标记为失效的对象是否一定会被回收？
+
+被标记为失效的对象被回收前会经历如下步骤：
+
+1. JVM判断对象是否重写了finalize()方法：
+
+   - 若重写了finalize()，则将其放入F-Queue队列中；
+   - 若未重写，则直接回收。
+
+2. 执行队列中的finalize()方法：
+
+   JVM自动创建一个优先级较低的线程执行队列中的finalize()方法，只负责触发，不保证执行完毕。若finalize()方法执行了耗时操作，则JVM会停止执行方法并立刻回收对象。
+
+3. 对象销毁/重生：
+
+   若finalize()方法中将this赋值给了某个引用，则该对象会重生，否则会被回收。
+
+#### Q：为什么年龄达15时放入老年代？
+
+因为对象markword中的分代年龄用4bit表示，最大15
+
+对象内存布局
+
+<img src="images\Java高级\未命名图片-16485691371701.png" alt="未命名图片" style="zoom:50%;" />
+
+markword结构（64位系统中是8B=64bit）
+
+<img src="images\Java高级\20180322153316377.jpg" alt="20180322153316377" />
+
+### 主流垃圾收集器
+
+
+
+<img src="images\Java高级\微信截图_20220324211950.png" alt="微信截图_20220324211950" />
+
+实线连接表示配合使用。分类方法有串行/并行，年轻代/老年代/不分代：
+
+- 串行垃圾回收器：Serial GC， Serial Old
+
+- 并行垃圾回收器：Parallel Scavenge，Parallel Old，ParNew
+
+- 并发标记扫描垃圾回收器：CMS
+
+  
+
+发展路线：内存越来越大，**STW**时间越来越短。从分代到不分代。
+
+|                   | 管理内存 | STW时间 |
+| ----------------- | -------- | ------- |
+| Serial            | 几十M    |         |
+| Parallel Scavenge | 几个G    |         |
+| CMS               | 几十G    | 200ms   |
+| G1                | 上百G    | 10ms    |
+| ZGC               | 4TB      | 1ms     |
+
+
+
+#### JVM默认回收器
+
+- 1.7和1.8：PS+PO （Parallel Scavenge + ParallelOld）
+- 1.9：G1
+
+#### Q：为什么要STW机制？
+
+如果不暂停线程，让其继续执行，会破坏GC Root的依赖关系，导致某些对象被回收，增加gc的复杂性。
+
+**STW**
+
+stop the world的简写，停止所有用户线程，所有线程进入**SafePoint**等待。
+
+**Safepoint** 
+
+可以理解成是在**代码执行过程中的一些特殊位置**，当线程执行到这些位置的时候，**线程可以暂停**。
+
+在 SafePoint 保存了其他位置没有的**一些当前线程的运行信息，供其他线程读取**。这些信息包括：线程上下文的任何信息，例如对象或者非对象的内部指针等等。信息的使用场景：
+
+1. 当需要 GC 时，需要知道哪些对象还被使用，或者已经不被使用可以回收了，这样就需要每个线程的对象使用情况。
+2. 对于偏向锁（Biased Lock），在高并发时想要解除偏置，需要线程状态还有获取锁的线程的精确信息。
+3. 对方法进行即时编译优化（OSR栈上替换），或者反优化（bailout栈上反优化），这需要线程究竟运行到方法的哪里的信息。
+
+线程只有运行到了 SafePoint 的位置，他的**一切状态信息才是确定的**
+
+**Safepoint 如何实现**
+
+SafePoint 可以插入到代码的某些位置，每个线程运行到 SafePoint 代码时，主动去检查是否需要进入 SafePoint，称为 **Polling**
+
+理论上，可以在每条 Java 编译后的字节码的边界，都放一个检查 Safepoint 的机器命令。线程执行到这里的时候，会执行 **Polling** 询问 JVM 是否需要进入 SafePoint，这个询问是会有性能损耗的，所以 JIT 会优化尽量减少 SafePoint。
+
+经过 **JIT 编译优化**的代码，会在下列放置一个 SafePoint：
+
+1. 所有方法的返回之前
+
+2. 所有非counted loop的循环（即：无界循环）回跳之前（即循环体末尾）
+
+   **注意**：对于明确有界的int循环，不会放置 SafePoint，如：
+
+   ```java
+   for (int i = 0; i < 100000000; i++) {
+       ...
+   }
+   ```
+
+   但是int换成**long**就还是会放置 SafePoint
+
+目的：防止发生 GC 需要 Stop the world 时，该线程一直不能暂停
+
+**STW时线程状态的变化**
+
+当线程处于下列5种状态：
+
+1. 运行字节码
+
+   运行字节码时，解释器会看线程是否被标记为 **poll armed**，如果是，VM 线程调用 `SafepointSynchronize::block(JavaThread *thread)`进行 block。
+
+2. 运行 native 代码
+
+   当运行 native 代码时，VM 线程略过这个线程，但是给这个线程设置 **poll armed**，让它在执行完 native 代码之后，它会检查是否 poll armed，如果还需要停在 SafePoint，则直接 block。
+
+3. 运行 JIT 编译好的代码
+
+   由于运行的是编译好的机器码，直接查看本地 local polling page 是否为脏，如果为脏则需要 block。这个特性是在 Java 10 引入的 [JEP 312: Thread-Local Handshakes](https://openjdk.java.net/jeps/312) 之后，才是只用检查本地 local polling page 是否为脏就可以了。
+
+4. 处于 BLOCK 状态
+
+   在需要所有线程需要进入 SafePoint 的操作完成之前，不许离开 BLOCK 状态
+
+5. 处于线程切换状态或者处于 VM 运行状态
+
+   会一直轮询线程状态直到线程处于阻塞状态（线程肯定会变成上面说的那四种状态，变成哪个都会 block 住）。
+
+#### 垃圾回收算法
+
+> 回收器主要使用2和3
+
+1. 标记清除：优点是时间短。缺点是不连续，有碎片。只有CMS使用
+
+   <img src="images\Java高级\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
+
+2. （标记）拷贝算法：优点是无碎片，缺点是浪费空间
+
+   <img src="images\Java高级\b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
+
+3. 标记整理（标记压缩）：优点是无碎片，缺点是时间长
+
+   <img src="images\Java高级\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
+
+   
+
+#### 年轻代垃圾收集器
+
+年轻代因为有两个s区，因此都可以采用**标记-复制**算法。
+
+1. Serial 串行垃圾回收器：串行回收，STW
+
+   <img src="images\Java高级\image-20220325014554879.png" alt="image-20220325014554879" style="zoom:50%;" />
+
+2. ParNew 并行垃圾回收器：可以理解为Serial回收器的多线程版，STW时多个线程并行回收。
+
+   默认开启的线程数与CPU数量相同，在CPU核数很多的机器上，可以通过参数`-XX:ParallelGCThreads`来设置线程
+
+   <img src="images\Java高级\image-20220325014725018.png" alt="image-20220325014725018" style="zoom:50%;" />
+
+3. Parallel Scavenge（ParallelGC）
+
+#### 老年代垃圾收集器
+
+1. SerialOld：可理解为Serial回收器的老年代版本，同样是一个单线程回收器，使用的是**标记整理**算法。其作用主要有：
+
+   - 在JDK1.5及之前的版本中与Parallel Scavenge收集器搭配使用；
+   - 作为CMS收集器的后备预案，如果CMS出现Concurrent Mode Failure，则SerialOld将作为后备收集器进行垃圾回收；
+   - JVM使用的实际上是基于SerialOld改进的PS MarkSweep收集器。
+
+2. ParallelOld：类似新生代的Parallel Scavenge，也是一种多线程的回收器，关注的重点同样在于吞吐量。使用了**标记-整理**算法进行垃圾回收。
+
+3. CMS：
+
+   即Concurrent Mark Sweep，并发标记清除，优点是并发和低停顿，因为主要关注系统停顿时间。
+
+   缺点：
+
+   1. 对CPU敏感：并发阶段虽然不会导致用户线程停顿，但是会因为占用了一部分线程使应用程序变慢
+
+   2. 有碎片
+
+   3. 无法处理**浮动垃圾**：最后一步并发清理，不阻塞用户线程，但是这部分垃圾是在标记之后，只能等待下一次gc。
+
+   使用的是**标记清除**算法。共有四个阶段：
+
+   1. 初始标记：标记所有[根可达](#####Q：JVM如何判断对象存活？)对象，需要STW（但非常短）
+
+   2. 并发标记：用户线程与gc线程**并发执行**（最耗时，因此才用并发，不会产生长时间STW）
+
+   3. 重新标记：STW，因为上一个阶段可能会存在标记失误（从线程角度理解），需要再次标记保证正确性  
+
+   4. 并发清理：一次性完成回收
+
+   <img src="images\Java高级\未命名图片.png" alt="未命名图片" style="zoom:50%;" />
+
+CMS的标记清除算法，其实就是三色标记法：
+
+> **三色标记法**
+>
+> 为解决根可达算法**循环引用**问题，以及引用计数法STW时间长的问题，引入三色标记法
+>
+> 将对象分为三种状态：白、灰、黑。
+>
+> - 白色：该对象没有被标记过。
+> - 灰色：该对象已经被标记过了，但该对象的引用对象还没标记完。
+> - 黑色：该对象已经被标记过了，并且他的全部引用对象也都标记完了
+>
+> ![sansebiaoji](images/Java高级/sansebiaoji.png)
+>
+> 总体分为标记过程和清除过程。
+>
+> **标记过程**可以分为三个阶段：初始标记（Initial Marking）、并发标记（Concurrent Marking）和重新标记（Remark）。
+>
+> - 初始标记：遍历所有的根对象，将根对象和直接引用的对象标记为灰色。在这个阶段中，垃圾回收器只会扫描被直接或者间接引用的对象，而不会扫描整个堆。因此，初始标记阶段的时间比较短。（Stop The World）
+>
+> - 并发标记：在这个过程中，垃圾回收器会从灰色对象开始遍历整个对象图，将被引用的对象标记为灰色，并将已经遍历过的对象标记为黑色。并发标记过程中，应用程序线程可能会修改对象图，因此垃圾回收器需要使用**写屏障（Write Barrier）**技术来保证并发标记的正确性（不需要STW）
+>
+> - 重新标记：重新标记的主要作用是标记在并发标记阶段中被修改的对象以及未被遍历到的对象。这个过程需要STW，垃圾回收器会从灰色对象重新开始遍历对象图，将被引用的对象标记为灰色，并将已经遍历过的对象标记为黑色。
+>
+> 标记过程之后，垃圾回收器会执行**清除操作**，将未被标记为可达对象的对象进行回收，从而释放内存空间。这个过程中，垃圾回收器会将所有未被标记的对象标记为白色。
+>
+> 三个阶段，只有并发标记不需要STW，其他都需要。
+>
+> 
+>
+> **写屏障**
+>
+> 是一种在对象引用被修改时，将其新的引用信息记录在特殊数据结构中的机制。**在三色标记法中，写屏障技术被用于记录对象的标记状态，并且只对未被标记过的对象进行标记。**
+>
+> 当应用程序线程修改了一个对象的引用时，写屏障会记录该对象的新标记状态。
+>
+> - 如果该对象未被标记过，那么它会被标记为灰色，以便在垃圾回收器的下一次遍历中进行标记。
+> - 如果该对象已经被标记为可达对象，那么写屏障不会对该对象进行任何操作。
+>
+> 通过使用写屏障技术，可以使得三色标记法过程中标记更加准确。然而，尽管写屏障对于维护垃圾收集器的准确性至关重要，它们仍然存在一些局限性：性能开销、并发场景、保守策略导致的多标、优化策略导致某些引用更新被错过等。所以写屏障依然会带来多标和少标的准确性问题。
+
+#### 不分代垃圾收集器
+
+1. G1（Garbage First，垃圾优先）：jdk9默认，也有STW。逻辑分代，但物理不分代
+
+   三色标记 + SATB
+
+2. ZGC：oracle官方，java11引入，逻辑和物理都不分代
+
+   颜色指针 + 读屏障
+
+3. Shenandoah ：redhat开发，和ZGC差不多
+
+4. Epsilon：啥也不干（调试用，或确认不用GC的场景）
+
+
+
+### GC调优
+
+减少FGC（实际上是减少STW）
+
+### Java中引用的类型
+
+JDK1.2之后，Java中存在4种引用类型，从强到弱包括：强、软、弱、虚。
+
+
+
+1. 强引用 Strong Reference
+
+  Java中的**默认引用**声明就是强引用，如new instance语句和显式赋值语句等。只要强引用存在，垃圾回收器永远不会回收被引用的对象，即使内存不足时，JVM也会直接抛出OutOfMemoryError，而不会回收对象。
+
+  将引用赋值为null，则中断强引用。
+
+2. 软引用 Soft Reference
+
+  用于描述一些非必需但有用的对象，可通过` java.lang.ref.SoftReference `来使用软引用，如：
+
+  ```java
+SoftReference<Object> obj = new SoftReference<>();
+  ```
+
+  在内存足够的时候，软引用对象不会被回收；内存不足时，JVM则会回收软引用对象。如果回收了软引用对象之后仍然没有足够的内存，JVM才会抛出OutOfMemoryError。
+
+  软引用的特性可以很好地解决OOM问题，适用于很多缓存场景，如网页缓存、图片缓存等。
+
+3. 弱引用 Weak Reference
+
+  弱引用的强度比软引用要更弱，无论内存是否足够，只要 JVM 开始进行垃圾回收，那被弱引用关联的对象都会被回收。可通过` java.lang.ref.WeakReference ` 来使用弱引用，如：
+
+  ```java
+WeakReference<Object> obj = new WeakReference<>();
+  ```
+
+4. 虚引用 Phantom Reference
+
+  最弱的引用类型，如果一个对象仅持有虚引用，那么它等同于没有持有任何引用。
+
+  ```java
+PhantomReference<Object> obj = new PhantomReference<>();
+  ```
+
+  无法通过虚引用获得对象。虚引用必须与**引用队列**配合使用。虚引用的实际应用场景为当对象被回收时，收到系统通知。
+
+  > **引用队列**
+  >
+  > 可以与软引用、弱引用以及虚引用一起配合使用，当垃圾回收器准备回收一个对象时，如果发现它还有引用，那么就会在回收对象之前，把这个引用加入到与之关联的引用队列中去。程序可以通过判断引用队列中是否已经加入了引用，来判断被引用的对象是否将要被垃圾回收，这样就可以在对象被回收之前采取一些必要的措施。  
+
+### finalize方法
+
+是Object的protected方法。当某个对象被jvm垃圾回收的时候，finalize()将被自动调用。但是jvm不保证finalize()一定被调用
+
+默认为空实现，自定义某个类M的finalize()需要重写
+
+```java
+public class M {
+    @Override
+    protected void finalize () throws  Throwable {
+        System.out.println("finalize");
+    }
+}
+```
+
+
+
+## JVM命令
+
+- 标准：-开头，所有Hotspot都支持
+
+- 非标准：-X开头，特定版本hotspot支持特定命令
+
+- 不稳定：-XX开头，下个版本可能取消
+
+  -XX: +PrintCommandLineFlags 打印命令行参数值
+
+#### 线上JVM启动参数
+
+```shell
+/usr/java/default/jre/bin/java -server -Xmx4g -Xms4g -Xmn2g -Xss256K -XX:SurvivorRatio=8 -XX:MetaspaceSize=512m -Xnoclassgc -XX:MaxTenuringThreshold=7 -XX:GCTimeRatio=19 -XX:+DisableExplicitGC -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+UseCMSCompactAtFullCollection -XX:CMSFullGCsBeforeCompaction=0 -XX:+CMSParallelRemarkEnabled -XX:+CMSClassUnloadingEnabled -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:SoftRefLRUPolicyMSPerMB=0 -XX:+UseFastAccessorMethods -XX:+UseCompressedOops -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -Xloggc:/data/logs/xxx/debug/gc.20210331_082950.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump -Dfile.encoding=UTF-8 -Djava.awt.headless=true -Djetty.logging.dir=/data/logs/xxx -Djava.io.tmp=/tmp -jar xxx.jar --spring.profiles.active=prod
+```
+
+\####
+
+```shell
+-server 服务器模式
+-Xmx4g 最大堆内存4g
+-Xms4g 初始堆内存4g
+-Xmn2g 新生代内存大小
+-Xss256K 线程栈大小
+-XX:SurvivorRatio=8 eden与survivor比例
+-XX:MetaspaceSize=512m 元空间大小
+-XX:MaxTenuringThreshold=7 该参数主要是控制新生代需要经历多少次GC晋升到老年代中的最大阈值。
+-XX:GCTimeRatio=19 吞吐量 垃圾收集时间为1/(1+19),默认值为99，即1%时间用于垃圾收集。
+-XX:+UseParNewGC 使用ParNew收集器
+-XX:+CMSParallelRemarkEnabled 开启并发标记
+-XX:+UseConcMarkSweepGC 使用CMS收集器
+-XX:+UseCMSCompactAtFullCollection 和-XX:CMSFullGCsBeforeCompaction=0配合使用 意思就是GC之后对堆内存进行压缩整理
+-XX:CMSFullGCsBeforeCompaction=0 
+-XX:+UseCompressedOops 开启对象压缩
+-XX:+PrintGCDetails 打印gc详情
+-XX:+HeapDumpOnOutOfMemoryError OOM时生成dump文件
+-XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump dump存放路径
+```
 
 
 
@@ -1398,395 +1995,6 @@ method.invoke(object, 1);
    ```
    
    
-
-## 垃圾回收（GC）
-
-就是将没有引用的对象回收，主要是针对堆和方法区进行，这些区域是**线程共享**的。
-
-程序计数器、虚拟机栈和本地方法栈这三个区域属于**线程私有**的，只存在于线程的生命周期内，线程结束之后就会消失，因此不需要回收。
-
-<img src="images\Java高级\image-20220324020703131.png" alt="image-20220324020703131" />
-
-新生代与老年代是1：3；
-
-新生代包括eden区、s0和s1（Survivor缩写），大小比例是8：1：1。
-
-### Minor GC 和 Full GC
-
-HotSpot虚拟机中的GC可分为两种：Partial GC和Full GC。
-
-- YGC（Young GC，或minor GC）：对新生代堆gc，在eden区（也包含某个s0/s1）满时发生。使用**拷贝算法**，频率较高，性能耗费小
-
-- FGC（Full GC，或Major GC）：全堆（新生代+老年代）范围gc，在老年代满时发生。使用**标记压缩**算法，比YGC慢。需要两类垃圾收集器结合使用。
-
-  FGC触发时机：
-
-  1. 手动调用System.gc
-  2. 在Minor GC之后，若JVM判断老年代的连续内存空间已少于先前每次Minor GC结束后晋升至老年代的对象总大小的平均值，则JVM会进行Full GC（具体的判断逻辑随着收集器不同有所区别）；
-  3. 方法区（永久代）的空间不足时。
-
-  
-
-### 堆对象生命周期
-
-1. 新建对象，默认先放入eden区，此时年龄为0。
-
-   - eden区放满，触发YGC，还存活的对象放入s0，且年龄+1。
-
-   - eden区放不下（大对象，如长字符串或数组），直接放老年代。
-
-     `-XX:PretenureSizeThreshold`，大于此值的对象直接放老年代
-
-2. 下一次YGC，扫描并回收eden + s0，还存活的对象放s1，且年龄+1
-
-   也就是每次YGC，存活的交替放入s0或s1
-
-3. 当**年龄足够**时（一般15，CMS是6），放入老年代
-
-   若YGC的存活对象s区装不下，不管年龄多少，**多余的**直接放入老年代。见下文年龄动态判断
-
-   -XX:MaxTenuringThreshold 用来定义年龄的阈值
-
-4. 当老年代放满，触发FGC
-
-#### 对象年龄动态判断机制
-
-当单个 Survivor 区占用超过 50% (`-XX:TargetSurvivorRatio`)，则年龄最老的，即使没到15，也直接放入老年代。例如50%的对象最大年龄为8，则年龄>8的放入老年代。
-
-
-
-#### Q：JVM如何判断对象存活？
-
-1. 引用计数法
-
-   为每个对象设置一个引用计数器，每当有引用时，计数器+1，引用失效时计数器-1。当对象引用为0时，判断对象失效。
-
-   优点：实现简单，效率高；缺点：难以解决垃圾对象间循环引用，但实际上已经无法寻址的情况。
-
-2. 根可达分析法
-
-   从**GC Roots**出发，与之直接或间接关联的对象就是有效对象，反之就是无效对象。
-
-   可作为GC Roots的对象包括：
-
-   - 虚拟机栈中引用的对象（局部变量）
-   - 方法区中类静态属性引用的对象（静态变量）
-   - 方法区中常量引用的对象（常量）
-   - 本地方法栈中JNI引用的对象（JNI指针）
-
-#### Q：Minor GC如何避免全堆扫描？
-
-由于**老年代的对象可能引用新生代的对象**，在标记存活对象的时候，需要扫描老年代的对象，如果该对象拥有对新生代对象的引用，那么这个引用也会被作为 GC Roots。这相当于就做了**全堆扫描**。
-
-HotSpot虚拟机通过**卡表**技术避免Minor GC触发全堆扫描。具体策略是将老年代的空间分成大小为 512B的若干张卡，并且维护一个卡表。卡表本身是字节数组，数组中的每个元素对应着一张卡，本质上就是维护一个标识位，这个标识位代表对应的卡是否可能存有指向新生代对象的引用，如果可能存在，那么这张卡就是所谓的**脏卡**。
-
-在进行Minor GC的时候，只需要在卡表中寻找脏卡，并将脏卡中的老年代指向新生代的引用加入到GC Roots中，当完成所有脏卡的扫描之后，将所有脏卡的标识位清零。
-
-
-
-#### Q：yGC频繁原因？
-
-eden区设置太小；对象创建太频繁；
-
-其他情况不会单纯引起ygc，也会导致fgc
-
-#### Java中引用的类型
-
-JDK1.2之后，Java中存在4种引用类型，从强到弱包括：强、软、弱、虚。
-
-
-
-1. 强引用 Strong Reference
-
-  Java中的**默认引用**声明就是强引用，如new instance语句和显式赋值语句等。只要强引用存在，垃圾回收器永远不会回收被引用的对象，即使内存不足时，JVM也会直接抛出OutOfMemoryError，而不会回收对象。
-
-  将引用赋值为null，则中断强引用。
-
-2. 软引用 Soft Reference
-
-  用于描述一些非必需但有用的对象，可通过` java.lang.ref.SoftReference `来使用软引用，如：
-
-  ```java
-  SoftReference<Object> obj = new SoftReference<>();
-  ```
-
-  在内存足够的时候，软引用对象不会被回收；内存不足时，JVM则会回收软引用对象。如果回收了软引用对象之后仍然没有足够的内存，JVM才会抛出OutOfMemoryError。
-
-  软引用的特性可以很好地解决OOM问题，适用于很多缓存场景，如网页缓存、图片缓存等。
-
-3. 弱引用 Weak Reference
-
-  弱引用的强度比软引用要更弱，无论内存是否足够，只要 JVM 开始进行垃圾回收，那被弱引用关联的对象都会被回收。可通过` java.lang.ref.WeakReference ` 来使用弱引用，如：
-
-  ```java
-  WeakReference<Object> obj = new WeakReference<>();
-  ```
-
-4. 虚引用 Phantom Reference
-
-  最弱的引用类型，如果一个对象仅持有虚引用，那么它等同于没有持有任何引用。
-
-  ```java
-  PhantomReference<Object> obj = new PhantomReference<>();
-  ```
-
-  无法通过虚引用获得对象。虚引用必须与**引用队列**配合使用。虚引用的实际应用场景为当对象被回收时，收到系统通知。
-
-  > **引用队列**
-  >
-  > 可以与软引用、弱引用以及虚引用一起配合使用，当垃圾回收器准备回收一个对象时，如果发现它还有引用，那么就会在回收对象之前，把这个引用加入到与之关联的引用队列中去。程序可以通过判断引用队列中是否已经加入了引用，来判断被引用的对象是否将要被垃圾回收，这样就可以在对象被回收之前采取一些必要的措施。  
-
-#### finalize方法
-
-是Object的protected方法。当某个对象被jvm垃圾回收的时候，finalize()将被自动调用。但是jvm不保证finalize()一定被调用
-
-默认为空实现，自定义某个类M的finalize()需要重写
-
-```java
-public class M {
-    @Override
-    protected void finalize () throws  Throwable {
-        System.out.println("finalize");
-    }
-}
-```
-
-
-
-#### 被标记为失效的对象是否一定会被回收？
-
-被标记为失效的对象被回收前会经历如下步骤：
-
-1. JVM判断对象是否重写了finalize()方法：
-
-   - 若重写了finalize()，则将其放入F-Queue队列中；
-   - 若未重写，则直接回收。
-
-2. 执行队列中的finalize()方法：
-
-   JVM自动创建一个优先级较低的线程执行队列中的finalize()方法，只负责触发，不保证执行完毕。若finalize()方法执行了耗时操作，则JVM会停止执行方法并立刻回收对象。
-
-3. 对象销毁/重生：
-
-   若finalize()方法中将this赋值给了某个引用，则该对象会重生，否则会被回收。
-
-#### Q：为什么年龄达15时放入老年代？
-
-因为对象markword中的分代年龄用4bit表示，最大15
-
-对象内存布局
-
-<img src="images\Java高级\未命名图片-16485691371701.png" alt="未命名图片" style="zoom:50%;" />
-
-markword结构（64位系统中是8B=64bit）
-
-<img src="images\Java高级\20180322153316377.jpg" alt="20180322153316377" />
-
-### 主流垃圾收集器
-
-<img src="images\Java高级\微信截图_20220324211950.png" alt="微信截图_20220324211950" />
-
-实线连接表示配合使用
-
-发展路线：内存越来越大，**STW**时间越来越短。从分代到不分代。
-
-|                   | 管理内存 | STW时间 |
-| ----------------- | -------- | ------- |
-| Serial            | 几十M    |         |
-| Parallel Scavenge | 几个G    |         |
-| CMS               | 几十G    | 200ms   |
-| G1                | 上百G    | 10ms    |
-| ZGC               | 4TB      | 1ms     |
-
-
-
-#### Q：为什么要STW机制？
-
-如果不暂停线程，让其继续执行，会破坏GC Root的依赖关系，导致某些对象被回收，增加gc的复杂性。
-
-**STW**
-
-stop the world的简写，停止所有用户线程，所有线程进入**SafePoint**等待。
-
-**Safepoint** 
-
-可以理解成是在**代码执行过程中的一些特殊位置**，当线程执行到这些位置的时候，**线程可以暂停**。
-
-在 SafePoint 保存了其他位置没有的**一些当前线程的运行信息，供其他线程读取**。这些信息包括：线程上下文的任何信息，例如对象或者非对象的内部指针等等。信息的使用场景：
-
-1. 当需要 GC 时，需要知道哪些对象还被使用，或者已经不被使用可以回收了，这样就需要每个线程的对象使用情况。
-2. 对于偏向锁（Biased Lock），在高并发时想要解除偏置，需要线程状态还有获取锁的线程的精确信息。
-3. 对方法进行即时编译优化（OSR栈上替换），或者反优化（bailout栈上反优化），这需要线程究竟运行到方法的哪里的信息。
-
-线程只有运行到了 SafePoint 的位置，他的**一切状态信息才是确定的**
-
-**Safepoint 如何实现**
-
-SafePoint 可以插入到代码的某些位置，每个线程运行到 SafePoint 代码时，主动去检查是否需要进入 SafePoint，称为 **Polling**
-
-理论上，可以在每条 Java 编译后的字节码的边界，都放一个检查 Safepoint 的机器命令。线程执行到这里的时候，会执行 **Polling** 询问 JVM 是否需要进入 SafePoint，这个询问是会有性能损耗的，所以 JIT 会优化尽量减少 SafePoint。
-
-经过 **JIT 编译优化**的代码，会在下列放置一个 SafePoint：
-
-1. 所有方法的返回之前
-
-2. 所有非counted loop的循环（即：无界循环）回跳之前（即循环体末尾）
-
-   **注意**：对于明确有界的int循环，不会放置 SafePoint，如：
-
-   ```java
-   for (int i = 0; i < 100000000; i++) {
-       ...
-   }
-   ```
-
-   但是int换成**long**就还是会放置 SafePoint
-
-目的：防止发生 GC 需要 Stop the world 时，该线程一直不能暂停
-
-**STW时线程状态的变化**
-
-当线程处于下列5种状态：
-
-1. 运行字节码
-
-   运行字节码时，解释器会看线程是否被标记为 **poll armed**，如果是，VM 线程调用 `SafepointSynchronize::block(JavaThread *thread)`进行 block。
-
-2. 运行 native 代码
-
-   当运行 native 代码时，VM 线程略过这个线程，但是给这个线程设置 **poll armed**，让它在执行完 native 代码之后，它会检查是否 poll armed，如果还需要停在 SafePoint，则直接 block。
-
-3. 运行 JIT 编译好的代码
-
-   由于运行的是编译好的机器码，直接查看本地 local polling page 是否为脏，如果为脏则需要 block。这个特性是在 Java 10 引入的 [JEP 312: Thread-Local Handshakes](https://openjdk.java.net/jeps/312) 之后，才是只用检查本地 local polling page 是否为脏就可以了。
-
-4. 处于 BLOCK 状态
-
-   在需要所有线程需要进入 SafePoint 的操作完成之前，不许离开 BLOCK 状态
-
-5. 处于线程切换状态或者处于 VM 运行状态
-
-   会一直轮询线程状态直到线程处于阻塞状态（线程肯定会变成上面说的那四种状态，变成哪个都会 block 住）。
-
-#### 垃圾回收算法
-
-1. 标记清除：缺点是不连续。只有CMS使用
-
-   <img src="images\Java高级\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
-
-2. 拷贝算法：优点是无碎片，缺点是浪费空间
-
-   <img src="images\Java高级\b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
-
-3. 标记整理（标记压缩）：优点是无碎片，缺点是时间长
-
-   <img src="images\Java高级\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
-
-   回收器主要使用2和3
-
-#### 年轻代垃圾收集器
-
-1. Serial 串行垃圾回收器：串行回收，STW
-
-   <img src="images\Java高级\image-20220325014554879.png" alt="image-20220325014554879" style="zoom:50%;" />
-
-2. ParNew 并行垃圾回收器：可以理解为Serial回收器的多线程版，STW时多个线程并行回收。
-
-   默认开启的线程数与CPU数量相同，在CPU核数很多的机器上，可以通过参数`-XX:ParallelGCThreads`来设置线程
-
-   <img src="images\Java高级\image-20220325014725018.png" alt="image-20220325014725018" style="zoom:50%;" />
-
-3. Parallel Scavenge（ParallelGC）
-
-#### 老年代垃圾收集器
-
-1. SerialOld：可理解为Serial回收器的老年代版本，同样是一个单线程回收器，使用的是**标记整理**算法。其作用主要有：
-
-   - 在JDK1.5及之前的版本中与Parallel Scavenge收集器搭配使用；
-   - 作为CMS收集器的后备预案，如果CMS出现Concurrent Mode Failure，则SerialOld将作为后备收集器进行垃圾回收；
-   - JVM使用的实际上是基于SerialOld改进的PS MarkSweep收集器。
-
-2. ParallelOld：类似新生代的Parallel Scavenge，也是一种多线程的回收器，关注的重点同样在于吞吐量。使用了标记-整理算法进行垃圾回收。
-
-3. CMS：
-
-   CMS即Concurrent Mark Sweep，并发标记清除，使用的是**标记清除**算法，主要关注系统停顿时间。
-
-   共有四个阶段：
-
-   初始标记：STW，但是非常短
-
-   并发标记：用户线程与gc线程**并发执行**（最耗时，因此才用并发，不会产生长时间STW）
-
-   重新标记：STW，因为上一个阶段可能会存在标记失误（从线程角度理解），需要再次标记保证正确性  
-
-   并发清理：一次性完成回收
-
-   <img src="images\Java高级\未命名图片.png" alt="未命名图片" style="zoom:50%;" />
-
-
-
-#### 不分代垃圾收集器
-
-1. G1（Garbage First，垃圾优先）：也有STW。逻辑分代，但物理不分代
-
-   三色标记 + SATB
-
-2. ZGC：oracle官方，java11引入，逻辑和物理都不分代
-
-   颜色指针 + 读屏障
-
-3. Shenandoah ：redhat开发，和ZGC差不多
-
-4. Epsilon：啥也不干（调试用，或确认不用GC的场景）
-
-### JVM默认回收器
-
-- 1.7和1.8：PS+PO （Parallel Scavenge + ParallelOld）
-- 1.9：G1
-
-### 调优
-
-减少FGC（实际上是减少STW）
-
-## JVM命令
-
-- 标准：-开头，所有Hotspot都支持
-
-- 非标准：-X开头，特定版本hotspot支持特定命令
-
-- 不稳定：-XX开头，下个版本可能取消
-
-  -XX: +PrintCommandLineFlags 打印命令行参数值
-
-#### 线上JVM启动参数
-
-```shell
-/usr/java/default/jre/bin/java -server -Xmx4g -Xms4g -Xmn2g -Xss256K -XX:SurvivorRatio=8 -XX:MetaspaceSize=512m -Xnoclassgc -XX:MaxTenuringThreshold=7 -XX:GCTimeRatio=19 -XX:+DisableExplicitGC -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+UseCMSCompactAtFullCollection -XX:CMSFullGCsBeforeCompaction=0 -XX:+CMSParallelRemarkEnabled -XX:+CMSClassUnloadingEnabled -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:SoftRefLRUPolicyMSPerMB=0 -XX:+UseFastAccessorMethods -XX:+UseCompressedOops -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -Xloggc:/data/logs/xxx/debug/gc.20210331_082950.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump -Dfile.encoding=UTF-8 -Djava.awt.headless=true -Djetty.logging.dir=/data/logs/xxx -Djava.io.tmp=/tmp -jar xxx.jar --spring.profiles.active=prod
-```
-
-\####
-
-```shell
--server 服务器模式
--Xmx4g 最大堆内存4g
--Xms4g 初始堆内存4g
--Xmn2g 新生代内存大小
--Xss256K 线程栈大小
--XX:SurvivorRatio=8 eden与survivor比例
--XX:MetaspaceSize=512m 元空间大小
--XX:MaxTenuringThreshold=7 该参数主要是控制新生代需要经历多少次GC晋升到老年代中的最大阈值。
--XX:GCTimeRatio=19 吞吐量 垃圾收集时间为1/(1+19),默认值为99，即1%时间用于垃圾收集。
--XX:+UseParNewGC 使用ParNew收集器
--XX:+CMSParallelRemarkEnabled 开启并发标记
--XX:+UseConcMarkSweepGC 使用CMS收集器
--XX:+UseCMSCompactAtFullCollection 和-XX:CMSFullGCsBeforeCompaction=0配合使用 意思就是GC之后对堆内存进行压缩整理
--XX:CMSFullGCsBeforeCompaction=0 
--XX:+UseCompressedOops 开启对象压缩
--XX:+PrintGCDetails 打印gc详情
--XX:+HeapDumpOnOutOfMemoryError OOM时生成dump文件
--XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump dump存放路径
-```
 
 
 
