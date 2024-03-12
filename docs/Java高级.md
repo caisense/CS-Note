@@ -1381,6 +1381,24 @@ markword结构（64位系统中是8B=64bit）
 
 <img src="images\Java高级\20180322153316377.jpg" alt="20180322153316377" />
 
+### 垃圾回收算法
+
+> 回收器主要使用2和3
+
+1. 标记清除：优点是时间短。缺点是不连续，有碎片。只有CMS使用
+
+   <img src="images\Java高级\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
+
+2. （标记）拷贝算法：优点是无碎片，缺点是浪费空间
+
+   <img src="images\Java高级\b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
+
+3. 标记整理（标记压缩）：优点是无碎片，缺点是时间长
+
+   <img src="images\Java高级\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
+
+   
+
 ### 主流垃圾收集器
 
 
@@ -1484,23 +1502,7 @@ stop the world的简写，停止所有用户线程，所有线程进入**SafePoi
 >
 >    会一直轮询线程状态直到线程处于阻塞状态（线程肯定会变成上面说的那四种状态，变成哪个都会 block 住）。
 
-#### 垃圾回收算法
 
-> 回收器主要使用2和3
-
-1. 标记清除：优点是时间短。缺点是不连续，有碎片。只有CMS使用
-
-   <img src="images\Java高级\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
-
-2. （标记）拷贝算法：优点是无碎片，缺点是浪费空间
-
-   <img src="images\Java高级\b2b77b9e-958c-4016-8ae5-9c6edd83871e.png" alt="img" style="zoom:50%;" />
-
-3. 标记整理（标记压缩）：优点是无碎片，缺点是时间长
-
-   <img src="images\Java高级\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
-
-   
 
 #### 年轻代垃圾收集器
 
