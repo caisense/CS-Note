@@ -1383,8 +1383,6 @@ markword结构（64位系统中是8B=64bit）
 
 ### 垃圾回收算法
 
-> 回收器主要使用2和3
-
 1. 标记清除：优点是时间短。缺点是不连续，有碎片。只有CMS使用
 
    <img src="images\Java高级\005b481b-502b-4e3f-985d-d043c2b330aa.png" alt="img" style="zoom:50%;" />
@@ -1397,7 +1395,11 @@ markword结构（64位系统中是8B=64bit）
 
    <img src="images\Java高级\ccd773a5-ad38-4022-895c-7ac318f31437.png" alt="img" style="zoom:50%;" />
 
-   
+> 回收器主要使用2和3：
+>
+> 年轻代回收器适合使用标记拷贝，而且用两个Survivor区解决拷贝问题
+>
+> 老年代回收器通常使用标记整理。但CMS使用标记清除
 
 ### 主流垃圾收集器
 
@@ -1548,7 +1550,7 @@ stop the world的简写，停止所有用户线程，所有线程进入**SafePoi
 
    2. 并发标记：用户线程与gc线程**并发执行**（最耗时，因此才用并发，不会产生长时间STW）
 
-   3. 重新标记：STW，因为上一个阶段可能会存在标记失误（从线程角度理解），需要再次标记保证正确性  
+   3. 重新标记：会STW，因为上一个阶段可能会存在标记失误（从线程角度理解），需要再次标记保证正确性  
 
    4. 并发清理：一次性完成回收
 
@@ -1597,9 +1599,33 @@ CMS的标记清除算法，其实就是三色标记法：
 
 #### 不分代垃圾收集器
 
-1. G1（Garbage First，垃圾优先）：jdk9默认，也有STW。逻辑分代，但物理不分代
+1. G1（Garbage First，垃圾优先）：jdk9默认。使用三色标记算法 + SATB。
 
-   三色标记 + SATB
+   - 并发回收：G1能充分利用CPU、多核环境下的硬件优势，使用多个CPU（CPU或者CPU核心）来缩短STW的停顿时间
+   - 空间整合：将整个Java堆划分为多个大小相等的独立区域（Region），新生代和老年代不再物理隔离，而是逻辑划分到不同的Region
+   - 分代收集：虽然G1是不分代收集器，但不意味着没有年轻代和老年代，而是不需要其他收集器配合就能管理年轻代和老年代
+   - 可预测的停顿：相对于CMS的一大优势，G1除了追求低停顿外，还能建立可预测的停顿时间模型，能让使用者明确指定一个长度为M毫秒的时间片段内，消耗在垃圾收集上的时间不得超过N毫秒
+   - 支持热插拔：G1可以在运行时动态调整堆的大小，以适应不同的内存需求。
+
+   G1 和 CMS比较：
+
+   > 他们都是基于三色标记法实现的，替代了原有的传统的可达性分析（三色标记也是可达性分析的一种，只不过特殊一点），可以大大的降低STW的时长。但还是有很多不同：
+   >
+   > | 特性           | CMS                          | G1                                               |
+   > | -------------- | ---------------------------- | ------------------------------------------------ |
+   > | 回收位置       | 老年代                       | **整堆**                                         |
+   > | GC算法         | 标记-清除算法                | 标记-复制算法回收年轻代，标记-整理算法回收老年代 |
+   > | 垃圾识别算法   | 三色标记法——增量更新解决漏标 | 三色标记法——原始快照解决漏标                     |
+   > | 碎片产生       | 有内存碎片                   | 可防止内存碎片                                   |
+   > | **可预测性**   | 无法预测                     | G1的STW时长可预测                                |
+   > | 堆内存基本要求 | 一般要求不高                 | 4G以上                                           |
+   > | 自适应调优     | 不支持                       | 支持                                             |
+   >
+   > 总之就是，G1会把Java的堆分为多个大小相等的Region（每个Region的大小为1M-32M），他在年轻代回收的时候采用标记-复制算法，而在老年代回收的时候，采用的是标记-整理算法，这两种算法都可以避免内存碎片的产生。
+   >
+   > G1在回收的过程中，标记和清理的过程是并行的，可以充分利用多个CPU来缩短STW的时长，在复制的过程中是并发的，可以让复制线程和用户线程并发执行，不需要STW。并且G1还可以在运行时动态的做区域内存大小的调整。
+
+   
 
 2. ZGC：oracle官方，java11引入，逻辑和物理都不分代
 
@@ -1640,45 +1666,57 @@ CMS的标记清除算法，其实就是三色标记法：
 
 JDK1.2之后，Java中存在4种引用类型，从强到弱包括：强、软、弱、虚。
 
-1. 强引用 Strong Reference
+#### **强引用 Strong Reference**
 
-  Java中的**默认引用**声明就是强引用，如new instance语句和显式赋值语句等。只要强引用存在，垃圾回收器永远不会回收被引用的对象，即使内存不足时，JVM也会直接抛出OutOfMemoryError，而不会回收对象。
+Java的**默认引用**声明，只要强引用存在，垃圾回收器**永远不会回收**被引用的对象，即使内存不足时，JVM也会直接抛出OutOfMemoryError，而不会回收对象。
 
-  将引用赋值为null，则中断强引用。
+将引用指向一个对象（`=`号赋值），则创建强引用。
 
-2. 软引用 Soft Reference
+将引用赋值为null，则中断强引用。
 
-  用于描述一些非必需但有用的对象，可通过` java.lang.ref.SoftReference `来使用软引用，如：
+#### 软引用 Soft Reference
+
+  用于描述一些非必需但有用的对象，可通过` java.lang.ref.SoftReference `来使用软引用：
 
   ```java
 SoftReference<Object> obj = new SoftReference<>();
   ```
 
-  在内存足够的时候，软引用对象不会被回收；内存不足时，JVM则会回收软引用对象。如果回收了软引用对象之后仍然没有足够的内存，JVM才会抛出OutOfMemoryError。
+在内存足够的时候，软引用对象不会被回收；内存不足时，JVM则会回收软引用对象。如果回收了软引用对象之后仍然没有足够的内存，JVM才会抛出OutOfMemoryError。
 
-  软引用的特性可以很好地解决OOM问题，适用于很多缓存场景，如网页缓存、图片缓存等。
+软引用的特性可以很好地解决OOM问题，适用于很多缓存场景，如网页缓存、图片缓存等。
 
-3. 弱引用 Weak Reference
+#### 弱引用 Weak Reference
 
-  弱引用的强度比软引用要更弱，无论内存是否足够，只要 JVM 开始进行垃圾回收，那被弱引用关联的对象都会被回收。可通过` java.lang.ref.WeakReference ` 来使用弱引用，如：
+弱引用的强度比软引用要更弱，无论内存是否足够，只要 JVM 开始GC，那被弱引用关联的对象都会被回收。可通过` java.lang.ref.WeakReference ` 来使用弱引用，如：
 
   ```java
 WeakReference<Object> obj = new WeakReference<>();
   ```
 
-4. 虚引用 Phantom Reference
+最常见的例子：ThreadLocal是弱引用
 
-  最弱的引用类型，如果一个对象仅持有虚引用，那么它等同于没有持有任何引用。
+#### 虚引用 Phantom Reference
+
+最弱的引用类型，如果一个对象仅持有虚引用，那么它等同于没有持有任何引用。
 
   ```java
 PhantomReference<Object> obj = new PhantomReference<>();
   ```
 
-  无法通过虚引用获得对象。虚引用必须与**引用队列**配合使用。虚引用的实际应用场景为当对象被回收时，收到系统通知。
+无法通过虚引用获得对象。虚引用必须与**引用队列**配合使用。虚引用的实际应用场景为当对象被回收时，收到系统通知。
 
   > **引用队列**
   >
   > 可以与软引用、弱引用以及虚引用一起配合使用，当垃圾回收器准备回收一个对象时，如果发现它还有引用，那么就会在回收对象之前，把这个引用加入到与之关联的引用队列中去。程序可以通过判断引用队列中是否已经加入了引用，来判断被引用的对象是否将要被垃圾回收，这样就可以在对象被回收之前采取一些必要的措施。  
+
+比较：
+
+| 特性        | 强引用 | 软引用     | 弱引用     | 虚引用     |
+| ----------- | ------ | ---------- | ---------- | ---------- |
+| 生命周期    | 最长   | 次于强引用 | 次于软引用 | 次于弱引用 |
+| OOM前被清理 | 否     | 是         | 是         | 是         |
+| GC被清理    | 否     | 否         | 是         | 是         |
 
 ### finalize方法
 
@@ -1710,12 +1748,6 @@ public class M {
 #### 线上JVM启动参数
 
 ```shell
-/usr/java/default/jre/bin/java -server -Xmx4g -Xms4g -Xmn2g -Xss256K -XX:SurvivorRatio=8 -XX:MetaspaceSize=512m -Xnoclassgc -XX:MaxTenuringThreshold=7 -XX:GCTimeRatio=19 -XX:+DisableExplicitGC -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+UseCMSCompactAtFullCollection -XX:CMSFullGCsBeforeCompaction=0 -XX:+CMSParallelRemarkEnabled -XX:+CMSClassUnloadingEnabled -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:SoftRefLRUPolicyMSPerMB=0 -XX:+UseFastAccessorMethods -XX:+UseCompressedOops -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -Xloggc:/data/logs/xxx/debug/gc.20210331_082950.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump -Dfile.encoding=UTF-8 -Djava.awt.headless=true -Djetty.logging.dir=/data/logs/xxx -Djava.io.tmp=/tmp -jar xxx.jar --spring.profiles.active=prod
-```
-
-\####
-
-```shell
 -server 服务器模式
 -Xmx4g 最大堆内存4g
 -Xms4g 初始堆内存4g
@@ -1734,6 +1766,12 @@ public class M {
 -XX:+PrintGCDetails 打印gc详情
 -XX:+HeapDumpOnOutOfMemoryError OOM时生成dump文件
 -XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump dump存放路径
+```
+
+举例：
+
+```shell
+/usr/java/default/jre/bin/java -server -Xmx4g -Xms4g -Xmn2g -Xss256K -XX:SurvivorRatio=8 -XX:MetaspaceSize=512m -Xnoclassgc -XX:MaxTenuringThreshold=7 -XX:GCTimeRatio=19 -XX:+DisableExplicitGC -XX:+UseParNewGC -XX:+UseConcMarkSweepGC -XX:+UseCMSCompactAtFullCollection -XX:CMSFullGCsBeforeCompaction=0 -XX:+CMSParallelRemarkEnabled -XX:+CMSClassUnloadingEnabled -XX:+UseCMSInitiatingOccupancyOnly -XX:CMSInitiatingOccupancyFraction=70 -XX:SoftRefLRUPolicyMSPerMB=0 -XX:+UseFastAccessorMethods -XX:+UseCompressedOops -XX:+PrintGCDetails -XX:+PrintGCDateStamps -XX:+PrintGCTimeStamps -Xloggc:/data/logs/xxx/debug/gc.20210331_082950.log -XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump -Dfile.encoding=UTF-8 -Djava.awt.headless=true -Djetty.logging.dir=/data/logs/xxx -Djava.io.tmp=/tmp -jar xxx.jar --spring.profiles.active=prod
 ```
 
 
