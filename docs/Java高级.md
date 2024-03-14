@@ -642,7 +642,7 @@ public class AreaLimitInfo implements Serializable {
 public static void main(String[] args) {
     try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream("tempFile"))){
         AreaLimitInfo obj = (AreaLimitInfo) ois.readObject();  // 从文件读出对象
-        System.out.println(obj);  // com.eshore.cmp.corp.dto.AreaLimitInfo@4f4a7090
+        System.out.println(obj);  // com.eshxxx.cmp.corp.dto.AreaLimitInfo@4f4a7090
     } catch (IOException | ClassNotFoundException e ) {
         e.printStackTrace();
     }
@@ -652,7 +652,7 @@ public static void main(String[] args) {
 此时会报错：
 
 ```
-java.io.InvalidClassException: com.eshore.cmp.corp.dto.AreaLimitInfo; local class incompatible: stream classdesc serialVersionUID = -574488211598856253, local class serialVersionUID = -574488211598856258
+java.io.InvalidClassException: com.eshxxx.cmp.corp.dto.AreaLimitInfo; local class incompatible: stream classdesc serialVersionUID = -574488211598856253, local class serialVersionUID = -574488211598856258
 ```
 
 可以看到抛出InvalidClassException异常，且指出序列化前后的serialVersionUID不一致。
