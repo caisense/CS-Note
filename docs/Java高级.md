@@ -1760,28 +1760,32 @@ public class M {
 - 不稳定：-XX开头，下个版本可能取消
 
   -XX: +PrintCommandLineFlags 打印命令行参数值
+  
+  > 注意：-XX开头之后，带有加号“+”、减号“-”的参数一般为开关参数，加号就是启用，减号就是禁用。
 
-#### 线上JVM启动参数
+### 线上JVM启动参数
 
 ```shell
--server 服务器模式
--Xmx4g 最大堆内存4g
--Xms4g 初始堆内存4g
--Xmn2g 新生代内存大小
--Xss256K 线程栈大小
--XX:SurvivorRatio=8 eden与survivor比例
--XX:MetaspaceSize=512m 元空间大小
--XX:MaxTenuringThreshold=7 该参数主要是控制新生代需要经历多少次GC晋升到老年代中的最大阈值。
--XX:GCTimeRatio=19 吞吐量 垃圾收集时间为1/(1+19),默认值为99，即1%时间用于垃圾收集。
--XX:+UseParNewGC 使用ParNew收集器
--XX:+CMSParallelRemarkEnabled 开启并发标记
--XX:+UseConcMarkSweepGC 使用CMS收集器
--XX:+UseCMSCompactAtFullCollection 和-XX:CMSFullGCsBeforeCompaction=0配合使用 意思就是GC之后对堆内存进行压缩整理
+-server #服务器模式
+-Xmx4g #【常用】最大堆内存4g
+-Xms4g #【常用】初始堆内存4g
+-Xmn2g #新生代内存大小2g
+-Xss256K #线程栈大小256k
+-XX:SurvivorRatio=8 #eden与survivor比例
+-XX:MetaspaceSize=512m #【常用，java8及以上版本】元空间初始大小
+-XX:MaxMetaspaceSize=1g #元空间最大大小
+-XX:MaxTenuringThreshold=7 #该参数主要是控制新生代需要经历多少次GC晋升到老年代中的最大阈值。
+-XX:GCTimeRatio=19 #吞吐量 垃圾收集时间为1/(1+19),默认值为99，即1%时间用于垃圾收集。
+-XX:+UseParNewGC #使用ParNew收集器
+-XX:+CMSParallelRemarkEnabled #开启并发标记
+-XX:+UseConcMarkSweepGC #【常用】使用CMS收集器
+-XX:+UseG1GC #【常用】使用G1回收器
+-XX:+UseCMSCompactAtFullCollection 和 -XX:CMSFullGCsBeforeCompaction=0 配合使用 意思就是GC之后对堆内存进行压缩整理
 -XX:CMSFullGCsBeforeCompaction=0 
--XX:+UseCompressedOops 开启对象压缩
--XX:+PrintGCDetails 打印gc详情
--XX:+HeapDumpOnOutOfMemoryError OOM时生成dump文件
--XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump dump存放路径
+-XX:+UseCompressedOops #开启对象压缩
+-XX:+PrintGCDetails #【常用】打印gc详情
+-XX:+HeapDumpOnOutOfMemoryError #【常用】OOM时生成dump文件
+-XX:HeapDumpPath=/data/logs/xxx/debug/xxx.20210331_082950.dump #dump存放路径
 ```
 
 举例：
@@ -1791,6 +1795,28 @@ public class M {
 ```
 
 
+
+### 常见的JVM工具
+
+jps：JDK 1.5提供的一个显示当前所有java进程pid的命令，简单实用，非常适合在linux/unix平台上简单察看当前java进程的一些简单情况。
+
+jstack：JVM自带的命令行工具，主要用于生成线程的堆栈信息，用于诊断死锁及线程阻塞等问题。
+
+jmap：JVM自带，可以生成JVM中堆内存的Dump文件，用于分析堆内存的使用情况。排查内存泄漏等问题。
+
+jstat：JVM自带，主要用来监控JVM中的类加载、GC、线程等信息。
+
+**Arthas**：Alibaba开源的Java诊断工具，非常强大
+
+jhat：使用jmap可以生成Java堆的Dump文件，生成dump文件之后就可以用jhat命令，将dump文件转成html的形式，然后通过http访问可以查看堆情况。
+
+JConsole：一个基于JMX（Java Management Extensions）的监控工具，可以用来监视JVM中的内存、线程、GC等信息，并可以执行一些诊断和故障排除任务。
+
+VisualVM：一个基于NetBeans平台的可视化工具，可以监视本地和远程JVM进程的性能和资源使用情况，包括CPU、内存、线程、GC等信息，并可以进行故障排除和性能分析。
+
+YourKit：一个商业的JVM分析工具，可以进行内存、CPU、线程等方面的分析，提供了一些高级功能如内存泄漏检测、代码热替换等。
+
+JProfiler：一个商业的JVM分析工具，可以监视JVM中的内存、线程、GC等信息，并提供一些高级功能如代码分析、内存泄漏检测等。
 
 ## Java类加载机制
 

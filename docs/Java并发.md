@@ -1901,7 +1901,7 @@ count是锁计数器。线程执行monitorenter指令时（即线程成为owner�
 
 1. 对象头：由MarkWord和KlassPoint（类型指针）组成。
 
-   - KlassPoint指向类元数据，jvm通过其确定对象是哪个类的实例，大小8B
+   - KlassPoint指向类元数据，jvm通过其确定对象是哪个类的实例，大小8B（记忆：64位系统——64bit）
 
    - Mark Word用于存储对象自身的运行时数据， 大小8B。
 
