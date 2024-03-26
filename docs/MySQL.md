@@ -418,13 +418,11 @@ innodb本身的索引结构是B+tree，hash索引是innodb提供的特性功能�
 
    例如：**DATE_FORMAT**函数将create_date字段按'%Y-%m-%d'格式化后，再看是否等于'2023-02-01'。
 
-   但这样会导致不走create_date字段的索引
-   
-   ```sql
-select * from sum_group_status_trend_create where group_id =100000000034019 and DATE_FORMAT(create_date,'%Y-%m-%d') = '2023-02-01'
-   ```
+   但这样会导致不走create_date字段的索引：
 
-   
+   ```sql
+   select * from sum_group_status_trend_create where group_id =100000000034019 and DATE_FORMAT(create_date,'%Y-%m-%d') = '2023-02-01'
+   ```
 
 3. 使用不等于（`!=` 或者 `<>`）判断时
 
