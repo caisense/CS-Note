@@ -791,7 +791,7 @@ public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName
 
 
 
-## Spring 用到了哪些设计模式？
+# Q：Spring 用到了哪些设计模式？
 
 1. 工厂模式：**BeanFactory**就是简单工厂模式的体现，用来创建对象的实例；
 2. 单例模式：Bean默认为单例模式。
@@ -800,23 +800,29 @@ public Object postProcessBeforeInstantiation(Class<?> beanClass, String beanName
 5. 观察者模式：定义对象键一种一对多的依赖关系，当一个对象的状态发生改变时，所有依赖于它的对象都会得到通知被制动更新，如Spring中listener的实现–ApplicationListener。
 6. 责任链模式：SpringMVC中，通过一系列的拦截器来处理请求执行前，执行后，以及结束的response，核心的类是`handlerExecutionChain`，它封装了HandlerAdapter和一系列过滤器
 
-## Q：如何解决循环依赖？
+# Q：SpringBoot是怎么启动的？
+
+SpringBoot通常有一个入口类：`XXXApplication`， 里面有main方法，就是标准Java应用的入口方法，在main中调用`SpringApplication.run()` 启动整个应用。
+
+
+
+入口类要使用`@SpringBootApplication`注解声明，主要包含三个Annotation：
+
+- @EnableAutoConfiguration 通过@import将所有符合自动配置条件的bean定义都加载到IoC容器 搜索符合自动配置条件的功能需要借助于SpringFactoriesLoader提供的配置查找的功能 即根据 @EnableAutoConfiguration的完整类名作为查找的Key 获取对应的一组Configuration类
+- @Configuration 和JavaConfig形式的Spring loc容器的配置类使用的@Configuration一样 是其定义成一个JavaConfig配置类
+- @ComponentScan 对应XML配置中的元素 其功能就是自动扫描并加载符合条件的组件（比如@Component和@Repository等）或者bean定义，最终将这些bean定义加载到IoC容器
+
+# Q：如何解决循环依赖？
 
 A创建时--->需要B---->B去创建--->需要A，从而产生了循环依赖
 
 Spring使用三级缓存，其实就是三个map：
 
-1. `singletonObjects `：也称单例池，ConcurrentHashMap<beanName, bean>。
+1. `singletonObjects`：ConcurrentHashMap<beanName, bean>。也称单例池，缓存已经经历了完整生命周期的bean对象。
 
-   缓存已经经历了完整生命周期的bean对象。
+2.  `earlySingletonObjects`：HashMap<beanName, bean>。比单例池多了一个early，表示缓存的是早期的bean对象（Bean的生命周期还没完整） 
 
-2.  `earlySingletonObjects `：HashMap<beanName, bean>。
-
-   比单例池多了一个early，表示缓存的是早期的bean对象（Bean的生命周期还没完整） 
-
-3. `singletonFactories ` ：ConcurrentHashMap<beanName, bean>
-
-   缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
+3. `singletonFactories` ：ConcurrentHashMap<beanName, bean>。缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
 
 SingletonObjecs 完成初始化的单例对象的cache（一级缓存）
 
@@ -828,9 +834,9 @@ SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级�
 
 
 
-## Q：循环依赖无法解决的场景？
+# Q：循环依赖无法解决的场景？
 
-### 1.@Repository
+**1.@Repository**
 
 ```java
 // IA 、 IB是两个空接口，略
@@ -850,7 +856,7 @@ A、B两个实现类中互相注入对方的接口，若A、B的注解都是@Rep
 
 只有当其中一个不是@Repository，或两个都不是，比如用@Service、@Controller或@Component时，才不会报错
 
-### 2.循环依赖+@Async
+**2.循环依赖+@Async**
 
 ```java
 @Component
@@ -880,7 +886,7 @@ public class BService {
 
 2 test方法移到B。Spring对循环依赖的两个类创建还是有**先后顺序**的，先创建A再创建B，因此B不会提前AOP，而是顺利走完生命周期添加到单例池，然后A也顺利创建
 
-### 3.都是原型
+**3.都是原型**
 
 ```java
 @Scope("prototype")
@@ -901,7 +907,7 @@ A需要注入一个新的B（因为B是原型），同理然后B也需要注入�
 
 解决：将其中一个设为单例
 
-### 4.构造函数注入
+**4.构造函数注入**
 
 ```java
 @Component
@@ -924,7 +930,7 @@ public class BService {
 
 解决：构造方法加@Lazy
 
-## Q：@Component 和 @Configuration + @Bean 同时存在，创建bean用哪个？
+# Q：@Component 和 @Configuration + @Bean 同时存在，创建bean用哪个？
 
 `allowBeanDefinitionOverriding=true;`，默认是允许BeanDefinition覆盖
 
@@ -942,7 +948,7 @@ public class BService {
 
 
 
-## Q：Spring Boot 配置优先级？
+# Q：Spring Boot 配置优先级？
 
 优先级由高到低：
 
@@ -979,7 +985,17 @@ Spring Boot 启动时，会自动加载 **JAR 包内部及 JAR 包所在目录**
 
 
 
+# Q：Spring如何实现自动配置？
 
+Spring Boot会根据类路径中的jar包、类，为jar包里的类自动配置，这样可以极大的减少配置的数量。简单点说就是它会根据定义在classpath下的类，自动的给你生成一些Bean，并加载到Spring的Context中。
+
+SpringBoot通过Spring 的条件配置决定哪些bean可以被配置，将这些条件定义成具体的Configuration，然后将这些Configuration配置到spring.factories文件中（这种方式Springboot 2.7.0版本已不建议使用，最新的方式是使用 /META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports）
+
+作为key: org.springframework.boot.autoconfigure.EnableAutoConfiguration的值
+
+这时候，容器在启动的时候，由于使用了`@EnableAutoConfiguration`注解，该注解Import的EnableAutoConfigurationImportSelector会去扫描classpath下的所有spring.factories文件，然后进行bean的自动化配置：
+
+![r](images/Spring常见问题/r.png)
 
 # SpringBoot 引导配置
 
@@ -1431,19 +1447,7 @@ public class TestController {
 
 可以看到虽然每次都是单独创建一个Controller，但类变量在不同请求中是用的同一个。
 
-# SpringBoot是怎么启动的
 
-在Application类下 SpringApplication.run()
-
-SpringBootApplication有三个Annotation
-
-@EnableAutoConfiguration 通过@import将所有符合自动配置条件的bean定义都加载到IoC容器 搜索符合自动配置条件的功能需要借助于SpringFactoriesLoader提供的配置查找的功能 即根据 @EnableAutoConfiguration的完整类名作为查找的Key 获取对应的一组Configuration类
-
-@Configuration 和JavaConfig形式的Spring loc容器的配置类使用的@Configuration一样 是其定义成一个JavaConfig配置类
-
- 
-
-@ComponentScan 对应XML配置中的元素 其功能就是自动扫描并加载符合条件的组件（比如@Component和@Repository等）或者bean定义，最终将这些bean定义加载到IoC容器
 
 
 
