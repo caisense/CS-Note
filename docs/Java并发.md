@@ -3520,7 +3520,7 @@ public class AtomicInteger extends Number implements java.io.Serializable {
 
    对一个共享变量执行操作时，CAS能够保证原子操作，但是对多个共享变量操作时，CAS是无法保证操作的原子性的。
 
-   - 解决：Java从1.5开始JDK提供了**AtomicReference**类来保证引用对象之间的原子性，可以把多个变量放在一个对象里来进行CAS操作。
+   - 解决：JDK1.5开始提供了**AtomicReference**类来保证引用对象之间的原子性，可以把多个变量放在一个对象里来进行CAS操作。
 
  
 
