@@ -2,8 +2,6 @@
 
 # 一、Bean生成过程
 
-生成时机：
-
 流程：
 
 <img src="images/Spring常见问题/image-20221201010853186.png" alt="image-20221201010853186" />
@@ -130,25 +128,23 @@ BeanDefinition  。
 
 
 
-## getBean方法
+### getBean方法
 
 前期扫描是准备工作，这里真正开始创建bean
 
 AbstractBeanFactory 类的 `getBean(String name)`：返回一个bean，若容器没有就创建。
 
-具体逻辑在类内
+具体逻辑在类内的
 
 ```java
 protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullable Object[] args, boolean typeCheckOnly)
 ```
 
-
-
 1. 用bean名找BeanDefinition，如果没有就去父bean工厂找。
 
 2. 检查@DependsOn。遍历依赖该bean的所有bean，只用名字检查，依赖关系存入dependentBeanMap中。先创建该bean依赖的bean
 
-3. 开始创建，看@Scope。
+3. 开始创建，看@Scope：
 
    1. 是单例，getSingleton()——传入一个lambda表达式（用于回调），先锁单例池，然后看池里是否有，没有就创建后加入池。
    2. 是原型，创建一个对象
@@ -226,7 +222,7 @@ userService这个Bean，在实例化前会直接返回一个由我们所定义�
 
 ## 5.实例化
 
-   在这个步骤中就会根据BeanDefinition去创建一个对象了。
+在这个步骤中就会根据BeanDefinition去创建一个对象了。
 
 实现：org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory#doCreateBean
 
@@ -381,7 +377,7 @@ public class ZhouyuInstantiationAwareBeanPostProcessor implements InstantiationA
 
 这个扩展点，在Spring源码中基本没有怎么使用。
 
-## 8. 自动注入
+## 8. 自动注入（填充属性）
 
 这里的自动注入指的是Spring的自动注入，后续依赖注入课程中单独讲
 ​
@@ -463,7 +459,7 @@ public class ZhouyuBeanPostProcessor implements BeanPostProcessor {
 1. 查看当前Bean对象是否实现了InitializingBean接口，如果实现了就调用其afterPropertiesSet()方法
 2. 执行BeanDefinition中指定的初始化方法
 
-### 
+
 
 ## 13. 初始化后
 

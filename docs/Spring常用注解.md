@@ -621,18 +621,18 @@ jdk1.6开始，用于修饰非静态的void方法，在当前类构造完成时�
 
 ```java
 // 某个类中
-    @Autowired
-    private IParamApi paramApi;
+@Autowired
+private IParamApi paramApi;
 
-    @PostConstruct
-    public void initOiddUrl() {
-        if (!"local".equals(envActive)) {
-            CmpParam param = paramApi.queryCmpParam("OIDD_URL");
-            if (StringHelper.isNotEmpty(param.getParamValue())) {
-                this.oiddUrl = param.getParamValue();
-            }
+@PostConstruct
+public void initOiddUrl() {
+    if (!"local".equals(envActive)) {
+        CmpParam param = paramApi.queryCmpParam("OIDD_URL");
+        if (StringHelper.isNotEmpty(param.getParamValue())) {
+            this.oiddUrl = param.getParamValue();
         }
     }
+}
 ```
 
 

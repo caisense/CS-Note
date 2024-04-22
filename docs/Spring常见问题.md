@@ -765,9 +765,9 @@ Spring AOP 就是基于动态代理的
 
 ### Q：Spring AOP创建时机？
 
-**实例化后**
+**在bean生命周期的实例化后**
 
-在BeanPostProcessor后置处理器时创建，有jdk动态代理和cglib两种实现
+在`BeanPostProcessor`后置处理器时创建，有jdk动态代理和cglib两种实现
 
 org.springframework.aop.framework.autoproxy.AbstractAutoProxyCreator#postProcessBeforeInstantiation
 
@@ -1159,6 +1159,108 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 - @Configuration 和JavaConfig形式的Spring loc容器的配置类使用的@Configuration一样 是其定义成一个JavaConfig配置类
 - @ComponentScan 对应XML配置中的元素 其功能就是自动扫描并加载符合条件的组件（比如@Component和@Repository等）或者bean定义，最终将这些bean定义加载到IoC容器
 
+# Q：Bean的生命周期是怎样的？
+
+![bean](images/Spring常见问题/bean.png)
+
+整个生命周期可以大致分为3个大的阶段，分别是：创建、使用、销毁。
+
+还可以进一步分为5个小的阶段：实例化、初始化、注册Destruction回调、Bean的正常使用以及Bean的销毁。
+
+> 有人把设置属性值这一步单独拿出来了，主要是因为在源码中doCreateBean是先调了populateBean进行属性值的设置，然后再调initializeBean进行各种前置&后置处理。但是其实设置属性其实就是**初始化**的一部分。要不然初始化啥呢？
+>
+> 有人也把注册Destruction回调放到销毁这一步了，其实是不对的，其实他不算初始化的一步，也不应该算作销毁的一个过程，他虽然和销毁有关，但是他是在创建的这个生命周期中做的。
+
+## 代码
+
+1. 实例化Bean：Spring容器首先创建Bean实例。
+
+   - 在`AbstractAutowireCapableBeanFactory`类中的`createBeanInstance`方法中实现
+2. 设置属性值：Spring容器注入必要的属性到Bean中。
+
+   - 在`AbstractAutowireCapableBeanFactory`的`populateBean`方法中处理
+3. 检查Aware：如果Bean实现了BeanNameAware、BeanClassLoaderAware等这些Aware接口，Spring容器会调用它们。
+
+   - 在`AbstractAutowireCapableBeanFactory`的`initializeBean`方法中调用
+4. 调用BeanPostProcessor的前置处理方法：在Bean初始化之前，允许自定义的BeanPostProcessor对Bean实例进行处理，如修改Bean的状态。BeanPostProcessor的postProcessBeforeInitialization方法会在此时被调用。
+
+   - 由`AbstractAutowireCapableBeanFactory`的`applyBeanPostProcessorsBeforeInitialization`方法执行。
+5. 调用InitializingBean的afterPropertiesSet方法：提供一个机会，在所有Bean属性设置完成后进行初始化操作。如果Bean实现了InitializingBean接口，afterPropertiesSet方法会被调用。
+
+   - 在`AbstractAutowireCapableBeanFactory`的`invokeInitMethods`方法中调用。
+6. 调用自定义init-method方法：提供一种配置方式，在XML配置中指定Bean的初始化方法。如果Bean在配置文件中定义了初始化方法，那么该方法会被调用。
+
+   - 在`AbstractAutowireCapableBeanFactory`的`invokeInitMethods`方法中调用。
+7. 调用BeanPostProcessor的后置处理方法：在Bean初始化之后，再次允许BeanPostProcessor对Bean进行处理。BeanPostProcessor的postProcessAfterInitialization方法会在此时被调用。
+
+   - 由`AbstractAutowireCapableBeanFactory`的`applyBeanPostProcessorsAfterInitialization`方法执行
+8. 注册Destruction回调：如果Bean实现了DisposableBean接口或在Bean定义中指定了自定义的销毁方法，Spring容器会为这些Bean注册一个销毁回调，确保在容器关闭时能够正确地清理资源。
+
+   - 在`AbstractAutowireCapableBeanFactory`类中的`registerDisposableBeanIfNecessary`方法中实现
+9. Bean准备就绪：此时，Bean已完全初始化，可以开始处理应用程序的请求了。
+10. 调用DisposableBean的destroy方法：当容器关闭时，如果Bean实现了DisposableBean接口，destroy方法会被调用。
+
+    - 在`DisposableBeanAdapter`的destroy方法中实现
+11. 调用自定义的destory-method：如果Bean在配置文件中定义了销毁方法，那么该方法会被调用。
+
+    - 在`DisposableBeanAdapter`的destroy方法中实现
+
+可以看到，整个Bean的创建的过程都依赖于AbstractAutowireCapableBeanFactory这个类，而销毁主要依赖DisposableBeanAdapter这个类。
+
+AbstractAutowireCapableBeanFactory 的入口处，doCreateBean的核心代码如下，其中包含了实例化、设置属性值、初始化Bean以及注册销毁回调的几个核心方法。
+
+```java
+protected Object doCreateBean(final String beanName, final RootBeanDefinition mbd, final Object[] args)
+    throws BeanCreationException {
+    // 实例化bean
+    BeanWrapper instanceWrapper = null;
+    if (instanceWrapper == null) {
+        instanceWrapper = createBeanInstance(beanName, mbd, args);
+    }
+    // ...
+    Object exposedObject = bean;
+    try {
+        //设置属性值
+        populateBean(beanName, mbd, instanceWrapper);
+        if (exposedObject != null) {
+            //初始化Bean
+            exposedObject = initializeBean(beanName, exposedObject, mbd);
+        }
+    }
+    // ...
+    // 注册Bean的销毁回调
+    try {
+        registerDisposableBeanIfNecessary(beanName, bean, mbd);
+    }
+    return exposedObject;
+}
+```
+
+而DisposableBeanAdapter的destroy方法中核心内容如下：
+
+```java
+@Override
+public void destroy() {
+    if (this.invokeDisposableBean) {
+            // ...
+            ((DisposableBean) bean).destroy();
+        }
+        // ...
+    }
+    if (this.destroyMethod != null) {
+        invokeCustomDestroyMethod(this.destroyMethod);
+    }
+    else if (this.destroyMethodName != null) {
+        Method methodToCall = determineDestroyMethod();
+        if (methodToCall != null) {
+            invokeCustomDestroyMethod(methodToCall);
+        }
+    }
+}
+```
+
+
+
 # Q：如何解决循环依赖？
 
 A创建时--->需要B---->B去创建--->需要A，从而产生了循环依赖
@@ -1285,6 +1387,11 @@ public class BService {
 
 ## getBean方法机制
 
+> AbstractBeanFactory 类提供的接口`getBean(String name)`：用于从容器中按名字获取一个bean，若容器没有就创建。
+>
+> - 可以用beanName获取容器的bean。
+> - 可以用别名或多重别名（最终肯定能找到对应bean），存在aliasMap中，是一个map：<别名, 真实名>
+
 推断构造方法，并调用生成bean，如果是单例（默认），放入spring容器。
 
 可以传多个参数，第一个为beanName，后面的作为构造函数参数。
@@ -1308,7 +1415,7 @@ public class BService {
 7. @Configuration 注解类上的 @PropertySource 指定的配置文件
 8. 通过SpringApplication.setDefaultProperties 指定的默认属性
 
-### 配置文件优先级
+## 配置文件优先级
 
 Spring Boot 启动时，会自动加载 **JAR 包内部及 JAR 包所在目录**指定位置的配置文件（Properties 文件、YAML 文件），下图中展示了 Spring Boot 自动加载的配置文件的位置及其加载顺序
 
@@ -1731,23 +1838,11 @@ public static void main(String[] args) throws IOException {
 }
 ```
 
-# Bean的生命周期
 
-Bean的生命周期指的就是：在Spring中，Bean是如何生成的？
-被Spring管理的对象叫做Bean。Bean的生成步骤如下：
 
-1. Spring扫描class得到`BeanDefinition`
-2. 根据得到的BeanDefinition去生成bean
-3. 首先根据class推断构造方法
-4. 根据推断出来的构造方法，反射，得到一个对象（暂时叫做原始对象）
-5. 填充原始对象中的属性（依赖注入）
-6. 如果原始对象中的某个方法被AOP了，那么则需要根据原始对象生成一个代理对象
-7. 把最终生成的代理对象放入单例池（源码中叫做singletonObjects）中，下次getBean()时就直接
-    从单例池拿即可
 
-## getBean()
 
-可以用beanName获取容器的bean。可以用别名或多重别名（最终肯定能找到对应bean），存在aliasMap中，是一个map：<别名, 真实名>
+
 
 ## Q：bean是线程安全的吗？
 
@@ -1763,7 +1858,7 @@ Bean的生命周期指的就是：在Spring中，Bean是如何生成的？
 
 - 对于有状态的bean，Spring官方提供的bean，一般提供了通过ThreadLocal去解决线程安全的方法，比如RequestContextHolder、TransactionSynchronizationManager、LocaleContextHolder等。
 
-## Q： Spring中的Controller ，Service，Dao是不是线程安全的？
+## Q：Spring中的Controller，Service，Dao是不是线程安全的？
 
 controller、service和dao层本身并不是线程安全的，如果只是调用里面的方法，而且多线程调用一个实例的方法，会在内存中复制变量，这是自己线程的工作内存，是安全的。但是对于controller中的类变量，如果只读就是线程安全，如果有读有写就会存在线程并发冲突的问题，所以类变量一般都定义成只读的常量。
 
