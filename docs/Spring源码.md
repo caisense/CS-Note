@@ -162,7 +162,7 @@ protected <T> T doGetBean(String name, @Nullable Class<T> requiredType, @Nullabl
 
 BeanDefinition合并之后，就可以去创建Bean对象了。
 
-创建Bean就必须实例化对象，实例化就必须先加载当前BeanDefinition所对应的class，AbstractAutowireCapableBeanFactory类的createBean()方法中，一开始就会调用这行代码就是去加载类：  
+创建Bean就必须实例化对象，实例化就必须先加载当前BeanDefinition所对应的class，`AbstractAutowireCapableBeanFactory`类的createBean()方法中，一开始就会调用这行代码就是去加载类：  
 
 ```java
 Class<?> resolvedClass = resolveBeanClass(mbd, beanName);  
