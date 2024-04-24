@@ -1188,7 +1188,7 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 5. 调用InitializingBean的afterPropertiesSet方法：提供一个机会，在所有Bean属性设置完成后进行初始化操作。如果Bean实现了InitializingBean接口，afterPropertiesSet方法会被调用。
 
    - 在`AbstractAutowireCapableBeanFactory`的`invokeInitMethods`方法中调用。
-6. 调用自定义init-method方法：提供一种配置方式，在XML配置中指定Bean的初始化方法。如果Bean在配置文件中定义了初始化方法，那么该方法会被调用。
+6. 调用自定义[init-method](#Q：@PostConstruct、init-method和afterPropertiesSet执行顺序？)方法：提供一种配置方式，在XML配置中指定Bean的初始化方法。如果Bean在配置文件中定义了初始化方法，那么该方法会被调用。
 
    - 在`AbstractAutowireCapableBeanFactory`的`invokeInitMethods`方法中调用。
 7. 调用BeanPostProcessor的后置处理方法：在Bean初始化之后，再次允许BeanPostProcessor对Bean进行处理。BeanPostProcessor的postProcessAfterInitialization方法会在此时被调用。
@@ -1558,7 +1558,7 @@ public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, S
 
 这三种都是用于在Bean初始化阶段执行特定方法的方式：
 
-- @PostConstruct 是javax.annotation 包中的注解(Spring Boot 3.0之后jakarta.annotation中，用于在构造函数执行完毕并且依赖注入完成后执行特定的初始化方法。标注在方法上，表示这个方法将在Bean初始化阶段被调用。
+- @PostConstruct 是 javax.annotation 包中的注解(Spring Boot 3.0之后jakarta.annotation中，用于在构造函数执行完毕并且依赖注入完成后执行特定的初始化方法。标注在方法上，表示这个方法将在Bean初始化阶段被调用。
 - init-method 是在Spring配置文件（如XML文件）中配置的一种方式。通过在Bean的配置中指定 init-method 属性，可以告诉Spring在Bean初始化完成后调用指定的初始化方法。如果不使用xml文件，也可以使用 @Bean 注解的 initMethod 属性来指定初始化方法。（下面的例子就是用的这种方式）
 - afterPropertiesSet 是 Spring 的 InitializingBean 接口中的方法。如果一个 Bean 实现了 InitializingBean 接口，Spring 在初始化阶段会调用该接口的 afterPropertiesSet 方法。
 
