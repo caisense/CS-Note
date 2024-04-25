@@ -615,19 +615,18 @@ public User user123(User user1) {
 
 jdk1.6开始，用于修饰非静态的void方法，在当前类构造完成时执行该方法，完成某些初始化动作。
 
-执行顺序：Constructor -> @Autowired -> @PostConstruct  （构造完成，说明是完整的bean，因此依赖注入已完成）
+执行顺序：Constructor -> @Autowired -> @PostConstruct  
 
-例：当某个类中，注入的bean加载顺序迟于当前类，则程序无法启动，因为@PostConstruct方法依赖于注入bean，而此时bean未加载，无法继续
+例：当某个类中，为避免调用paramApi时还未注入，造成使用null，于是将这段逻辑用@PostConstruct修饰，让其在类构造完成后再执行，就能保证此时所有依赖都已注入，不会出现paramApi为空的情况。
 
 ```java
-// 某个类中
+// 某个类中，注入依赖
 @Autowired
 private IParamApi paramApi;
-
 @PostConstruct
 public void initOiddUrl() {
     if (!"local".equals(envActive)) {
-        CmpParam param = paramApi.queryCmpParam("OIDD_URL");
+        CmpParam param = paramApi.queryCmpParam("OIDD_URL");  // 使用依赖
         if (StringHelper.isNotEmpty(param.getParamValue())) {
             this.oiddUrl = param.getParamValue();
         }

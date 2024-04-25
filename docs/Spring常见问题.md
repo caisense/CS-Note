@@ -1165,7 +1165,7 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 
 整个生命周期可以大致分为3个大的阶段，分别是：创建、使用、销毁。
 
-还可以进一步分为5个小的阶段：实例化、初始化、注册Destruction回调、Bean的正常使用以及Bean的销毁。
+还可以进一步分为5个小的阶段：**实例化（1-2步）**、**初始化（3-8）**、**注册Destruction回调**、Bean的正常使用、**Bean的销毁**。
 
 > 有人把设置属性值这一步单独拿出来了，主要是因为在源码中doCreateBean是先调了populateBean进行属性值的设置，然后再调initializeBean进行各种前置&后置处理。但是其实设置属性其实就是**初始化**的一部分。要不然初始化啥呢？
 >
@@ -1173,39 +1173,39 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 
 ## 代码
 
-1. 实例化Bean：Spring容器首先创建Bean实例。
+1. 生成、合并BeanDefinition
+2. 实例化Bean：Spring容器首先加载当前BeanDefinition对应的class，然后创建Bean实例。
+   - 在AbstractAutowireCapableBeanFactory类中的`createBeanInstance`方法中实现
+3. 设置属性值：Spring容器注入必要的属性到Bean中。
 
-   - 在`AbstractAutowireCapableBeanFactory`类中的`createBeanInstance`方法中实现
-2. 设置属性值：Spring容器注入必要的属性到Bean中。
+   - 在AbstractAutowireCapableBeanFactory的`populateBean`（填充bean）方法中处理
+4. 检查Aware：如果Bean实现了BeanNameAware、BeanClassLoaderAware等这些Aware接口，Spring容器会调用它们。
 
-   - 在`AbstractAutowireCapableBeanFactory`的`populateBean`（填充bean）方法中处理
-3. 检查Aware：如果Bean实现了BeanNameAware、BeanClassLoaderAware等这些Aware接口，Spring容器会调用它们。
+   - 在AbstractAutowireCapableBeanFactory的`initializeBean`方法中调用
+5. 调用BeanPostProcessor的前置处理方法：在Bean初始化之前，允许自定义的BeanPostProcessor对Bean实例进行处理，如修改Bean的状态。BeanPostProcessor的postProcessBeforeInitialization方法会在此时被调用。
 
-   - 在`AbstractAutowireCapableBeanFactory`的`initializeBean`方法中调用
-4. 调用BeanPostProcessor的前置处理方法：在Bean初始化之前，允许自定义的BeanPostProcessor对Bean实例进行处理，如修改Bean的状态。BeanPostProcessor的postProcessBeforeInitialization方法会在此时被调用。
+   - 由AbstractAutowireCapableBeanFactory的`applyBeanPostProcessorsBeforeInitialization`方法执行。
+6. 调用InitializingBean的afterPropertiesSet方法：提供一个机会，在所有Bean属性设置完成后进行初始化操作。如果Bean实现了InitializingBean接口，afterPropertiesSet方法会被调用。
 
-   - 由`AbstractAutowireCapableBeanFactory`的`applyBeanPostProcessorsBeforeInitialization`方法执行。
-5. 调用InitializingBean的afterPropertiesSet方法：提供一个机会，在所有Bean属性设置完成后进行初始化操作。如果Bean实现了InitializingBean接口，afterPropertiesSet方法会被调用。
+   - 在AbstractAutowireCapableBeanFactory的`invokeInitMethods`方法中调用。
+7. 调用自定义[init-method](#Q：@PostConstruct、init-method和afterPropertiesSet执行顺序？)方法：提供一种配置方式，在XML配置中指定Bean的初始化方法。如果Bean在配置文件中定义了初始化方法，那么该方法会被调用。
 
-   - 在`AbstractAutowireCapableBeanFactory`的`invokeInitMethods`方法中调用。
-6. 调用自定义[init-method](#Q：@PostConstruct、init-method和afterPropertiesSet执行顺序？)方法：提供一种配置方式，在XML配置中指定Bean的初始化方法。如果Bean在配置文件中定义了初始化方法，那么该方法会被调用。
+   - 在AbstractAutowireCapableBeanFactory的`invokeInitMethods`方法中调用。
+8. 调用BeanPostProcessor的后置处理方法：在Bean初始化之后，再次允许BeanPostProcessor对Bean进行处理。BeanPostProcessor的postProcessAfterInitialization方法会在此时被调用。
 
-   - 在`AbstractAutowireCapableBeanFactory`的`invokeInitMethods`方法中调用。
-7. 调用BeanPostProcessor的后置处理方法：在Bean初始化之后，再次允许BeanPostProcessor对Bean进行处理。BeanPostProcessor的postProcessAfterInitialization方法会在此时被调用。
+   - 由AbstractAutowireCapableBeanFactory的`applyBeanPostProcessorsAfterInitialization`方法执行
+9. 注册**Destruction回调**：如果Bean实现了DisposableBean接口或在Bean定义中指定了自定义的销毁方法，Spring容器会为这些Bean注册一个销毁回调，确保在容器关闭时能够正确地清理资源。
 
-   - 由`AbstractAutowireCapableBeanFactory`的`applyBeanPostProcessorsAfterInitialization`方法执行
-8. 注册Destruction回调：如果Bean实现了DisposableBean接口或在Bean定义中指定了自定义的销毁方法，Spring容器会为这些Bean注册一个销毁回调，确保在容器关闭时能够正确地清理资源。
+   - 在AbstractAutowireCapableBeanFactory类中的`registerDisposableBeanIfNecessary`方法中实现
+10. Bean准备就绪：此时，Bean已完全初始化，可以开始处理应用程序的请求了。
+11. 调用DisposableBean的destroy方法：当容器关闭时，如果Bean实现了DisposableBean接口，destroy方法会被调用。
 
-   - 在`AbstractAutowireCapableBeanFactory`类中的`registerDisposableBeanIfNecessary`方法中实现
-9. Bean准备就绪：此时，Bean已完全初始化，可以开始处理应用程序的请求了。
-10. 调用DisposableBean的destroy方法：当容器关闭时，如果Bean实现了DisposableBean接口，destroy方法会被调用。
+    - 在DisposableBeanAdapter的destroy方法中实现
+12. 调用自定义的destory-method：如果Bean在配置文件中定义了销毁方法，那么该方法会被调用。
 
-    - 在`DisposableBeanAdapter`的destroy方法中实现
-11. 调用自定义的destory-method：如果Bean在配置文件中定义了销毁方法，那么该方法会被调用。
+    - 在DisposableBeanAdapter的destroy方法中实现
 
-    - 在`DisposableBeanAdapter`的destroy方法中实现
-
-可以看到，整个Bean的创建的过程都依赖于AbstractAutowireCapableBeanFactory这个类，而销毁主要依赖DisposableBeanAdapter这个类。
+可以看到，整个Bean的创建的过程都依赖于`AbstractAutowireCapableBeanFactory`这个类，而销毁主要依赖`DisposableBeanAdapter`这个类。
 
 AbstractAutowireCapableBeanFactory 的入口处，doCreateBean的核心代码如下，其中包含了实例化、设置属性值、初始化Bean以及注册销毁回调的几个核心方法。
 
@@ -1561,6 +1561,8 @@ public Object applyBeanPostProcessorsBeforeInitialization(Object existingBean, S
 - @PostConstruct 是 javax.annotation 包中的注解(Spring Boot 3.0之后jakarta.annotation中，用于在构造函数执行完毕并且依赖注入完成后执行特定的初始化方法。标注在方法上，表示这个方法将在Bean初始化阶段被调用。
 - init-method 是在Spring配置文件（如XML文件）中配置的一种方式。通过在Bean的配置中指定 init-method 属性，可以告诉Spring在Bean初始化完成后调用指定的初始化方法。如果不使用xml文件，也可以使用 @Bean 注解的 initMethod 属性来指定初始化方法。（下面的例子就是用的这种方式）
 - afterPropertiesSet 是 Spring 的 InitializingBean 接口中的方法。如果一个 Bean 实现了 InitializingBean 接口，Spring 在初始化阶段会调用该接口的 afterPropertiesSet 方法。
+
+
 
 参考：https://www.yuque.com/hollis666/abunv0/sgf2ipp88i6qk803
 
