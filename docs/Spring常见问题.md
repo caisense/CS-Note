@@ -94,7 +94,7 @@ Servlet API是一个jar包，需要通过Maven来引入
 
 ## servlet开发
 
-上述方法在tomcat中运行war，如果想在IDE中断点调试，还需要打开Tomcat的远程调试端口并且连接上去。
+上述方法在tomcat中运行war，如果想在IDE中断点调试，还需 要打开Tomcat的远程调试端口并且连接上去。
 
 如何在IDE中启动并调试webapp？可以把Tomcat的jar包全部引入进来，然后自己编写一个`main()`方法，先启动Tomcat，然后让它加载我们的webapp就行。
 
