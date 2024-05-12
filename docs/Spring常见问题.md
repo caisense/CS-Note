@@ -1638,7 +1638,7 @@ SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级�
 **1.@Repository**
 
 ```java
-// IA 、 IB是两个空接口，略
+// IA、IB是两个空接口，略
 @Repository
 public class A implements IA {
     @Autowired
