@@ -1617,11 +1617,11 @@ A创建时--->需要B---->B去创建--->需要A，从而产生了循环依赖
 
 Spring使用三级缓存，其实就是三个map：
 
-1. `singletonObjects`：ConcurrentHashMap<beanName, bean>。也称单例池，缓存已经经历了完整生命周期的bean对象。
+1. 一级缓存`singletonObjects`：ConcurrentHashMap<beanName, bean>。也称单例池，缓存已经经历了完整生命周期的bean对象。
 
-2.  `earlySingletonObjects`：HashMap<beanName, bean>。比单例池多了一个early，表示缓存的是早期的bean对象（Bean的生命周期还没完整） 
+   二级缓存`earlySingletonObjects`：HashMap<beanName, bean>。比单例池多了一个early，表示早期（Bean生命周期还没完整） 
 
-3. `singletonFactories` ：ConcurrentHashMap<beanName, bean>。缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
+3. 三级缓存`singletonFactories` ：ConcurrentHashMap<beanName, bean>。缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
 
 SingletonObjecs 完成初始化的单例对象的cache（一级缓存）
 
