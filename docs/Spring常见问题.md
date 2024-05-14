@@ -1619,15 +1619,15 @@ Spring使用三级缓存，其实就是三个map：
 
 1. 一级缓存`singletonObjects`：ConcurrentHashMap<beanName, bean>。也称单例池，缓存已经经历了完整生命周期的bean对象。
 
-   二级缓存`earlySingletonObjects`：HashMap<beanName, bean>。比单例池多了一个early，表示早期（Bean生命周期还没完整） 
+2. 二级缓存`earlySingletonObjects`：HashMap<beanName, bean>。比单例池多了一个early（表示早期，Bean生命周期还没完整），**存储尚未完全创建好的单例bean对象**。
 
-3. 三级缓存`singletonFactories` ：ConcurrentHashMap<beanName, bean>。缓存ObjectFactory，表示对象工厂，表示用来创建早期bean对象的 工厂。
+3. 三级缓存`singletonFactories` ：ConcurrentHashMap<beanName, bean>。缓存ObjectFactory，表示对象工厂，**存储单例bean的创建工厂**。
 
-SingletonObjecs 完成初始化的单例对象的cache（一级缓存）
+流程：
 
-EarlySingletonObjecs 完成实例化但没有初始化的 提前曝光的单例对象的Cache（二级缓存）
-
-SingletonFactories 进入实例化阶段的单例对象工厂的cache（三级缓存）
+- 创建一个单例bean时，会先从`singletonObjects`中尝试获取该bean的实例，如果能够获取到，则直接返回该实例，否则继续创建该bean。
+- 如果发现该bean存在循环依赖，则会先创建该bean的"半成品"对象，并将半成品存入`earlySingletonObjects`，当循环依赖的bean创建完成，再将“完成品”存入`singletonObjects`。这样可以保证单例bean的创建过程不会出现循环依赖问题。
+- 当一个单例bean被创建时，Spring会先将该bean的创建工厂存储到`singletonFactories`中，然后再执行创建工厂的getObject()方法，生成该bean的实例对象。在该bean被其他bean引用时，Spring会从singletonFactories中获取该bean的创建工厂，创建出该bean的实例对象，并将该bean的实例对象存储到singletonObjects中。
 
 <img src="images/Spring常见问题/image-20220311095851373-16469639344001.png" alt="image-20220311095851373-16469639344001" />
 
