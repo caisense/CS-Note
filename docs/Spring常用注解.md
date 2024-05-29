@@ -59,10 +59,11 @@ java.lang.IllegalArgumentException: Unknown return value type: java.lang.Integer
 
 用法：
 
-- `singleton`：单例（默认），每次getBean都只返回同一个bean
+- `singleton`：**（默认）**单例，每次getBean都只返回同一个bean
 - `prototype`：原型，每次getBean返回一个新的bean
 - `request`: 表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP request内有效
 - `session`：表示该针对每一次HTTP请求都会产生一个新的bean，同时该bean仅在当前HTTP session内有效
+- `global-session`：将对象存入web项目集群的session域，若不存在集群，则相当于`session`
 
 **多例失效场景**
 
