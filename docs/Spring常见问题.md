@@ -1179,7 +1179,7 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 3. 设置属性值：Spring容器注入必要的属性到Bean中。
 
    - 在AbstractAutowireCapableBeanFactory的`populateBean`（填充bean）方法中处理
-4. 检查Aware：如果Bean实现了BeanNameAware、BeanClassLoaderAware等这些Aware接口，Spring容器会调用它们。
+4. 检查**Aware**：如果Bean实现了**BeanNameAware**、**BeanClassLoaderAware**等这些Aware接口，Spring容器会调用它们。
 
    - 在AbstractAutowireCapableBeanFactory的`initializeBean`方法中调用
 5. 调用BeanPostProcessor的前置处理方法：在Bean初始化之前，允许自定义的BeanPostProcessor对Bean实例进行处理，如修改Bean的状态。BeanPostProcessor的postProcessBeforeInitialization方法会在此时被调用。
@@ -1198,7 +1198,7 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 
    - 在AbstractAutowireCapableBeanFactory类中的`registerDisposableBeanIfNecessary`方法中实现
 10. Bean准备就绪：此时，Bean已完全初始化，可以开始处理应用程序的请求了。
-11. 调用DisposableBean的destroy方法：当容器关闭时，如果Bean实现了DisposableBean接口，destroy方法会被调用。
+11. 调用**DisposableBean**的destroy方法：当容器关闭时，如果Bean实现了DisposableBean接口，destroy方法会被调用。
 
     - 在DisposableBeanAdapter的destroy方法中实现
 12. 调用自定义的destory-method：如果Bean在配置文件中定义了销毁方法，那么该方法会被调用。
@@ -1330,7 +1330,7 @@ protected BeanWrapper createBeanInstance(String beanName, RootBeanDefinition mbd
 }
 ```
 
-其实就是先确保这个Bean对应的类已经被加载，然后确保它是public的，然后如果有工厂方法，则直接调用工厂方法创建一本Bean，如果没有的话就调用它的构造方法来创建这个Bean。
+其实就是先确保这个Bean对应的类已经被加载，然后确保它是public的，然后如果有工厂方法，则直接调用工厂方法创建一个Bean，如果没有的话就调用它的构造方法来创建这个Bean。
 
 这里需要注意的是，在Spring的完整Bean创建和初始化流程中，容器会在调用createBeanInstance之前检查Bean定义的作用域。如果是Singleton，容器会在其内部单例缓存中查找现有实例。如果实例已存在，它将被重用；如果不存在，才会调用createBeanInstance来创建新的实例。
 
