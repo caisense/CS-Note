@@ -1727,7 +1727,7 @@ public class BService {
 
 先构造A，发现A需要注入B；再构造B，发现B需要注入A，互相死锁。
 
-解决：构造方法加@Lazy
+解决：构造方法加@Lazy，采用的是spring提前暴露对象的解决方法
 
 # Q：@Component 和 @Configuration + @Bean 同时存在，创建bean用哪个？
 
