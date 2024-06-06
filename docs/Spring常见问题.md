@@ -812,7 +812,7 @@ SpringBoot通常有一个入口类：`XXXApplication`， 里面有main方法，�
 @SpringBootApplication
 public class Application {
     public static void main(String[] args) {
-    	SpringApplication.run(Application.class, args);  也可简化调用静态方法
+    	SpringApplication.run(Application.class, args);  //也可简化调用静态方法
     }
 }
 ```
@@ -1076,7 +1076,7 @@ private void createWebServer() {
         StartupStep createWebServer = getApplicationStartup().start("spring.boot.webserver.create");
         ServletWebServerFactory factory = getWebServerFactory();
         createWebServer.tag("factory", factory.getClass().toString());
-        // 这里默认获取 TomcatServletWebServerFactory
+        // ============这里默认获取 TomcatServletWebServerFactory==================
         this.webServer = factory.getWebServer(getSelfInitializer());
         createWebServer.end();
         getBeanFactory().registerSingleton("webServerGracefulShutdown",
@@ -1151,7 +1151,7 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 
 
 
-
+# 启动类注解
 
 入口类要使用`@SpringBootApplication`注解声明，主要包含三个Annotation：
 
