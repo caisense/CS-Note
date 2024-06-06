@@ -837,16 +837,16 @@ run方法的实现分两步：`new SpringApplication`的初始化过程，`Sprin
 >
 > ```java
 > private <T> Collection<? extends T> getSpringFactoriesInstances(Class<T> type, Class<?>[] parameterTypes, Object... args) {
->     // 3.1 获取当前线程的上下文类加载器
->     ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
->     // 3.2 从spring.factories加载指定类型的工厂名称，并使用LinkedHashSet确保名称的唯一性，以防重复
->     Set<String> names = new LinkedHashSet<String>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
->     // 3.3 创建指定类型的实例。这里使用反射来实例化类，并传入任何必要的参数
->     List<T> instances = createSpringFactoriesInstances(type, parameterTypes, classLoader, args, names);
->     // 3.4 对实例进行排序，这里使用的是Spring的注解感知比较器，可以处理@Order注解和Ordered接口
->     AnnotationAwareOrderComparator.sort(instances);
->     // 3.5 返回实例集合
->     return instances;
+>        // 3.1 获取当前线程的上下文类加载器
+>        ClassLoader classLoader = Thread.currentThread().getContextClassLoader();
+>        // 3.2 从spring.factories加载指定类型的工厂名称，并使用LinkedHashSet确保名称的唯一性，以防重复
+>        Set<String> names = new LinkedHashSet<String>(SpringFactoriesLoader.loadFactoryNames(type, classLoader));
+>        // 3.3 创建指定类型的实例。这里使用反射来实例化类，并传入任何必要的参数
+>        List<T> instances = createSpringFactoriesInstances(type, parameterTypes, classLoader, args, names);
+>        // 3.4 对实例进行排序，这里使用的是Spring的注解感知比较器，可以处理@Order注解和Ordered接口
+>        AnnotationAwareOrderComparator.sort(instances);
+>        // 3.5 返回实例集合
+>        return instances;
 > }
 > ```
 >
@@ -1155,9 +1155,9 @@ public TomcatWebServer(Tomcat tomcat, boolean autoStart, Shutdown shutdown) {
 
 入口类要使用`@SpringBootApplication`注解声明，主要包含三个Annotation：
 
-- @EnableAutoConfiguration 通过@import将所有符合自动配置条件的bean定义都加载到IoC容器 搜索符合自动配置条件的功能需要借助于SpringFactoriesLoader提供的配置查找的功能 即根据 @EnableAutoConfiguration的完整类名作为查找的Key 获取对应的一组Configuration类
-- @Configuration 和JavaConfig形式的Spring loc容器的配置类使用的@Configuration一样 是其定义成一个JavaConfig配置类
-- @ComponentScan 对应XML配置中的元素 其功能就是自动扫描并加载符合条件的组件（比如@Component和@Repository等）或者bean定义，最终将这些bean定义加载到IoC容器
+- @EnableAutoConfiguration：开启自动配置，具体见[Spring如何实现自动配置？](#Q：Spring如何实现自动配置？)
+- @SpringBootConfiguration：底层是**Configuration**注解，简单说就是支持注解的方式来进行配置（区别于XML配置）
+- @ComponentScan：扫描含有@Component的类，注入spring容器。默认是扫描**当前类下**的package
 
 # Q：Bean的生命周期是怎样的？
 
@@ -1791,13 +1791,15 @@ Spring Boot 启动时，会自动加载 **JAR 包内部及 JAR 包所在目录**
 
 # Q：Spring如何实现自动配置？
 
+> @EnableAutoConfiguration是关键(启用自动配置)，内部实际上就去加载META-INF/spring.factories文件的信息，然后筛选出以EnableAutoConfiguration为key的数据，加载到IOC容器中，实现自动配置功能！
+
 Spring Boot会根据类路径中的jar包、类，为jar包里的类自动配置，这样可以极大的减少配置的数量。简单点说就是它会根据定义在classpath下的类，自动的给你生成一些Bean，并加载到Spring的Context中。
 
 SpringBoot通过Spring 的条件配置决定哪些bean可以被配置，将这些条件定义成具体的Configuration，然后将这些Configuration配置到spring.factories文件中（这种方式Springboot 2.7.0版本已不建议使用，最新的方式是使用 /META-INF/spring/org.springframework.boot.autoconfigure.AutoConfiguration.imports）
 
 作为key: org.springframework.boot.autoconfigure.EnableAutoConfiguration的值
 
-这时候，容器在启动的时候，由于使用了`@EnableAutoConfiguration`注解，该注解Import的EnableAutoConfigurationImportSelector会去扫描classpath下的所有spring.factories文件，然后进行bean的自动化配置：
+容器在启动的时候，由于使用了`@EnableAutoConfiguration`注解，该注解Import的**EnableAutoConfigurationImportSelector**会去扫描classpath下的所有spring.factories文件，然后进行bean的自动化配置：
 
 ![r](images/Spring常见问题/r.png)
 
@@ -1824,7 +1826,6 @@ public class Application {
 
 
 ```java
-
 public class ServletInitializer extends SpringBootServletInitializer {
 
     @Override
