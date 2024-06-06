@@ -1803,6 +1803,14 @@ SpringBoot通过Spring 的条件配置决定哪些bean可以被配置，将这�
 
 ![r](images/Spring常见问题/r.png)
 
+# Q：Spring自动配置和@Configuration的功能有什么区别？
+
+或者问：为什么有了@Configuration，还需要写spring.factories文件？
+
+spring.factories文件是帮助spring-boot**项目包以外**的bean（即在pom文件中添加依赖中的bean）注册到spring-boot项目的spring容器。
+
+由于@ComponentScan注解只能扫描spring-boot项目包内的bean，因此@Configuration注解只能将项目包内的bean注册到spring容器中。所以需要@EnableAutoConfiguration注解来注册项目包外的bean，这就需要spring.factories文件来记录**项目包外**要注册的bean类名。
+
 # SpringBoot 引导配置
 
 **Spring Boot应用程序的入口点是使用@SpringBootApplication注释的类**
