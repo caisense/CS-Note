@@ -1,3 +1,4 @@
+本项目使用vuepress
 # 本地开发预览
 进入docs目录执行npm run docs:dev
 
