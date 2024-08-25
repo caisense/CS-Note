@@ -3126,17 +3126,17 @@ public static void main(String[] args) {
 
 ## Q：如何实现深拷贝？
 
-1、用对象的clone方法：
+### 1、用对象的clone方法：
 
 ```java
- public static void main(String[] args) throws CloneNotSupportedException {
-        User user = new User("Hollis", "hollischuang");
-        user.setAddress(new Address("zhejiang", "hangzhou", "binjiang"));
-        User newUser = new User();
-        BeanUtils.copyProperties(user, newUser);  // 浅拷贝
-        User newUser1 = (User) user.clone();  // 深拷贝
-        System.out.println(user.getAddress() == newUser.getAddress());  // true
-        System.out.println(user.getAddress() == newUser1.getAddress()); // false
+public static void main(String[] args) throws CloneNotSupportedException {
+    User user = new User("css");
+    user.setAddress(new Address(111, "hangzhou"));
+    User userShallow = new User();
+    BeanUtils.copyProperties(user, userShallow);  // 浅拷贝
+    User userDepth = (User) user.clone();  // 深拷贝
+    System.out.println(user.getAddress() == userShallow.getAddress());  // true
+    System.out.println(user.getAddress() == userDepth.getAddress()); // false
 }
 ```
 
@@ -3144,27 +3144,27 @@ public static void main(String[] args) {
 
 ```java
 public class Address implements Cloneable {
-    private String province;
-    private String city;
+    private int addrId;
     private String area;
     //省略构造函数和setter/getter
 
     @Override
     public Object clone() throws CloneNotSupportedException {
-        return super.clone();
+        return super.clone();  // 最终通过继承的clone方法实现克隆
+        // 注意：addrId是简单类型，无需克隆；String类是不可变的，也无需克隆
     }
 }
 
 class User implements Cloneable {
     private String name;
-    private String password;
     private Address address;
     //省略构造函数和setter/getter
 
     @Override
     protected Object clone() throws CloneNotSupportedException {
-        User user = (User)super.clone();
-        user.setAddress((Address)address.clone());
+        User user = (User)super.clone();  // 先克隆自己
+        user.setAddress((Address)address.clone());  // 再克隆下面的属性，并赋值给克隆出的自己
+        // 注意：String类是不可变的，无需克隆
         return user;
     }
 }
@@ -3172,7 +3172,7 @@ class User implements Cloneable {
 
 这样还是有缺陷，如果我们在User中有很多个对象，那么每个对象都要clone、set，导致clone方法就写的很长；而且如果后面有修改，在User中新增属性，clone也要改。
 
-2、序列化
+### 2、序列化
 
 借助序列化来实现深拷贝。先把对象序列化成流，再从流中反序列化成对象，这样就一定是新的对象了。
 
@@ -3183,13 +3183,13 @@ class User implements Serializable
 class Address implements Serializable
 ```
 
-fastjson：
+2.1 阿里fastjson库：
 
 ```java
 User newUser = JSON.parseObject(JSON.toJSONString(user), User.class);
 ```
 
-使用Apache Commons Lang中提供的SerializationUtils：
+2.2 使用**Apache Commons Lang**中提供的SerializationUtils：
 
 ```java
 User newUser = (User) SerializationUtils.clone(user);
