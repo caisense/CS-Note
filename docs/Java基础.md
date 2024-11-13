@@ -9,6 +9,7 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 ## JDK8新特性
 
 - 支持lambda表达式，允许把函数整体作为一个方法的参数
+- Function类
 - Optional类
   实际上是个容器，支持链式调用判空
 
