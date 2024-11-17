@@ -58,13 +58,14 @@ module.exports = {
                     {text: '系统设计', link: '/系统设计'},
                     {text: 'Linux', link: '/Linux'},
                     {text: 'Git', link: '/Git'},
-                    {text: '信息安全', link: '/信息安全'},
+                    {text: '信息安全', link: '/信息doc安全'},
                     {text: '编码', link: '/编码'}
                 ]
             },
             {
                 text: '项目', items: [
                     {text: '高性能数字货币交易系统', link: '/高性能数字货币交易系统'},
+                    {text: '手写Spring', link: '/手写Spring'},
                 ]
             }
         ],
