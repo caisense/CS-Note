@@ -9,16 +9,21 @@ Java10以后，JDK版本号与Java版本号数字一致：JDK10、JDK11、JDK12�
 ## JDK8新特性
 
 - 支持lambda表达式，允许把函数整体作为一个方法的参数
+
 - Function类
+
+- Stream类，引入函数式编程
+  
+- 方法引用
+  
+- 默认方法：接口支持默认的实现方法
+
 - Optional类
   实际上是个容器，支持链式调用判空
 
   ```java
   Optional.ofNullable(a).orElse(0); // 如果a为null，返回0；否则返回a
   ```
-
-- Stream类，引入函数式编程
-- 默认方法：接口支持默认的实现方法
 
 ## JDK9新特性（2017年9月）
 
@@ -1761,6 +1766,134 @@ web应用中可以不写main方法，因为web容器已经自带入口。
 ### Q：main方法为什么必须加static？
 
 已知在类加载时无法创建对象，因为静态方法可以不通过对象调用，所以在类的main方法所在在类加载时就可以通过main方法入口来运行程序。
+
+## Lambda 表达式
+
+也叫做匿名方法（Anonymous Method），不需要依附对象就能执行，主要依赖于 **函数式接口** 的机制和 **上下文推导**。
+
+> Java中，方法是需要在对象中定义的，匿名方法不需要依附对象，是因为它们在本质上是一种简化的 **匿名类** 实现。
+>
+> 虽然表面上看匿名方法不依附于对象，但在底层：
+>
+> 1. **编译时生成匿名类**
+>    Java 编译器会将 Lambda 表达式编译为一个匿名类或静态方法引用，具体实现依赖 JVM 优化。
+> 2. **运行时绑定到目标接口的实例**
+>    Lambda 表达式最终会被绑定到一个目标**函数式接口**的实例上，通过接口实例来调用抽象方法。
+
+Lambda 表达式的本质是对 **函数式接口** 的实例化形式。它不是独立存在的，而是**依附于某个函数式接口**的实现。当 Lambda 表达式被使用时，实际上是创建了一个对应的函数式接口的实例：
+
+```java
+@FunctionalInterface
+interface MyInterface {
+    void execute();
+}
+
+public class Main {
+    public static void main(String[] args) {
+        MyInterface lambda = () -> System.out.println("Hello, Lambda!");
+        lambda.execute(); // 执行匿名方法
+    }
+}
+```
+
+这里的 `() -> System.out.println("Hello, Lambda!")` 是对 `MyInterface` 的实现，相当于：
+
+```java
+javaCopy codeMyInterface lambda = new MyInterface() {
+    @Override
+    public void execute() {
+        System.out.println("Hello, Lambda!");
+    }
+};
+```
+
+因此，**匿名方法是通过接口实例调用的，并非完全独立存在**。
+
+## 方法引用
+
+Java 8 引入的一种简洁语法，本质就是lambda表达式的简化写法。
+
+语法为
+
+```
+ClassName::methodName
+```
+
+该语法依赖函数式接口，要求是：目标方法的签名（参数类型和返回类型）必须与函数式接口的抽象方法匹配。
+
+主要有四种方法引用：
+
+| 类型                                                         | 语法               | 对应Lambda表达式                                             |
+| ------------------------------------------------------------ | ------------------ | ------------------------------------------------------------ |
+| 静态方法引用                                                 | 类名::staticMethod | Function<T, R> function = (args)->类名.staticMethod(args)    |
+| 实例方法引用                                                 | inst::instMethod   | Consumer<T> consumer = (args)->inst.instMethod(args)         |
+| 对象方法引用（与上面的区别，这里所有实例通用，因此是类方法） | 类名::instMethod   | BiFunction<T, R, U> function = (args)->类名.instMethod(args) |
+| 构造方法引用                                                 | 类名::new          | Supplier<T> supplier = (args)->new 类名(args)                |
+
+
+
+## 函数式接口
+
+**函数式接口（Functional Interface）** 是支持函数式编程的关键概念。它是一个只包含 **一个抽象方法** 的接口，通常用作 lambda 表达式或方法引用的目标。
+
+一个函数式接口必须满足以下条件：
+
+1. 只包含一个抽象方法。
+2. 可以包含默认方法、静态方法以及从 `Object` 类继承的方法（如 `toString`, `equals` 等），但这些都不会影响其函数式接口的性质。
+3. 可以使用 `@FunctionalInterface` 注解明确标记（可选，但推荐），用于编译器检查是否符合函数式接口的要求。
+
+示例：
+
+```java
+@FunctionalInterface
+public interface MyFunctionalInterface {
+    void doSomething();
+
+    // 可以包含默认方法和静态方法
+    default void defaultMethod() {
+        System.out.println("This is a default method.");
+    }
+
+    static void staticMethod() {
+        System.out.println("This is a static method.");
+    }
+}
+```
+
+### 使用场景
+
+1. **Lambda 表达式**
+   函数式接口是 lambda 表达式的目标类型。例如：
+
+   ```java
+   MyFunctionalInterface example = () -> System.out.println("Hello, Lambda!");
+   example.doSomething();
+   ```
+
+2. **方法引用**
+   函数式接口可以通过方法引用使用：
+
+   ```java
+   MyFunctionalInterface example = System.out::println;
+   example.doSomething("Hello, Method Reference!");
+   ```
+
+3. **内置函数式接口**
+   Java 8 提供了一些常用的函数式接口，位于 `java.util.function` 包中，包括：
+
+   - `Consumer<T>`：接受一个参数，无返回值。
+   - `Supplier<T>`：无参数，返回一个结果。
+   - `Function<T, R>`：接受一个参数，返回一个结果。
+   - `Predicate<T>`：接受一个参数，返回一个布尔值。
+   - `BiFunction<T, U, R>`：接受两个参数，返回一个结果。
+
+### Q：为什么函数式接口不能有多个抽象方法？
+
+它的核心目标是支持 **Lambda 表达式**，而 Lambda 表达式需要一个明确的目标方法。如果函数式接口有多个抽象方法，会导致**语义模糊**，编译器将无法确定 Lambda 表达式应该对应哪个方法。
+
+如果需要多个方法，可以通过 **默认方法（default method）**或 **静态方法（static method）**提供其他非抽象行为，而不破坏函数式接口的单一抽象方法的性质。
+
+
 
 ## StackTraceElement
 

@@ -2271,7 +2271,7 @@ synchronized (user){
 
 - 重量锁markword中也没有地方存储hashcode，只有指向ObjectMonitor的指针，ObjectMonitor的_header字段可记录非加锁状态下（标志位01）的markword，里面记录了hashcode
 
-## 题：如何实现三个线程交替打印ABC，共100次？
+## Q：如何实现三个线程交替打印ABC，共100次？
 
 一道题分别用synchronized锁、lock锁的wait/notify方法、lock锁的await/signal方法、countDownLatch解决
 
