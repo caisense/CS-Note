@@ -226,13 +226,18 @@ required，布尔值，默认true--表示注入的对象必须存在。false--�
 
 3. 构造方法（构造器注入）：先根据方法**参数类型**去找Bean，如果找到多个再根据**参数名**确定一个
 
+- 3.1 修饰构造方法时，对所有参数都生效
+
+- 3.2 修饰构造方法参数时，只对某几个特定参数生效（更灵活）
+
    用途：由于Java变量的初始化顺序为：静态变量或静态语句块–>实例变量或初始化语句块–>构造方法–>@Autowired，因此构造时属性还未注入，如果此时需要这个属性值，则应在构造方法加@Autowired
 
    > Spring中构造方法调用优先级：
    >
    > 带@Autowired的有参构造方法 > 不带@Autowired的有参构造方法  > 无参构造方法
-   
+
    ```java
+   // 第1、第2中用法举例：
    public class UserService {
        // 下面两种@Autowired效果相同
        @Autowired
@@ -244,18 +249,24 @@ required，布尔值，默认true--表示注入的对象必须存在。false--�
        }
    }
    ```
-   
+
    ```java
-   // 第3种：加载构造方法
+   // 第3.1种用法：
    @Component
    public class UserService {
        private OrderService os;
        @Autowired  
        public UserService(OrderService os) {
-           System.out.println(this.os);  // null
-           System.out.println(os);  // com.zhouyu.service.OrderService@59690aa4
+           System.out.println(this.os);  // null（因为没给自身os赋值）
+           System.out.println(os);  // 从容器中找到一个bean：com.zhouyu.service.OrderService@59690aa4
        }
    }
+   // 3.2 修饰构造参数，比修饰构造方法更灵活：
+   public UserService( @Autowired  OrderService os,  @Autowired  Object1 os1, Object2 os2, ...)  {
+       ...
+   }
+   
+   
    //测试：
    public static void main(String[] args) {
        // 创建一个Spring容器
@@ -263,9 +274,9 @@ required，布尔值，默认true--表示注入的对象必须存在。false--�
        UserService userService = (UserService) context.getBean("userService");
    }
    ```
-   
+
    如果根据属性名还是找不到，则报错
-   
+
    ```java
    public class AppConfig {  // 配置类
    	@Bean({"orderService2", "orderService3"})  // 名字orderService2，别名orderService3
@@ -287,7 +298,7 @@ required，布尔值，默认true--表示注入的对象必须存在。false--�
    	private OrderService orderService;  // 正确，虽然Autowired没找到，但是value找到了
    }
    ```
-   
+
    
 
 @Bean 和 @Autowired 做了两件完全不同的事情：
@@ -373,27 +384,27 @@ private Bean bean;
 
    使用Autowired，说明这个类依赖了Spring容器，这让我们在进行UT的时候必须要启动一个Spring容器才可以测试这个类，显然太麻烦，这种测试方式非常重，对于大型项目来说，往往启动一个容器就要好几分钟，这样非常耽误时间。
 
-> 构造器注入可能产生的问题？
->
-> bean循环依赖的话，构造器注入就会抛出异常：
+## Q：构造器注入可能产生什么问题？
+
+> bean之间构成 **循环依赖** 的话，构造器注入就会抛出异常：
 >
 > ```java
-> @Component
+>@Component
 > public class BeanTwo implements Bean{
->     Bean beanOne;
->     public BeanTwo(Bean beanOne) {
+>  Bean beanOne;
+>  public BeanTwo(Bean beanOne) {
 >         this.beanOne = beanOne;
 >     }
-> }
-> @Component
+>    }
+>    @Component
 > public class BeanOne implements Bean{
->     Bean beanTwo;
->     public BeanOne(Bean beanTwo) {
+>  Bean beanTwo;
+>  public BeanOne(Bean beanTwo) {
 >         this.beanTwo = beanTwo;
 >     }
-> }
-> ```
->
+>    }
+>    ```
+> 
 > 解决：在其中一个构造器加@Lazy注解
 
 
