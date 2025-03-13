@@ -1249,7 +1249,7 @@ class JobTest {
 public class LinkedHashMap<K,V> extends HashMap<K,V> implements Map<K,V>
 ```
 
-**与hashmap的不同**：所有Entry用双向链表串起来。即Enrty是有序的
+**与hashmap的不同**：所有Entry用双向链表串起来。即Entry是有序的
 
 **实现**
 
@@ -1512,7 +1512,7 @@ System.out.println(collect); // [3, 6, 9, 12]
 List<Integer> collect = Arrays.asList(1, 2, 3, 4).stream().map(i -> func(i)).collect(Collectors.toList());
 // 3、peek + collect
 List<Integer> collect = Stream.of(1, 2, 3, 4).peek(i -> func(i)).collect(Collectors.toList());
-System.out.println(collect);
+System.out.println(collect); // 3 6 9 12 [1, 2, 3, 4]
 
 // 辅助函数
 public static int func(int i) {
@@ -1533,7 +1533,6 @@ public static int func(int i) {
 
   ```java
   List<String> roleCodes = sysRoles.stream().filter(Objects::nonNull).map(SysRole::getRoleCode).collect(Collectors.toList());
-  
   ```
 
 
@@ -1683,7 +1682,7 @@ public class Exam {
         str.append("sss");  // 情况2
     }
     public static void main(String[] args) {
-        Exam ex=  new Exam();
+        Exam ex=  new Exam(); // str="good", ch="abc"
         ex.change(ex.str, ex.ch);
         System.out.println(ex.str);  // good
         System.out.println(ex.ch); // gbc 
@@ -1729,6 +1728,8 @@ class B extends A {
     public void show(C obj) {System.out.println("B.show(C)");}
     public void show(D obj) {System.out.println("B.show(D)");}
 }
+class C extends B {}
+class D extends C {}
 class Test1{
     public static void main(String[] args) {
         A a = new A(); B b = new B(); C c = new C(); D d = new D();
@@ -1773,7 +1774,7 @@ web应用中可以不写main方法，因为web容器已经自带入口。
 
 ### Q：main方法为什么必须加static？
 
-已知在类加载时无法创建对象，因为静态方法可以不通过对象调用，所以在类的main方法所在在类加载时就可以通过main方法入口来运行程序。
+已知在类加载时无法创建对象，因为静态方法可以不通过对象调用，所以在类的main方法所在在**类加载时**就可以通过main方法入口来运行程序。
 
 ## Lambda 表达式
 
@@ -1807,7 +1808,7 @@ public class Main {
 这里的 `() -> System.out.println("Hello, Lambda!")` 是对 `MyInterface` 的实现，相当于：
 
 ```java
-javaCopy codeMyInterface lambda = new MyInterface() {
+MyInterface lambda = new MyInterface() {
     @Override
     public void execute() {
         System.out.println("Hello, Lambda!");
@@ -1855,7 +1856,7 @@ ClassName::methodName
 ```java
 @FunctionalInterface
 public interface MyFunctionalInterface {
-    void doSomething();
+    void doSomething();  // 抽象方法
 
     // 可以包含默认方法和静态方法
     default void defaultMethod() {
@@ -2050,14 +2051,14 @@ public final void wait() throws InterruptedException
 
 对象实例的equals()可能报空指针异常，而`Objects.equals()`方法不会
 
-`java.util`包下提供的Objects类（不是java.land.Object），有许多对象操作的辅助方法
+`java.util`包下提供的Objects类（不是java.lang.Object），有许多对象操作的辅助方法
 
 ```java
 Integer a = 1;
 int b = 1;
 Integer c = null;
-// System.out.println(c.equals(a));  //报错, null不存在，不能调用实例方法
-System.out.println(a.equals(c));  // true
+System.out.println(c.equals(a));  //报错, null不存在，不能调用实例方法
+System.out.println(a.equals(c));  // false
 System.out.println(Objects.equals(a, c)); //false
 System.out.println(Objects.equals(a, b)); //true
 ```
@@ -2187,7 +2188,7 @@ public class B extends A{
     public void test() {
         System.out.println(super.hashCode()); // 621009875
         System.out.println(this.hashCode());  // 621009875
-        super.hash();  // hash 621009875
+        super.hash();  // hash 621009875  // 注意比较两个hash()调用的区别
     }
 }
 public class Test {
@@ -2257,7 +2258,10 @@ public class A extends B implements C, D, E {
 
 子类对象赋值给父类对象引用，之后父类对象就可以在**运行时**根据当前赋值给它的子对象的特性，执行方法时就可以有不同的操作。
 
-多态分为编译时多态和运行时多态。**编译时多态**是静态的，主要指方法重载（overload）；**运行时多态**指方法覆盖（override），在运行时通过动态绑定实现。
+多态分为编译时多态和运行时多态。
+
+- **编译时多态**是静态的，主要指方法重载（overload）；
+- **运行时多态**指方法覆盖（override），在运行时通过动态绑定实现。
 
 最常见的用法：
 
@@ -2275,7 +2279,7 @@ listAdd的形参类型是List，而实际传参时不仅可以传List，也可�
 
 ### 向上转型和向下转型
 
-对象的类型在new()时刻就由构造函数指定，之后不可更改。
+
 
 1. 向上转型：接收new创建的对象需要声明类型，若接收类型与new类型不一致，则发生**隐式转换（向上转换）**。子类型可以赋给父，隐式转换仍为子类型，但丢失部分属性。
 2. 向下转型：反之父类型赋给子类型（即**向下转型**）需要强制转换，否则可能报错。可以先用instanceof运算符判断再强转。
@@ -2340,6 +2344,14 @@ public static void main(String[] args) {
 
 
 
+#### Q：对象的类型由构造函数决定还是接收的引用决定？
+
+对象的类型在new()时刻就由构造函数指定，之后不可更改。
+
+```java
+Father father = new Son("M", 30, "bob");  // 用Son创建的对象，类型一定是Son，哪怕用Father类型引用
+```
+
 
 
 ## 访问控制
@@ -2378,7 +2390,7 @@ static修饰的方法。静态方法属于类，在类加载时就存在了，�
 
 所以静态方法必须有实现，即不能是抽象方法。
 
-静态方法内只能访问所属类的静态字段和其他静态方法，不能访问其他字段和方法（此时还未chu'shi'h。
+静态方法内只能访问所属类的静态字段和其他静态方法，不能访问其他字段和方法（此时还未初始化）。
 
 静态方法不能被重写（override），因为override基于运行时的**动态绑定**，静态方法在编译时使用**静态绑定**进行绑定，静态方法属于类而不是实例。
 
@@ -2446,7 +2458,7 @@ static修饰的内部类
    但重载（Overload）不会受到限制。
 
 3. final修饰类
-   表示最终的，该类不类能作为任何类的父类，即不能被继承
+   表示最终的，该类不能作为任何类的父类，即不能被继承
    类中的**方法会全部被隐式定义为final**类型。但类变量不会隐式加final，需要手动加final修饰。
 
 
@@ -2615,14 +2627,14 @@ java.lang.IllegalArgumentException
 
 说明新的异常丢失了原始异常NullPointerException的信息
 
-为了能追踪到完整的异常栈，在构造异常时，把原始的Exception实例传进去，新的Exception就可以持有原始Exception信息。对上述代码改进：
+为了能追踪到完整的异常栈，在构造异常时，把原始的 **Exception实例传进去** ，新的Exception就可以持有原始Exception信息。对上述代码改进：
 
 ```java
 static void process1() {
     try {
         process2();
     } catch (NullPointerException e) {  // 捕获NullPointerException
-        throw new IllegalArgumentException(e);   // 创建异常时将捕获的异常传入
+        throw new IllegalArgumentException(e);   // 创建异常时将捕获的异常传入【注意这里把e传入】
     }
 }
 ```
@@ -2713,9 +2725,13 @@ Suppressed: java.lang.NumberFormatException: For input string: "abc"
 
 ### finally块
 
-非必须，可写可不写。无论是否发生异常，都会执行。且总是最后执行（但实际执行时，throw在finally之后执行，return在finally之后执行，见 [Q：finally和return的执行顺序？](#Q：finally和return的执行顺序？)）
+非必须，可写可不写。无论是否发生异常，都会执行。且总是最后执行
 
-建议：不在finally块return；不在finally块抛异常
+>  但实际执行时，throw在finally之后执行，return也在finally之后执行，见 [Q：finally和return的执行顺序？](#Q：finally和return的执行顺序？)
+
+建议：1、不在finally块return；
+
+2、不在finally块抛异常
 
 ## try-with-resources 语句
 
@@ -2798,7 +2814,7 @@ springboot 项目，http 接口的异常处理主要分为三类：
   实现方式：
 
   - @ExceptionHandler
-  - @ControllerAdvice+@ExceptionHandler
+  - @ControllerAdvice + @ExceptionHandler
   - SimpleMappingExceptionResolver
   - HandlerExceptionResolver
 
@@ -3162,7 +3178,7 @@ public <P1> Builder<T> join(Consumer1<T, P1> consumer, P1 p1)
 
 这种通过Class实例获取class信息的方法称为**反射**（Reflection）。
 
-获取class的**Class实例**方式
+获取class的**Class实例**方式：
 
 1. 直接通过一个class的静态变量class获取
 
@@ -3188,8 +3204,13 @@ public <P1> Builder<T> join(Consumer1<T, P1> consumer, P1 p1)
 注意，.class获取到的类实例再用getClass，得到的是java的Class类，因为所有类实例的类型都是java.lang.Class
 
 ```java
-System.out.println(String.class.class);  // 报错，String.class是类实例，实例无法再获取实例
 System.out.println(String.class.getClass());  // class java.lang.Class
+```
+
+而.class是类实例，实例无法再获取实例
+
+```java
+System.out.println(String.class.class);  // 报错，String.class是类实例，实例无法再获取实例
 ```
 
 
@@ -3201,15 +3222,15 @@ System.out.println(String.class.getClass());  // class java.lang.Class
 - getDeclaredConstructor(Class...)：获取某个Constructor；
 - getDeclaredConstructors()：获取所有Constructor。
 
-## Q：new、newnewInstance() 、Constructor.newInstance()区别？
+## Q：new、newInstance() 、Constructor.newInstance()区别？
 
-### 1. new和newnewInstance()
+### 1. new 和 newInstance()
 
 在执行Class.forName("a.class.Name")时，JVM会在classapth中去找对应的类并加载，这时JVM会执行该类的静态代码段。在使用newInstance()方法的时候，必须保证这个类已经加载并且已经连接了，而这可以通过Class的静态方法forName()来完成的。
 
-使用关键字new创建一个类的时候，这个类可以没有被加载，一般也不需要该类在classpath中设定，但可能需要通过classlaoder来加载。
+使用关键字new创建一个类的时候，这个类可以没有被加载，一般也不需要该类在classpath中设定，但可能需要通过classloader来加载。
 
-### 2. newnewInstance() 和Constructor.newInstance()
+### 2. newInstance() 和 Constructor.newInstance()
 
 Class.newInstance() 只能够调用 **无参** 且**public**的构造函数，即**默认构造函数**； 
 Constructor.newInstance() 调用 **任意**构造构造函数，甚至可以调用私有的。
@@ -3231,7 +3252,7 @@ public static void main() {
     OrderDo orderDo = new OrderDo();
     orderDo.setTags(Arrays.asList("tag1", "tag2"));
     OrderDto orderDto = new OrderDto();
-    BeanUtils.copyProperties(orderDo, orderDto);  // spring提供的拷贝，使用反射机制
+    BeanUtils.copyProperties(orderDo, orderDto);  // spring提供的拷贝，使用反射机制，将orderDo拷给orderDto
     System.out.println(orderDto.getTags());
     System.out.println(orderDto.getTags().get(0));  // tag1
     System.out.println(orderDto.getTags().get(0).getClass());  // 运行时报错：java.lang.String cannot be cast to java.lang.Integer
@@ -3254,8 +3275,6 @@ public static void main() {
 
 ```java
 public static void main(String[] args) {
-    OrderDo orderDo = new OrderDo();
-    orderDo.setTags(Arrays.asList("tag1", "tag2"));
     List<String> stringList = Arrays.asList("tag1", "tag2");
     List<Integer> intList = new ArrayList<>();
     BeanUtils.copyProperties(stringList, intList);

@@ -22,7 +22,7 @@ Output指把数据从内存输出到外部
 
 - OutputStream：抽象类，所有输出字节流实现继承自它，**只能写不能读**
 
-**注意**：写输入流会导致流关闭，同理读输出流也会导致关闭
+> **注意**：写输入流会导致流关闭，同理读输出流也会导致关闭
 
 继承关系如下
 
@@ -93,7 +93,7 @@ public void readFile() throws IOException {
 
 在调用`InputStream`的`read()`方法读取数据时，我们说`read()`方法是**阻塞**（Blocking）的。意思是，对于下面的代码，执行到第二行时，必须等`read()`方法返回后才能继续。因为读取IO流相比执行普通代码，速度会慢很多，因此，无法确定`read()`方法调用到底要花费多长时间。
 
-```
+```java
 int n;
 n = input.read(); // 必须等待read()方法返回才能执行下一行代码
 int m = n;
@@ -109,7 +109,7 @@ FilterInpustStream子类可以分成两类：
 
 - DataInputStream能以一种与机器无关的方式，直接从地从字节输入流读取JAVA基本类型和String类型的数据。
 
-- 其它的子类使得能够对InputStream进行改进，即在原有的InputStream基础上可以提供了新的功能特性。日常中用的最多的就是**ButtferInputStream**，使得inputStream具有缓冲的功能。
+- 其它的子类使得能够对InputStream进行改进，即在原有的InputStream基础上可以提供了新的功能特性。日常中用的最多的就是**BufferedInputStream**，使得inputStream具有缓冲的功能。
 
 > 装饰器模式
 >
@@ -162,7 +162,7 @@ FilterInpustStream子类可以分成两类：
 
 创建方式也是经典的装饰器模式。
 
-```
+```java
 DataInputStream dis = new DataInputStream(InputStream is);
 DataOutputStream dos = new DataOutputStream(OutputStream is);
 ```
@@ -215,7 +215,7 @@ public void writeFile() throws IOException {
 }
 ```
 
-此外可以在已存在的文件基础上，**追加写**文件流，构造方法加参数append=true
+此外可以在已存在的文件基础上，**追加写**文件流，构造方法加参数`append=true`
 
 ```java
 public void writeFile() throws IOException{
@@ -242,7 +242,7 @@ public void writeFile() throws IOException{
 
 常用的`System.out.println()`实际上就是使用`PrintStream`打印各种数据。其中，`System.out`是系统默认提供的`PrintStream`，表示标准输出：
 
-```
+```java
 System.out.print(12345); // 输出12345
 System.out.print(new Object()); // 输出类似java.lang.Object@3c7a835a
 System.out.println("Hello"); // 输出Hello并换行
@@ -337,11 +337,13 @@ reader.close();
 input.close();
 ```
 
-> 注意流关闭的顺序，应该先关闭**最外层的**。如果先关闭input，再关闭reader，会报错IOException：Stream closed。
+> 注意流关闭的顺序，应该先关闭**最外层的**。
 >
-> 原因是reader使用了input，所以先关闭input，再关闭reader时相当于使用一个已关闭的流。
+> 如果先关闭input，再关闭reader，会报错IOException：Stream closed。原因是reader使用了input，所以先关闭input，再关闭reader时相当于使用一个已关闭的流。
 >
-> 或者直接关闭最外层。
+> 或者直接关闭最外层input。
+
+#### 最佳实践
 
 实际上也是层层包裹的**装饰器模式**，使用完毕时只需要关闭最外层的Reader即可，因此可以通过`try (resource)`更简洁地改写如下：
 
@@ -374,7 +376,7 @@ public class Main {
             pw.println(12345);
             pw.println(true);
         }
-        System.out.println(buffer.toString());
+        System.out.println(buffer.toString());  // 最终在这打印
     }
 }
 ```
@@ -597,7 +599,7 @@ try (ObjectInputStream input = new ObjectInputStream(...)) {
 }
 ```
 
-注意：反序列化时，由JVM直接构造出Java对象，**不调用构造方法**，构造方法内部的代码，在反序列化时根本不可能执行。
+> 注意：反序列化时，由JVM直接构造出Java对象，**不调用构造方法**，构造方法内部的代码，在反序列化时根本不可能执行。
 
 安全性：因为Java的序列化机制可以导致一个实例能直接从`byte[]`数组创建，而不经过构造方法，因此，它存在一定的安全隐患。一个精心构造的`byte[]`数组被反序列化后可以执行特定的Java代码，从而导致严重的安全漏洞。
 
@@ -826,7 +828,7 @@ try (Connection conn = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PAS
 SELECT * FROM user WHERE login='bob' AND pass='1234'
 ```
 
-用户可能通过精心构造的字符串，拼出意想不到的SQL，如传入name = `"bob' OR pass="`, pass = `" OR pass='"`：
+用户可能通过精心构造的字符串，拼出意想不到的SQL，如传入login= `"bob' OR pass="`, pass = `" OR pass='"`：
 
 ```sql
 SELECT * FROM user WHERE login='bob' OR pass=' AND pass=' OR pass=''
@@ -844,7 +846,7 @@ try (Connection conn = DriverManager.getConnection(JDBC_URL, JDBC_USER, JDBC_PAS
     try (PreparedStatement ps = conn.prepareStatement("SELECT id, grade, name, gender FROM students WHERE gender=? AND grade=?")) {
         ps.setObject(1, "M"); // 填充占位符。注意：索引从1开始
         ps.setObject(2, 3);
-        try (ResultSet rs = ps.executeQuery()) {
+        try (ResultSet rs = ps.executeQuery()) { // 读取查询结果
             while (rs.next()) {
                 long id = rs.getLong("id");
                 long grade = rs.getLong("grade");
@@ -912,7 +914,7 @@ java源码编译为字节码（用javac命令）后，还是不能直接执行�
 JIT实现有两种：
 
 1. 基于采样：周期性检测各线程栈顶，发现某方法经常出现在栈顶，则认为是热点方法。优点是简单，缺点是无法精确计量一个方法的热度，容易受线程阻塞干扰
-2. 基于计数器：为每个方法，甚至是代码块设置计数器，统计执行次数，超过阈值就认为是热点方法。HotSpot使用该方法，有两种计数器：
+2. 基于计数器（**HotSpot**使用该方法）：为每个方法，甚至是代码块设置计数器，统计执行次数，超过阈值就认为是热点方法。有两种计数器：
    - 方法计数器：记录方法被调用次数
    - 回边计数器：记录方法中for或while循环执行次数
 
@@ -977,15 +979,17 @@ JIT对代码的优化：**逃逸分析**、**锁消除**、锁膨胀、**标量�
 
 ### 标量替换&栈上分配
 
-标量（Scalar）指一个无法再分解成更小数据的数据。例如Java中的**原始数据类型**就是标量。
+> **标量**（Scalar）指一个无法再分解成更小数据的数据。例如Java中的**原始数据类型**就是标量。
+>
+> 相对的，那些还可以分解的数据叫 **聚合量**（Aggregate），例如对象，可以分解为标量和聚合量。
 
-相对的，那些还可以分解的数据叫聚合量（Aggregate），例如对象，可以分解为标量和聚合量。
+- **标量替换**：JIT阶段，如果经过**逃逸分析**，发现某对象不会被外界访问，则经过JIT优化，会把该对象拆解为若干标量。
 
-**标量替换**：JIT阶段，如果经过逃逸分析，发现某对象不会被外界访问，则经过JIT优化，会把该对象拆解为若干标量。
+  标量替换之后就便于栈上分配了。
 
-标量替换之后就便于栈上分配了。
+- **栈上分配**：方法中创建的对象，如果是**无逃逸**[见【逃逸分析】第3点](#逃逸分析)的，则可以对其内存分配进行优化，将堆上分配改为栈上分配。
 
-**栈上分配**：方法中创建的对象，如果是**无逃逸**[见【逃逸分析】第3点](#逃逸分析)的，则可以对其内存分配进行优化，将堆上分配改为栈上分配。
+
 
 例如如下代码，在alloc方法中创建100万个User对象，且该对象是无逃逸的：
 
@@ -1043,7 +1047,7 @@ public class StackAllocTest {
 -Xmx4G -Xms4G -XX:+DoEscapeAnalysis -XX:+PrintGCDetails -XX:+HeapDumpOnOutOfMemoryError
 ```
 
-可以看到User实例数降到8万（为什么不降为0？因为线程的栈内存是有限的，-xss）：
+可以看到User实例数降到8万（为什么不降为0？因为虽然由堆上分配改为栈上分配，但线程的栈内存是有限的，-xss）：
 
 ```
 ➜  ~ jps  // jps命令，查看本机jvm进程
@@ -1067,7 +1071,7 @@ public class StackAllocTest {
 
 ### 方法内联
 
-将方法的代码直接插入调用的地方，减少方法调用的开销。适用于规模小切频繁调用的方法。
+将方法的代码直接插入调用的地方，减少方法调用的开销。适用于规模小且频繁调用的方法。
 
 ```java
 public class InlineExample {
@@ -1077,7 +1081,7 @@ public class InlineExample {
     public void exampleMethod() {
         int result = add(1, 2);  // 调用add方法
     }
-    // 内联
+    // 上面两个方法可以改写为内联方法
     public void inlineMethod() {
         int result = 1 + 2;  // 调用的add方法很简单，直接将add的逻辑拿过来
     }
@@ -1156,7 +1160,7 @@ public class Math {
    - StackOverflowError：线程请求的栈深度大于虚拟机所允许的深度时抛出；
    - OutOfMemoryError：虚拟机栈无法申请到足够的内存时抛出。
 
-2. 本地方法栈Native Method Stack
+2. 本地方法栈 Native Method Stack
 
    为JVM使用的Native方法（C、C++代码）提供运行空间。功能上与虚拟机栈是类似。
 
@@ -1284,7 +1288,7 @@ HotSpot虚拟机中的GC可分为两种：Partial GC和Full GC。
 >
 > 如果小于，那么虚拟机会查看HandlePromotionFailure 参数设置的值判断是否允许担保失败。如果值为true，那么会继续检查老年代最大可用连续空间是否大于历次晋升到老年代的对象的平均大小（一共有多少对象在内存回收后存活下来是不可预知的，因此只好取之前每次垃圾回收后晋升到老年代的对象大小的平均值作为参考）。如果大于，则尝试进行一次YoungGC，但这次YoungGC依然是有风险的；如果小于，或者HandlePromotionFailure=false，则会直接触发一次Full GC。
 >
-> 但是，需要注意的是HandlePromotionFailure这个参数，在JDK 7中就不再支持了。在后续的版本中， 只要检查老年代最大可用连续空间是否大于**历次晋升到老年代的对象的平均大小**，如果大于，则认为担保成功。
+> 注意：HandlePromotionFailure这个参数，在JDK 7中就不再支持了。在后续的版本中， 只要检查老年代最大可用连续空间是否大于**历次晋升到老年代的对象的平均大小**，如果大于，则认为担保成功。
 
 #### 对象年龄动态判断机制
 
