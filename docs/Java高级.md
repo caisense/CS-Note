@@ -1162,7 +1162,7 @@ public class Math {
 
 2. 本地方法栈 Native Method Stack
 
-   为JVM使用的Native方法（C、C++代码）提供运行空间。功能上与虚拟机栈是类似。
+   为JVM使用的Native方法（C、C++代码）提供运行空间，存储JNI（Java Native Interface）指针。功能上与虚拟机栈是类似。
 
    该区域JVM也规定了StackOverflowError和OutOfMemoryError异常。
 
@@ -1296,15 +1296,15 @@ HotSpot虚拟机中的GC可分为两种：Partial GC和Full GC。
 
 ```c++
 uint ageTable::compute_tenuring_threshold(size_t survivor_capacity) {
-  size_t desired_survivor_size = (size_t)((((double) survivor_capacity)*TargetSurvivorRatio)/100);
-  size_t total = 0;
-  uint age = 1;
-  while (age < table_size) {
-    total += sizes[age];
-    if (total > desired_survivor_size) break;
-    age++;
-  }
-  uint result = age < MaxTenuringThreshold ? age : MaxTenuringThreshold;
+    size_t desired_survivor_size = (size_t)((((double) survivor_capacity)*TargetSurvivorRatio)/100);
+    size_t total = 0;
+    uint age = 1;
+    while (age < table_size) {
+        total += sizes[age];
+        if (total > desired_survivor_size) break;
+        age++;
+    }
+    uint result = age < MaxTenuringThreshold ? age : MaxTenuringThreshold;
     ...
 }
 ```
@@ -1356,7 +1356,7 @@ eden区设置太小；对象创建太频繁；
 
 所以好的办法是使用标记复制算法，将gc结果存放另一块区域s1。
 
-#### 被标记为失效的对象是否一定会被回收？
+#### Q：被标记为失效的对象是否一定会被回收？
 
 被标记为失效的对象被回收前会经历如下步骤：
 
@@ -1389,13 +1389,13 @@ markword结构（64位系统中是8B=64bit）
 
 jvm给对象分配内存的过程：
 
-1. 如果JIT的逃逸分析后该对象没有逃逸，那么可能优化到栈上分配——不存在线程安全问题。
+1. 如果JIT的逃逸分析后该对象没有逃逸，那么可能优化到栈上分配——不存在线程安全问题（栈是线程独享的）。
 
 2. 否则对象主要分配到新生代上，如果启动了**TLAB**，则分配到TLAB中——不存在线程安全问题。
 
 3. 最后才会在堆上分配内存，如果同一块堆内存空间被多个线程同时分配对象，JVM会采用**CAS+失败重试**的方式来避免线程问题。
 
-> **TLAB：Thread Local Allocation  Buffer，线程本地分配缓存。**
+> **TLAB：Thread Local Allocation Buffer，线程本地分配缓存。**
 >
 > 是JVM在堆内存的**eden区**划分出来的一块专用空间，是线程专属的。在虚拟机的TLAB功能启动的情况下，在线程初始化时，虚拟机会为每个线程分配一块TLAB空间，只给当前线程使用，这样每个线程都单独拥有一个空间，如果需要分配内存，就在自己的空间上分配，这样就不存在竞争的情况，可以大大提升分配效率。
 >
@@ -1451,16 +1451,16 @@ jvm给对象分配内存的过程：
 
 #### JVM默认回收器
 
-- 1.7和1.8：PS+PO （Parallel Scavenge + ParallelOld）
+- 1.7和1.8：PS+PO （Parallel Scavenge + Parallel Old）
 - 1.9：G1
 
 #### Q：为什么要STW机制？
 
 如果不暂停线程，让其继续执行，会破坏GC Root的依赖关系，导致某些对象被回收，增加gc的复杂性。
 
-**STW**
-
-stop the world的简写，停止所有用户线程，所有线程进入**SafePoint**等待。
+> **STW**
+>
+> stop the world的简写，停止所有用户线程，所有线程进入**SafePoint**等待。
 
 #### Q：什么是Safepoint ？
 

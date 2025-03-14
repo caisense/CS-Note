@@ -1063,17 +1063,27 @@ System.out.println(stringArray.getClass());    //class [Ljava.lang.String
 
 扩容操作：
 
-1. 扩容：创建新的Entry空数组，长度是原数组**翻倍**。
+1. 扩容：创建新的Table空数组，长度是原数组**翻倍**（newCapacity = oldCapacity * 2）。
 
-2. ReHash：遍历原Entry数组，把所有Entry重写Hash到新数组
+2. ReHash：遍历原Table数组，对每条链表（红黑树）上的节点重新计算Hash，然后迁移至新的Table数组。
 
-   需要reHash的原因：hashMap计算数组下标逻辑是`index = HashCode(Key) & (Length - 1)`，数组长度倍增后，需要重新计算下标
+   > 扩容并不需要对Entry的**每一位**都重新计算hash，这样效率很低。
+   >
+   > 由于newCapacity = oldCapacity * 2，在二进制上其实就是左移一位。
+   >
+   > 通过位运算可知，可以先计算`hash(key) & oldCapacity` ，判断该节点属于哪一部分：
+   >
+   > - 如果结果为 `0`，节点留在原位置`index`。
+   >
+   > - 如果结果为 `1`，节点移动到 `index + oldCapacity` 的位置。
+   >
+   > 由此可将多位的&运算降低至1位（Capacity始终保持2^n，因此只有最高位是1）。
 
 扩容结果：
 
 jdk1.7：由于ReHash，可能导致原来在一个桶的结点分散到不同桶
 
-jdk1.8：也是由于ReHash，可能导致原来的红黑树退化为链表，或链表进化为红黑树
+jdk1.8：也是由于ReHash，还可能导致原来的红黑树退化为链表，或链表进化为红黑树
 
 <img src="images/Java基础/image-20220322102957906.png" alt="image-20220322102957906" style="zoom:50%;" />
 
