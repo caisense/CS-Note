@@ -1458,9 +1458,28 @@ jvm给对象分配内存的过程：
 
 如果不暂停线程，让其继续执行，会破坏GC Root的依赖关系，导致某些对象被回收，增加gc的复杂性。
 
+有时我们需要全局所有线程进入 SafePoint， 这样才能统计出那些内存还可以回收用于 GC，以及回收不再使用的代码清理 **CodeCache**，以及执行某些 Java instrument 命令或者 JDK 工具（例如 jstack 打印堆栈就需要 Stop the world 获取当前所有线程快照）。
+
 > **STW**
 >
 > stop the world的简写，停止所有用户线程，所有线程进入**SafePoint**等待。
+>
+> STW 阶段可以简单分为（这段时间内，JVM 都是处于所有线程进入 Safepoint 就 block 的状态）：
+>
+> 1. 某个操作，需要 Stop the world（就是上面提到的哪些情况下会让所有线程进入 SafePoint， 即发生 Stop the world 的那些操作）
+> 2. 向 Signal Dispatcher 这个 JVM 守护线程发起 Safepoint 同步信号并交给对应的模块执行。
+> 3. 对应的模块，采集所有线程信息，并对每个线程根据状态做不同的操作以及标记（根据之前源代码那一块的描述，有5种情况）
+> 4. 所有线程都进入 Safepoint 并 block。
+> 5. 做需要发起 Stop the world 的操作。
+> 6. 操作完成，所有线程从 Safepoint 恢复。
+
+#### Q：什么情况会导致 STW 时间过长？
+
+基于上面的STW各阶段，导致 Stop the world 时间过长的原因有：
+
+1. 阶段 4 耗时过长，即等待所有线程中的某些线程进入 Safepoint 的时间过长，这个很可能和有 **大有界循环与JIT优化** 有关，也很可能是 OpenJDK 11 引入的获取调用堆栈的类`StackWalker`的使用导致的，也可能是系统 CPU 资源问题或者是系统内存脏页过多或者发生 swap 导致的。
+2. 阶段 5 耗时过长，需要看看是哪些操作导致的，例如偏向锁撤销过多， GC时间过长等等，需要想办法减少这些操作消耗的时间，或者直接关闭这些事件（例如关闭偏向锁，关闭 JFR 的 OldObjectSample 事件采集）减少进入，这个和本篇内容无关，这里不赘述。
+3. 阶段2，阶段3耗时过长，由于 Signal Dispatcher 是单线程的，可以看看当时 Signal Dispatcher 这个线程在干什么，可能是 Signal Dispatcher 做其他操作导致的。也可能是系统 CPU 资源问题或者是系统内存脏页过多或者发生 swap 导致的。
 
 #### Q：什么是Safepoint ？
 
@@ -1502,29 +1521,37 @@ jvm给对象分配内存的过程：
 
 > **STW时线程状态的变化**
 >
-> 当线程处于下列5种状态：
+> 针对 SafePoint，线程有 5 种情况；假设现在有一个操作触发了某个 VM 线程所有线程需要进入 SafePoint（例如现在需要 GC），如果其他线程现在：
 >
-> 1. 运行字节码
+> 1. **运行字节码**
 >
 >    运行字节码时，解释器会看线程是否被标记为 **poll armed**，如果是，VM 线程调用 `SafepointSynchronize::block(JavaThread *thread)`进行 block。
 >
-> 2. 运行 native 代码
+> 2. **运行 native 代码**
 >
 >    当运行 native 代码时，VM 线程略过这个线程，但是给这个线程设置 **poll armed**，让它在执行完 native 代码之后，它会检查是否 poll armed，如果还需要停在 SafePoint，则直接 block。
 >
-> 3. 运行 JIT 编译好的代码
+> 3. **运行 JIT 编译好的代码**
 >
 >    由于运行的是编译好的机器码，直接查看本地 local polling page 是否为脏，如果为脏则需要 block。这个特性是在 Java 10 引入的 [JEP 312: Thread-Local Handshakes](https://openjdk.java.net/jeps/312) 之后，才是只用检查本地 local polling page 是否为脏就可以了。
 >
-> 4. 处于 BLOCK 状态
+> 4. **处于 BLOCK 状态**
 >
 >    在需要所有线程需要进入 SafePoint 的操作完成之前，不许离开 BLOCK 状态
 >
-> 5. 处于线程切换状态或者处于 VM 运行状态
+> 5. **处于线程切换状态或者处于 VM 运行状态**
 >
 >    会一直轮询线程状态直到线程处于阻塞状态（线程肯定会变成上面说的那四种状态，变成哪个都会 block 住）。
 
+#### Q：哪些情况下会让所有线程进入 SafePoint（即发生STW）？
 
+1. **定时进入 SafePoint**：每经过`-XX:GuaranteedSafepointInterval` 配置的时间，都会让所有线程进入 Safepoint，一旦所有线程都进入，立刻从 Safepoint 恢复。这个定时主要是为了一些没必要立刻 Stop the world 的任务执行，可以设置`-XX:GuaranteedSafepointInterval=0`关闭这个定时，我推荐是关闭。
+2. **由于 jstack，jmap 和 jstat 等命令，也就是 [Signal Dispatcher](https://zhida.zhihu.com/search?content_id=124069063&content_type=Article&match_order=1&q=Signal+Dispatcher&zhida_source=entity) 线程要处理的大部分命令，都会导致 Stop the world**：这种命令都需要采集堆栈信息，所以需要所有线程进入 Safepoint 并暂停。
+3. **偏向锁取消（这个不一定会引发整体的 Stop the world，参考[JEP 312: Thread-Local Handshakes](https://link.zhihu.com/?target=https%3A//openjdk.java.net/jeps/312)）**：Java 认为，锁大部分情况是没有竞争的（某个同步块大多数情况都不会出现多线程同时竞争锁），所以可以通过偏向来提高性能。即在无竞争时，之前获得锁的线程再次获得锁时，会判断是否偏向锁指向我，那么该线程将不用再次获得锁，直接就可以进入同步块。但是高并发的情况下，偏向锁会经常失效，导致需要取消偏向锁，取消偏向锁的时候，需要 Stop the world，因为要获取每个线程使用锁的状态以及运行状态。
+4. **Java Instrument 导致的 Agent 加载以及类的重定义**：由于涉及到类重定义，需要修改栈上和这个类相关的信息，所以需要 Stop the world
+5. **Java Code Cache相关**：当发生 JIT 编译优化或者去优化，需要 OSR 或者 Bailout 或者清理代码缓存的时候，由于需要读取线程执行的方法以及改变线程执行的方法，所以需要 Stop the world
+6. **GC**：这个由于需要每个线程的对象使用信息，以及回收一些对象，释放某些堆内存或者直接内存，所以需要 Stop the world
+7. **JFR 的一些事件**：如果开启了 JFR 的 OldObject 采集，这个是定时采集一些存活时间比较久的对象，所以需要 Stop the world。同时，JFR 在 dump 的时候，由于每个线程都有一个 JFR 事件的 buffer，需要将 buffer 中的事件采集出来，所以需要 Stop the world。
 
 #### 年轻代垃圾收集器
 
@@ -1615,7 +1642,7 @@ CMS的标记清除算法，其实就是三色标记法：
 > - 如果该对象未被标记过，那么它会被标记为灰色（因为该对象被别人引用，说明是可达的，只是由于gc和应用线程并发，gc还没扫描到它），以便在垃圾回收器的下一次遍历中进行标记。
 > - 如果该对象已经被标记为可达对象，那么写屏障不会对该对象进行任何操作。（该对象后继引用修改到别处，不影响该对象自身被引用，因此可达关系不变）
 >
-> 通过使用写屏障技术，可以使得三色标记法过程中标记更加准确。然而，尽管写屏障对于维护垃圾收集器的准确性至关重要，它们仍然存在一些局限性：性能开销、并发场景、保守策略导致的多标、优化策略导致某些引用更新被错过等。所以写屏障依然会带来**多标**和**少标**的准确性问题。
+> 通过使用写屏障技术，可以使得三色标记法过程中标记更加准确。然而，尽管写屏障对于维护垃圾收集器的准确性至关重要，它们仍然存在一些局限性：性能开销、并发场景、保守策略导致的多标、优化策略导致某些引用更新被错过等。所以写屏障依然会带来 **多标** 和 **少标**  的准确性问题。
 
 #### 不分代垃圾收集器
 
@@ -1646,7 +1673,6 @@ CMS的标记清除算法，其实就是三色标记法：
    > G1在回收的过程中，标记和清理的过程是并行的，可以充分利用多个CPU来缩短STW的时长，在复制的过程中是并发的，可以让复制线程和用户线程并发执行，不需要STW。并且G1还可以在运行时动态的做区域内存大小的调整。
 
    
-
 
 2. ZGC：oracle官方，java11引入，逻辑和物理都不分代
 
