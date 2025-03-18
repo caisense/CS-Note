@@ -73,7 +73,7 @@ Java并发
 
    由于Callable任务是异步执行的，且不能明确是得到了返回值还是捕获了异常，因此需要对其进一步封装，即Future接口。
 
-   FutureTask实现了RunnableFuture接口，表示FutureTask本质上也是表征了一个任务。可以传入Runnable（无返回值）或Callable（有返回）
+   **FutureTask** 实现了RunnableFuture接口，表示FutureTask本质上也是表征了一个任务。可以传入Runnable（无返回值）或Callable（有返回）
 
    - 创建FutureTask时传入Callable实例，再创建Thread传入FutureTask实例
    
@@ -221,13 +221,13 @@ Java中线程的状态有以下几种：
 
    这种状态一般在**jstack日志**中看到。
 
-   其实是通过JNI（Java Native Interface）接口去执行了 c和c++的一些native的code，在这种状态下，其实在JNI中已经认为它进入了safepoint，即使已经在运行,与前面提到的stop the world好像理解上有点不一样,这时候这个线程其实还是可以一直在运行的，因为如果这个代码是native的code，其实hotstpot是没法知道是什么状态的，而且也没法控制行为，有可能在做一个很长的 Loop，在那里不停的执行，所以这个时候如果要等的话，肯定会出问题safepoint就进不去了，但这时候认为已经是safepoint了，就可以做那些vm operation，因为我的Java线上还在运行，当 native code执行自己的东西的时候，是不会去碰到那些Java内部的那些hip hop object的那些东西，当想访问那些object的时候，需要通过那些JMI的接口，当调用接口的时候，这个时候JVM就会来检查这时候是不是正在做safepoint,如果正在做safepoint，就会把调用给阻塞，然后线程就会被停下来,等vm operation结束了以后再继续执行下去。 所以虽然在Thread in native状态你仍然在运行，但实际上不会造成造成危害,因为要访问那种Java object或者访问hip的时候，这里的JMI接口会挡住。
+   其实是通过JNI（Java Native Interface）接口去执行了 c和c++的一些native的code，在这种状态下，其实在JNI中已经认为它进入了safepoint，即使已经在运行,与前面提到的stop the world好像理解上有点不一样,这时候这个线程其实还是可以一直在运行的，因为如果这个代码是native的code，其实hotspot是没法知道线程是什么状态的，而且也没法控制其行为，有可能在做一个很长的 Loop，在那里不停的执行，所以这时如果要等的话，肯定会出问题safepoint就进不去了，但这时候认为已经是safepoint了，就可以做那些vm operation，因为我的Java线上还在运行，当 native code执行自己的东西的时候，是不会去碰到那些Java内部的那些hip hop object的那些东西，当想访问那些object的时候，需要通过那些JNI的接口，当调用接口的时候，这个时候JVM就会来检查这时候是不是正在做safepoint,如果正在做safepoint，就会把调用给阻塞，然后线程就会被停下来,等vm operation结束了以后再继续执行下去。 所以虽然在Thread in native状态你仍然在运行，但实际上不会造成造成危害,因为要访问那种Java object或者访问hip的时候，这里的JNI接口会挡住。
 
    **Safepoint 可以理解成是在代码执行过程中的一些特殊位置**，当线程执行到这些位置的时候，**线程可以暂停**。在 SafePoint 保存了其他位置没有的**一些当前线程的运行信息，供其他线程读取**。这些信息包括：线程上下文的任何信息，例如对象或者非对象的内部指针等等。我们一般这么理解 SafePoint，就是线程只有运行到了 SafePoint 的位置，他的**一切状态信息，才是确定的**，也只有这个时候，才知道这个线程用了哪些内存，没有用哪些；并且，只有线程处于 SafePoint 位置，这时候对 JVM 的堆栈信息进行修改，例如回收某一部分不用的内存，线程才会感知到，之后继续运行，每个线程都有一份自己的内存使用快照，这时候其他线程对于内存使用的修改，线程就不知道了，只有再**进行到 SafePoint 的时候，才会感知**。
 
-   所以，GC 一定需要所有线程同时进入 SafePoint，并停留在那里，等待 GC 处理完内存，再让所有线程继续执。像这种**所有线程进入 SafePoint**等待的情况，就是 Stop the world
+   所以，GC 一定需要所有线程同时进入 SafePoint，并停留在那里，等待 GC 处理完内存，再让所有线程继续执行。像这种**所有线程进入 SafePoint**等待的情况，就是 Stop the world（STW）。
 
-   日志中调用sun.misc.Unsafe.park()会使线程进入BLOCKED，这个方法类似于Object.wait()
+   > 日志中还能看到，调用sun.misc.Unsafe.park()会使线程进入BLOCKED，这个方法类似于Object.wait()
 
 ## 线程方法
 
@@ -235,7 +235,7 @@ Java中线程的状态有以下几种：
 
 启动线程
 
-### 2. `Thread.sleep(long millis)`
+### 2.`Thread.sleep(long millis)`
 
 当前线程放弃获取的CPU时间片，进入TIMED_WAITING状态，**但不释放对象锁**，millis毫秒后线程自动苏醒进入就绪状态。
 
@@ -243,13 +243,13 @@ Java中线程的状态有以下几种：
 
 
 
-### 3. `Thread.yield()`
+### 3.`Thread.yield()`
 
 由**当前线程**调用此方法，当前线程放弃获取的CPU时间片，**但不释放锁资源**，由运行状态变为**就绪状态**，让OS再次选择线程。 作用：让相同优先级的线程轮流执行，但并不保证一定会轮流执行。实际中无法保证yield()达到让步目的，因为让步的线程还有可能被线程调度程序再次选中。Thread.yield()**不会导致阻塞**。该方法与sleep()类似，只是不能由用户指定暂停多长时间。
 
 
 
-### 4. `thread.join(long millis)`
+### 4.`thread.join(long millis)`
 
 （参数可选，表示等待时间）
 
@@ -268,9 +268,9 @@ Thread B = new Thread(...);
 Thread C = new Thread(...);
 
 A.start();
-A.join();
+A.join();  // 当前线程等待A线程结束，再往下走
 
-B.start();
+B.start();  // B一定是A结束后才启动
 B.join();
 
 C.start();
@@ -280,13 +280,13 @@ C.join();
 
 
 
-### 5. `Object.wait() / wait(long timeout)`
+### 5.`Object.wait() / wait(long timeout)`
 
-**必须在块或方法中使用**
+必须在**synchronized**块或方法中使用
 
 当前线程调用对象的wait()方法，当前线程**释放对象锁**并进入WAITING/TIMED_WAITING状态，**当前线程**进入等待队列。依靠**同一个被锁的对象**调用notify() / notifyAll()唤醒，或timeout时间到自动唤醒。
 
-### 6. `Object.notify() / notifyAll()`
+### 6.`Object.notify() / notifyAll()`
 
 也必须在**synchronized**块或方法中使用
 
@@ -492,7 +492,7 @@ b = a; // 读
 
 > 缓存加锁
 >
-> 核心机制基于缓存一致性协议实现，一个处理器的缓存回写内存会导致其他cpu的缓存失效，IA-32和Intel 64处理器使用MESI实现缓存一致性协议
+> 核心机制：基于缓存一致性协议实现，一个处理器的缓存回写内存会导致其他cpu的缓存失效，IA-32 和 Intel 64处理器使用MESI实现缓存一致性协议
 
 
 

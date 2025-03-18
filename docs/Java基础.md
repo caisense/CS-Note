@@ -1851,6 +1851,107 @@ ClassName::methodName
 
 
 
+## 接口
+
+接口（`interface`）是一种定义行为规范的机制，它允许开发者定义一组方法签名和常量，而具体的实现则由实现该接口的类提供。
+
+**基本语法**
+
+- 接口通过 `interface` 关键字定义。
+
+- 接口中的方法默认是 `public abstract` 的，即使没有显式声明的**抽象方法**。
+
+- 接口中的变量默认是 `public static final` 的，即全局常量。
+
+  ```java
+  public interface MyInterface {
+      // 全局常量，默认是 public static final
+      int MAX_VALUE = 100;
+  
+      // 抽象方法，默认是 public abstract
+      void doSomething();
+  }
+  ```
+
+### 方法类型
+
+从 Java 8 开始，接口的功能得到了增强，允许包含以下几种方法类型：
+
+1. **抽象方法**
+
+   接口的核心部分，定义了实现类必须提供的行为。默认是 `public abstract`，不需要显式声明。
+
+   ```java
+   void doSomething(); // 抽象方法
+   ```
+
+   
+
+2. **默认方法（Default Methods）**
+   
+   从 Java 8 开始支持，默认方法允许接口提供方法的默认实现。使用 `default` 关键字修饰。实现类可以选择重写默认方法，也可以直接使用默认实现。
+   
+   ```java
+   default void defaultMethod() {
+       System.out.println("This is a default method.");
+   }
+   ```
+   
+   
+   
+3. **静态方法（Static Methods）**
+
+   从 Java 8 开始支持，静态方法属于接口本身，不能被实现类继承或重写。使用 `static` 关键字修饰。
+
+   ```java
+   static void staticMethod() {
+       System.out.println("This is a static method.");
+   }
+   ```
+
+   
+
+4. **私有方法（Private Methods）**
+
+   从 Java 9 开始支持。私有方法只能在接口内部调用，不能被实现类访问。
+
+   ```java
+   private void privateMethod() {
+       System.out.println("This is a private method.");
+   }
+   ```
+
+### 接口变量
+
+- 接口中的变量默认是 `public static final`，即全局常量。
+- 必须在声明时初始化，且不能被修改。
+
+```java
+int MAX_VALUE = 100; // 等价于 public static final int MAX_VALUE = 100;
+```
+
+### 接口实现
+
+- 类通过 `implements` 关键字实现接口。
+- 实现类必须实现接口中所有的抽象方法，否则该类必须声明为抽象类。
+
+
+
+### 接口继承
+
+- 接口可以通过 `extends` 关键字继承其他接口。
+- 接口支持多继承，即一个接口可以继承多个接口。
+
+### **接口与类的区别**
+
+| 特性     | 接口                        | 类                         |
+| -------- | --------------------------- | -------------------------- |
+| 成员变量 | 只能是`public static final` | 可以是任意类型的变量       |
+| 方法     | 默认是抽象方法              | 可以包含具体实现方法       |
+| 构造器   | 不允许有构造器              | 必须有构造器               |
+| 多继承   | 支持多继承                  | 不支持多继承，但支持多实现 |
+| 实例化   | 不能实例化                  | 可以实例化                 |
+
 ## 函数式接口
 
 **函数式接口（Functional Interface）** 是支持函数式编程的关键概念。它是一个只包含 **一个抽象方法** 的接口，通常用作 lambda 表达式或方法引用的目标。
