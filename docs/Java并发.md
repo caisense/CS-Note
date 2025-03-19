@@ -1418,10 +1418,17 @@ submit：提交一个任务给线程池执行，如果线程异常并不会直�
 ### Q：线程数如何设置？
 
 出自《Java并发编程实践》。并不绝对，需要动态调整：
+
+1、对计算密集型任务：
+
+线程数 = CPU核心数+1
+
+2、对IO密集型任务：
 $$
-{线程等待时间 + 线程 CPU 时间  \over 线程 CPU 时间} * CPU 数目 * CPU使用率
+{线程等待时间 + 线程 CPU 时间  \over 线程 CPU 时间} * CPU 核心数 * CPU使用率
 $$
 
+> 注意：这里的线程数一般指**核心线程数**。但也可以作为最大线程数的参考
 
 ### Q：为什么要用一个变量ctl表示线程池状态和工作线程数？
 
@@ -1431,7 +1438,9 @@ $$
 
 ## ThreadLocal
 
-线程本地变量。如果你创建了一个ThreadLocal变量，那么访问这个变量的每个线程都会有这个变量的一个本地拷贝，多个线程操作这个变量的时候，实际是操作自己本地内存里面的变量，从而起到线程隔离的作用，避免了线程安全问题。
+线程本地变量。
+
+如果你创建了一个ThreadLocal变量，那么访问这个变量的每个线程都会有这个变量的一个本地拷贝，多个线程操作这个变量的时候，实际是操作自己本地内存里面的变量，从而起到**线程隔离**的作用，避免了线程安全问题。
 
 ### 场景和用法
 
@@ -1475,7 +1484,7 @@ ThreadLocal相当于给**每个线程**都开辟了一个独立的 存储空间�
 
 ### 内部结构
 
-Thread类内部保存着类型为ThreadLocalMap 的两个变量
+Thread类内部保存着类型为 ThreadLocalMap 的两个变量
 
 ```java
 public class Thread implements Runnable {
@@ -1486,15 +1495,17 @@ public class Thread implements Runnable {
 }
 ```
 
-ThreadLocalMap 是 ThreadLocal 的 **内部类**，没有实现 Map 接口，用独立的方式实现了 Map 的功能，其内部的 Entry 也是独立实现。
+ThreadLocalMap 是 `Thread` 的 **内部类**，没有实现 Map 接口，用独立的方式实现了 Map 的功能，其内部的 Entry 也是独立实现。
+
+ThreadLocalMap 内部维护了一个数组（`Entry[] table`），所有 `Entry` 都存储在这个数组中。
 
 <img src="images\Java并发\image-20220329110107310.png" alt="image-20220329110107310" style="zoom:50%;" />
 
 Entry 中的 key 只能是 **ThreadLocal 对象**，value可以是任意类型。
 
-设计目的是只能通过 ThreadLocal 索引存储的数据。
+设计目的是只能通过 ThreadLocal 索引存储的数据，每个ThreadLocal实例都对应不同的数据。
 
-Entry 使用**弱引用**WeakReference，目的是将ThreadLocal 对象的生命周期和线程的生命周期解绑
+Entry 使用**弱引用**WeakReference，目的是**将ThreadLocal对象的生命周期和线程的生命周期解绑**
 
 ```java
 static class Entry extends WeakReference<ThreadLocal<?>> {
@@ -1506,21 +1517,41 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 }
 ```
 
-**Q：使用弱引用就一定能避免内存泄漏吗？**
 
-<img src="https://mmbiz.qpic.cn/mmbiz_png/emOFDDdibbjJS9CaEEQta2bLHwCCT5OAhuaRokLu3DE9nMoYibYjN28icaNZoJ9LOEAT7N2uJliarDCVh6EqIrNicgg/640?wx_fmt=png&wxfrom=5&wx_lazy=1&wx_co=1" alt="图片" style="zoom:50%;" />
 
-不一定。如图，由于 ThreadLocalMap 只持有 ThreadLocal 的弱引用，没有任何强引用指向 threadlocal 实例，所以**threadlocal** 就可以顺利被 gc 回收，此时 Entry 中的 key=null 。
+### Q：什么情况会造成ThreadLocal内存泄露？
 
-但是在没有手动删除这个 Entry 以及 CurrentThread 依然运行的前提下，考虑情况：CurrentThread 也使用了这个threadlocal ，因此也存在有强引用链 CurrentThreadRef->CurrentThread -> threadLocalMap -> Entry -> value，因此**value** 不会被回收，只是由于key为null，这块 value 永远不会被访问到了，导致 value 内存泄漏。
+**键被回收后，值未被清理**：
 
-简而言之：线程内部 threadLocalMap 的Entry中，key是弱引用会被回收，则只剩value但无法访问，造成内存泄漏。
+当 `ThreadLocal` 对象被垃圾回收时，`ThreadLocalMap` 中对应的键变为 `null`，但由于值仍然是强引用，这些值无法被回收。例如：
 
-### Q：什么情况会造成内存泄露？
+```java
+public class ThreadLocalMemoryLeakExample {
+    public static void main(String[] args) {
+        Thread thread = new Thread(() -> {
+            ThreadLocal<byte[]> threadLocal = new ThreadLocal<>();
+            threadLocal.set(new byte[1024 * 1024]); // 分配1MB数据
+            threadLocal = null; // 去掉强引用
+            System.gc(); // 请求垃圾回收
+            // 此时，ThreadLocal 对象被回收，但 ThreadLocalMap 中的值仍然存在
+        });
+        thread.start();
+        try {
+            thread.join();
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+    }
+}
+```
 
-在**线程池**中使用ThreadLocal。因为当ThreadLocal对象使用完后，应把设置的<key, value>回收，即回收Entry。
+注意第6行`ThreadLocal` 对象被置为 `null` 后，垃圾回收器可以回收该对象。即`ThreadLocalMap` 中的键在第7行显式gc后被回收。
 
-但线程池中的线程不会回收，而线程对象通过强引用指向ThreadLocalMap，Map也是通过强引用指向Entry，因此Entry对象也不会回收，从而导致内存泄露。还有可能当线程被复用执行其他代码时，将上一次执行中存储的ThreadLocal带入。
+然而gc后，`ThreadLocalMap` 中的值（`byte[]` 数组）仍然存在，因为它是强引用。并且由于`ThreadLocalMap`内部存储Entry数组，也是强引用，因此整个Entry也不会回收，即这个Entry成为了一个key为null的元素，虽然有值，但是无法被`ThreadLocalMap`索引，对用户来说永远访问不到了，也就相当于内存泄漏。
+
+### Q：线程池中使用ThreadLocal是否有问题？
+
+线程池中的线程不会回收，可能当线程被复用执行其他代码时，将上一次执行中存储的ThreadLocal带入。
 
 因此ThreadLocal一般搭配**try...finally**语句，保证最后一定执行remove
 
@@ -1530,7 +1561,7 @@ static class Entry extends WeakReference<ThreadLocal<?>> {
 
 上面场景的实现：
 
-为了保证能释放ThreadLocal关联的实例，我们可以通过AutoCloseable接口配合try-with-resource语句结构，让编译器自动为我们关闭
+为了保证能释放ThreadLocal关联的实例，可以通过AutoCloseable接口配合try-with-resource语句结构，让编译器自动为我们关闭：
 
 ```java
 // 创建工具类
@@ -1558,7 +1589,7 @@ public class ConnContext implements AutoCloseable {
 
 ```java
 // 实际使用时，安全获取连接，无需手动释放
-try (var ctx = new UserContext()) {
+try (var ctx = new ConnContext()) {
     Connection conn = ConnContext.currentConn();
 } 
 ```

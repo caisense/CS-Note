@@ -1741,7 +1741,26 @@ SoftReference<Object> obj = new SoftReference<>();
 WeakReference<Object> obj = new WeakReference<>();
   ```
 
-最常见的例子：ThreadLocal是弱引用
+最常见的例子：ThreadLocal中，内部map的key是弱引用，指向ThreadLocal
+
+> 如果弱引用本身被强引用持有，导致弱引用对象无法被回收，则仍会发生内存泄漏。例如：
+>
+> ```java
+> public class MemoryLeakExample {
+>     public static void main(String[] args) {
+>         List<WeakReference<byte[]>> list = new ArrayList<>();
+>         for (int i = 0; i < 1000; i++) {
+>             byte[] data = new byte[1024 * 1024]; // 分配1MB
+>             WeakReference<byte[]> weakRef = new WeakReference<>(data);
+>             list.add(weakRef); // 将弱引用添加到列表中
+>         }
+>         System.gc(); // 请求垃圾回收
+>         System.out.println("List size: " + list.size()); // 列表中的弱引用仍然存在
+>     }
+> }
+> ```
+>
+> 上述代码中，虽然`WeakReference`指向的对象可以被GC回收，但`list`本身是一个强引用，持有了所有的弱引用对象，因此这些弱引用无法被释放，最终导致内存泄漏。
 
 #### 虚引用 Phantom Reference
 
