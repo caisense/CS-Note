@@ -719,7 +719,7 @@ lock()方法和unlock()方法间的代码块即为加锁的代码块。Lock只�
 
 ### 1. Object 的 wait/notify 方法
 
-见上一节**线程方法**的第5、6方法
+见[线程方法](# 线程方法)的第5、6方法
 
 ### 2. Condition 的 await/singal  方法
 
@@ -794,16 +794,14 @@ Java标准库提供了ExecutorService接口表示线程池，通过Executor类�
 
 5. `BlockingQueue workQueue`： 工作队列
 
-   cmp项目用的是
-
    |                                       | 排序                       | 容量                                                         |
-   | ------------------------------------- | -------------------------- | ------------------------------------------------------------ |
+| ------------------------------------- | -------------------------- | ------------------------------------------------------------ |
    | ArrayBlockingQueue（有界队列）        | FIFO                       |                                                              |
    | LinkedBlockingQueue（可设置容量队列） | FIFO                       | 默认Integer.MAX_VALUE，吞吐量高于ArrayBlockingQueue          |
    | DelayQueue（延迟队列）                | 根据指定的执行时间从小到大 |                                                              |
    | PriorityBlockingQueue（优先级队列）   | 优先级                     |                                                              |
    | SynchronousQueue（同步队列）          |                            | 不存储元素，每个插入操作必须等到另一个线程调用移除操作，否则插入一直阻塞。吞吐量通常要高于LinkedBlockingQuene |
-
+   
    
 
 6. `ThreadFactory threadFactory`： 线程工厂，主要用来创建线程。
@@ -891,7 +889,7 @@ public class ThreadPoolExecutor extends AbstractExecutorService {
 }
 ```
 
-核心变量：ctl，用于表示【线程池状态】和【工作线程数】。长度32bit，高3位记录线程池状态（5种），低29位记录工作线程个数（2^29)。所以每个状态int都要左移29位，使得状态值保存在int的高三位。
+核心变量：ctl，用于表示【线程池状态】和【工作线程数】。长度32bit，高3位记录线程池状态（5种），低29位记录工作线程个数（2^29)。所以每个状态（RUNNING、SHUTDOWN、STOP、TIDYING、TERMINATED）都要左移29位，使得状态值保存在int的高三位。
 
 #### 1.任务调度 Executor.execute()
 
@@ -1065,10 +1063,7 @@ private final HashSet<Worker> workers = new HashSet<Worker>();
 线程池在执行shutdown方法或tryTerminate方法时会调用interruptIdleWorkers方法来中断空闲的线程，interruptIdleWorkers方法会使用tryLock方法来判断线程池中的线程是否是空闲状态；如果线程是空闲状态则可以安全回收
 
 ```java
-private final class Worker
-    extends AbstractQueuedSynchronizer
-    implements Runnable
-{
+private final class Worker extends AbstractQueuedSynchronizer implements Runnable {
     /**
      * This class will never be serialized, but we provide a
      * serialVersionUID to suppress a javac warning.
@@ -1418,9 +1413,7 @@ submit：提交一个任务给线程池执行，如果线程异常并不会直�
 
 由jvm调用
 
-java.lang.Thread#dispatchUncaughtException，最终调
-
-java.lang.ThreadGroup#uncaughtException()处理
+`java.lang.Thread#dispatchUncaughtException`，最终还是调用 `java.lang.ThreadGroup#uncaughtException()`处理
 
 ### Q：线程数如何设置？
 
