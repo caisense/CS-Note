@@ -1643,7 +1643,7 @@ if (inheritThreadLocals && parent.inheritableThreadLocals != null)
 
 ThreadLocal的set/remove的上下文传递模式 在使用线程池等异步执行组件的情况下不再是有效的。常见的典型例子：
 
-- 当线程池满了且线程池的RejectedExecutionHandler使用的是CallerRunsPolicy时，提交到线程池的任务会在提交线程中直接执行，ThreadLocal.remove操作清理提交线程的上下文导致上下文丢失。
+- 当线程池满了且线程池的RejectedExecutionHandler使用的是CallerRunsPolicy时（由调用线程处理该任务），提交到线程池的任务会在提交线程中直接执行，ThreadLocal.remove操作清理提交线程的上下文导致上下文丢失。
 - 类似的，使用ForkJoinPool（包含并行执行Stream与CompletableFuture，底层使用ForkJoinPool）的场景，展开的ForkJoinTask会在任务提交线程中直接执行。同样导致上下文丢失。
 
 因此，在生产应用（几乎一定会使用线程池等异步执行组件）中，**使用ThreadLocal及其set/remove的上下文传递模式几乎一定是有问题的**，只是在等一个出Bug的机会。
@@ -1687,7 +1687,7 @@ SimpleDateFormat是继承自DateFormat类，其中的Calendar对象被多线程�
 
    Java8提供的新的日期时间API中的类，是线程安全的
 
-   ```
+   ```java
     private static DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
    ```
 
