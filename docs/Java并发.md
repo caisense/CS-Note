@@ -1794,7 +1794,9 @@ public static void main(String[] args) throws InterruptedException {
 
 <img src="images/Java并发/2797a609-68db-4d7b-8701-41ac9a34b14f.jpg" alt="img" style="zoom:67%;" />
 
-AtomicInteger 能保证多个线程修改的原子性。
+即使int用`volatile` 修饰，也不保证最终是1000，因为 volatile 不保证操作的原子性。
+
+而AtomicInteger 能保证多个线程修改的原子性。
 
 <img src="images/Java并发/dd563037-fcaa-4bd8-83b6-b39d93a12c77.jpg" alt="img" style="zoom:67%;" />
 
@@ -1925,15 +1927,15 @@ count是锁计数器。线程执行monitorenter指令时（即线程成为owner�
 
 1. 对象头：由MarkWord和KlassPoint（类型指针）组成。
 
-   - KlassPoint指向类元数据，jvm通过其确定对象是哪个类的实例，大小8B（记忆：64位系统——64bit）
+   - KlassPoint指向类元数据，jvm通过其确定对象是哪个类的实例，大小**8B**（记忆：64位系统——64bit）
 
-   - Mark Word用于存储对象自身的运行时数据， 大小8B。
+   - Mark Word用于存储对象自身的运行时数据， 大小**8B**。
 
-   - Length用于存储**数组对象**长度，大小8B
+   - Length用于存储**数组对象长度**，大小**8B**，不是数组则没有此项
 
-     如果对象是非数组对象，那么对象头占用8B + 8B = 16B；
+     - 如果对象是非数组对象，那么对象头占用8B + 8B = 16B；
 
-     如果对象是数组对象，那么对象头占用16B + 8 = 24B。
+     - 如果对象是数组对象，那么对象头占用8B + 8B + 8B = 24B。
 
      > 注：
      >
@@ -3522,11 +3524,11 @@ public class AtomicInteger extends Number implements java.io.Serializable {
 
 涉及三个操作数：
 
-- 需要读写的内存值 V。
+- 需要读写的内存地址 V。
 - 进行比较的值 A。
 - 要写入的新值 B。
 
-当且仅当 V 的值等于 A 时，CAS通过原子方式用新值B来更新V的值（“比较+更新”整体是一个**原子操作**），否则不会执行任何操作。一般情况下，“更新”是一个**不断重试**的操作。
+当且仅当 V 存储的值等于 A 时，CAS通过原子方式将V存储的值更新为B（“比较+更新”整体是一个**原子操作**），否则不会执行任何操作。一般情况下，“更新”是一个**不断重试**的操作。
 
 ### 问题
 
@@ -3536,9 +3538,9 @@ public class AtomicInteger extends Number implements java.io.Serializable {
 
    - 解决：给值加版本号：1A 2B 3A
 
-2. 循环时间长开销大
+2. 自旋开销
 
-   CAS操作如果长时间不成功，会导致其一直自旋，给CPU带来非常大的开销。
+   高竞争场景下，CAS操作如果长时间不成功，会导致其一直自旋，给CPU带来非常大的开销。
 
 3. 只能保证一个共享变量的原子操作
 
@@ -3546,13 +3548,26 @@ public class AtomicInteger extends Number implements java.io.Serializable {
 
    - 解决：JDK1.5开始提供了**AtomicReference**类来保证引用对象之间的原子性，可以把多个变量放在一个对象里来进行CAS操作。
 
- 
+### 底层实现
+
+依赖于 `Unsafe` 类提供的方法：
+
+```java
+public final native boolean compareAndSwapInt(Object o, long offset, int expected, int x);
+```
+
+- `o`：目标对象。
+- `offset`：目标字段在对象中的偏移量。
+- `expected`：期望值。
+- `x`：新值。
+
+`Unsafe` 类直接调用了 CPU 提供的原子指令（如 `cmpxchg`），从而实现了高效的 CAS 操作。
 
 ## Q：如何实现原子操作？
 
 硬件层面：通过CPU的cmpxchg指令
 
-软件层面：例如实现incrementAndGet
+软件层面：例如实现原子自增：
 
 ```java
 public int incrementAndGet(AtomicInteger var) {
@@ -3560,12 +3575,14 @@ public int incrementAndGet(AtomicInteger var) {
     do {
         prev = var.get();
         next = prev + 1; // 如果要实现CAS，1可以改为变量
-    } while ( ! var.compareAndSet(prev, next));  // 不断重试CAS
+    } while (!var.compareAndSet(prev, next));  // 不断重试CAS
     return next;
 }
 ```
 
-CAS是指，在这个操作中，如果`AtomicInteger`的当前值是`prev`，那么就更新为`next`，返回`true`。如果`AtomicInteger`的当前值不是`prev`，就什么也不干，返回`false`。通过CAS操作并配合`do ... while`循环，即使其他线程修改了`AtomicInteger`的值，最终的结果也是正确的。
+CAS是指，在这个操作中，如果`AtomicInteger`的当前值是`prev`，那么就更新为`next`，返回`true`。如果`AtomicInteger`的当前值不是`prev`，就什么也不干，返回`false`。
+
+通过CAS操作，并配合`do ... while`循环的**重试机制**，即使其他线程修改了`AtomicInteger`的值，最终的结果也是正确的。
 
 # 虚拟线程
 
