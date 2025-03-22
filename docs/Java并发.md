@@ -2684,7 +2684,6 @@ AQS内部维护一个**FIFO队列**和一个volatile int 的变量**state**：
   >
   > 共享锁：CountDownLatch和Semaphore用的是共享锁。放入AQS的Node标记为EXCLUSIVE
   >
-  > 
 
 <img src="images/Java并发/640-1686624831180-4.png" alt="图片" />
 
