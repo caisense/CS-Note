@@ -342,7 +342,7 @@ public class AnnotationConfigApplicationContext {
 }
 ```
 
-这么做不是不可以，但是丢失了大量Bean的定义信息，不便于我们创建Bean以及解析依赖关系。合理的方式是先定义`BeanDefinition`，它能从Annotation中提取到足够的信息，便于后续创建Bean、设置依赖、调用初始化方法等：
+这么做不是不可以，但是**丢失了大量Bean的定义信息**，不便于我们创建Bean以及解析依赖关系。合理的方式是先定义`BeanDefinition`，它能从Annotation中提取到足够的信息，便于后续创建Bean、设置依赖、调用初始化方法等：
 
 ```java
 public class BeanDefinition {
@@ -398,11 +398,11 @@ public class AppConfig {
 
 ### Bean的声明类型
 
-这里我们要特别注意一点，就是Bean的声明类型。对于`@Component`定义的Bean，它的声明类型就是其Class本身。
+特别注意一点，就是Bean的声明类型。对于`@Component`定义的Bean，它的声明类型就是其Class本身。
 
 然而，对于用`@Bean`工厂方法创建的Bean，它的**声明类型与实际类型不一定是同一类型**。比如上述`createDataSource()`定义的Bean，声明类型是`DataSource`，实际类型却是某个子类（例如`HikariDataSource`）。
 
-因此要特别注意，我们在`BeanDefinition`中，存储的`beanClass`是**声明类型**，实际类型不必存储，因为可以通过`instance.getClass()`获得：
+因此要特别注意，在`BeanDefinition`中存储的`beanClass`是**声明类型**，实际类型不必存储，因为可以通过`instance.getClass()`获得：
 
 ```java
 public class BeanDefinition {
@@ -414,7 +414,7 @@ public class BeanDefinition {
 }
 ```
 
-这也引出了下一个问题：如果我们按照 **名字查找** Bean或BeanDefinition，要么拿到唯一实例，要么不存在，即通过查询`Map<String, BeanDefinition>`即可完成：
+这也引出了下一个问题：如果按照 **名字查找** Bean或BeanDefinition，要么拿到唯一实例，要么不存在，即通过查询`Map<String, BeanDefinition>`即可完成：
 
 ```java
 public class AnnotationConfigApplicationContext {
@@ -445,11 +445,11 @@ public class AppConfig {
 }
 ```
 
-当我们调用`getBean(AtomicInteger.class)`时，我们会获得`counter()`方法创建的唯一实例，但是，当我们调用`getBean(Number.class)`时，`counter()`方法和`bigInt()`方法创建的实例均符合要求，此时，如果有且仅有一个标注了`@Primary`，就返回标注了`@Primary`的Bean，否则，直接报`NoUniqueBeanDefinitionException`错误。
+当调用`getBean(AtomicInteger.class)`时，会获得`counter()`方法创建的唯一实例，但是当调用`getBean(Number.class)`时，`counter()`方法和`bigInt()`方法创建的实例均符合要求，此时，如果有且仅有一个标注了`@Primary`，就返回标注了`@Primary`的Bean，否则，直接报`NoUniqueBeanDefinitionException`错误。
 
 因此，对于`getBean(Class)`方法，必须遍历找出所有符合类型的Bean，如果不唯一，再判断`@Primary`，才能返回唯一Bean或报错。
 
-我们编写一个找出所有类型的`findBeanDefinitions(Class)`方法如下：
+编写一个找出所有类型的`findBeanDefinitions(Class)`方法如下：
 
 ```java
 // 根据Type查找若干个BeanDefinition，返回0个或多个:
@@ -463,7 +463,7 @@ List<BeanDefinition> findBeanDefinitions(Class<?> type) {
 }
 ```
 
-我们再编写一个`findBeanDefinition(Class)`方法如下：
+再编写一个`findBeanDefinition(Class)`方法如下：
 
 ```java
 // 根据Type查找某个BeanDefinition，如果不存在返回null，如果存在多个返回@Primary标注的一个:
@@ -505,7 +505,7 @@ public class AnnotationConfigApplicationContext {
 }
 ```
 
-第一步是扫描指定包下的所有Class，然后返回Class名字，这一步比较简单：
+第一步比较简单，扫描指定包下的所有Class，然后返回Class名字：
 
 ```java
 Set<String> scanForClassNames(Class<?> configClass) {
@@ -605,7 +605,7 @@ public @interface Controller {
 }
 ```
 
-所以，判断是否存在`@Component`，不但要在当前类查找`@Component`，还要在当前类的所有注解上，查找该注解是否有`@Component`，因此，我们编写了一个能递归查找注解的方法：
+所以，判断是否存在`@Component`，不但要在当前类查找`@Component`，还要在当前类的所有注解上，查找该注解是否有`@Component`，因此，编写一个能递归查找注解的方法：
 
 ```java
 public class ClassUtils {
@@ -628,7 +628,7 @@ public class ClassUtils {
 }
 ```
 
-带有`@Configuration`注解的Class，视为Bean的工厂，我们需要继续在`scanFactoryMethods()`中查找`@Bean`标注的方法：
+带有`@Configuration`注解的Class，视为Bean的工厂，需要继续在`scanFactoryMethods()`中查找`@Bean`标注的方法：
 
 ```java
 void scanFactoryMethods(String factoryBeanName, Class<?> clazz, Map<String, BeanDefinition> defs) {
@@ -682,9 +682,9 @@ public class DateTimeConfig {
 
 ### Q：为何同时存储`initMethodName`和`initMethod`？
 
-注意：我们同时存储了`initMethodName`和`initMethod`，以及`destroyMethodName`和`destroyMethod`，这是因为在`@Component`声明的Bean中，我们可以根据`@PostConstruct`和`@PreDestroy`直接拿到Method本身，而在`@Bean`声明的Bean中，我们拿不到Method，只能从`@Bean`注解提取出字符串格式的方法名称，因此，存储在`BeanDefinition`的方法名称与方法，其中至少有一个为`null`。
+注意：我们同时存储了`initMethodName`和`initMethod`，以及`destroyMethodName`和`destroyMethod`，这是因为在`@Component`声明的Bean中，可以根据`@PostConstruct`和`@PreDestroy`直接拿到Method本身，而在`@Bean`声明的Bean中，拿不到Method，只能从`@Bean`注解提取出字符串格式的方法名称，因此，存储在`BeanDefinition`的方法名称与方法，其中至少有一个为`null`。
 
-最后，仔细编写`BeanDefinition`的`toString()`方法，使之能打印出详细的信息。我们编写测试，运行，打印出每个`BeanDefinition`如下：
+最后，仔细编写`BeanDefinition`的`toString()`方法，使之能打印出详细的信息。编写测试，运行，打印出每个`BeanDefinition`如下：
 
 ```plain
 define bean: BeanDefinition [name=annotationDestroyBean, beanClass=com.itranswarp.scan.destroy.AnnotationDestroyBean, factory=null, init-method=null, destroy-method=destroy, primary=false, instance=null]
@@ -696,11 +696,311 @@ define bean: BeanDefinition [name=createSpecifyInitBean, beanClass=com.itranswar
 ...
 ```
 
-现在，我们已经能扫描并创建所有的`BeanDefinition`，只是目前每个`BeanDefinition`内部的`instance`还是`null`，因为我们后续才会创建真正的Bean。
+现在，我们已经能扫描并创建所有的`BeanDefinition`，只是目前每个`BeanDefinition`内部的`instance`还是`null`，因为后续才会创建真正的Bean。
 
 ## 1.4 创建Bean实例
 
+先介绍Spring支持的4种依赖注入模式：
 
+1。构造方法注入，例如：
+
+```java
+@Component
+public class Hello {
+    JdbcTemplate jdbcTemplate;
+    public Hello(@Autowired JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+}
+```
+
+2。工厂方法注入，例如：
+
+```java
+@Configuration
+public class AppConfig {
+    @Bean
+    Hello hello(@Autowired JdbcTemplate jdbcTemplate) {
+        return new Hello(jdbcTemplate);
+    }
+}
+```
+
+3.Setter方法注入，例如：
+
+```java
+@Component
+public class Hello {
+    JdbcTemplate jdbcTemplate;
+
+    @Autowired
+    void setJdbcTemplate(JdbcTemplate jdbcTemplate) {
+        this.jdbcTemplate = jdbcTemplate;
+    }
+}
+```
+
+4。字段注入，例如：
+
+```java
+@Component
+public class Hello {
+    @Autowired
+    JdbcTemplate jdbcTemplate;
+}
+```
+
+仔细分析发现，这4种注入方式实际上是有区别的。前两种方式，即构造方法注入和工厂方法注入，Bean的创建与注入是一体的，无法把它们分成两个阶段，因为无法中断方法内部代码的执行。而后两种方式，即Setter方法注入和属性注入，Bean的创建与注入是可以分开的，即先创建Bean实例，再用反射调用方法或字段，完成注入。
+
+再分析一下循环依赖的问题。循环依赖，即A、B互相依赖，或者A依赖B，B依赖C，C依赖A，形成了一个闭环。IoC容器对Bean进行管理，可以解决部分循环依赖问题，但不是所有循环依赖都能解决。
+
+假定下列代码定义的A、B两个Bean：
+
+```java
+class A {
+    final B b;
+    A(B b) { this.b = b; }
+}
+
+class B {
+    final A a;
+    B(A a) { this.a = a; }
+}
+```
+
+这种通过构造方法注入依赖的两个Bean，如果存在循环依赖，是无解的，因为我们不用IoC，自己写Java代码也写不出正确创建两个Bean实例的代码。因此把构造方法注入和工厂方法注入的依赖称为**强依赖**，不能有强依赖的循环依赖，否则只能报错。
+
+后两种注入方式形成的依赖则是弱依赖，假定下列代码定义的A、B两个Bean：
+
+```java
+class A {
+    B b;
+}
+
+class B {
+    A a;
+}
+```
+
+这种循环依赖则很容易解决，因为我们可以分两步，先分别实例化Bean，再注入依赖：
+
+```java
+// 第一步,实例化:
+A a = new A();
+B b = new B();
+// 第二步,注入:
+a.b = b;
+b.a = a;
+```
+
+所以，对于IoC容器来说，创建Bean的过程分两步：
+
+1. 创建Bean的实例，此时必须注入强依赖；
+2. 对Bean实例进行Setter方法注入和字段注入。
+
+第一步如果遇到循环依赖则直接报错，第二步则不需要关心有没有循环依赖。
+
+### 1.4.1 创建Bean的实例，同时注入强依赖
+
+我们先实现第一步：创建Bean的实例，同时注入强依赖。
+
+在上一节代码中，已经获得了所有的`BeanDefinition`：
+
+```java
+public class AnnotationConfigApplicationContext {
+    PropertyResolver propertyResolver;
+    Map<String, BeanDefinition> beans;
+
+    public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) {
+        this.propertyResolver = propertyResolver;
+        // 扫描获取所有Bean的Class类型:
+        Set<String> beanClassNames = scanForClassNames(configClass);
+        // 创建Bean的定义:
+        this.beans = createBeanDefinitions(beanClassNames);
+    }
+}
+```
+
+下一步是创建Bean的实例，同时注入强依赖。此阶段必须检测循环依赖。检测循环依赖其实非常简单，就是定义一个`Set<String>`跟踪当前正在创建的所有Bean的名称：
+
+```java
+public class AnnotationConfigApplicationContext {
+    Set<String> creatingBeanNames;
+    ...
+}
+```
+
+创建Bean实例我们用方法`createBeanAsEarlySingleton()`实现，在方法开始处检测循环依赖：
+
+```java
+// 创建一个Bean，但不进行字段和方法级别的注入。如果创建的Bean不是Configuration，则在构造方法/工厂方法中注入的依赖Bean会自动创建
+public Object createBeanAsEarlySingleton(BeanDefinition def) {
+    if (!this.creatingBeanNames.add(def.getName())) {
+        // 检测到重复创建Bean导致的循环依赖:
+        throw new UnsatisfiedDependencyException();
+    }
+    ...
+}
+```
+
+由于`@Configuration`标识的Bean实际上是工厂，它们必须先实例化，才能实例化其他普通Bean，所以先把`@Configuration`标识的Bean创建出来，再创建普通Bean：
+
+```java
+public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) {
+    this.propertyResolver = propertyResolver;
+    // 扫描获取所有Bean的Class类型:
+    Set<String> beanClassNames = scanForClassNames(configClass);
+    // 创建Bean的定义:
+    this.beans = createBeanDefinitions(beanClassNames);
+
+    // 创建BeanName检测循环依赖:
+    this.creatingBeanNames = new HashSet<>();
+
+    // 创建@Configuration类型的Bean:
+    this.beans.values().stream()
+            // 过滤出@Configuration:
+            .filter(this::isConfigurationDefinition).sorted().map(def -> {
+                // 创建Bean实例:
+                createBeanAsEarlySingleton(def);
+                return def.getName();
+            }).collect(Collectors.toList());
+
+    // 创建其他普通Bean:
+    List<BeanDefinition> defs = this.beans.values().stream()
+            // 过滤出instance==null的BeanDefinition:
+            .filter(def -> def.getInstance() == null)
+            .sorted().collect(Collectors.toList());
+    // 依次创建Bean实例:
+    defs.forEach(def -> {
+        // 如果Bean未被创建(可能在其他Bean的构造方法注入前被创建):
+        if (def.getInstance() == null) {
+            // 创建Bean:
+            createBeanAsEarlySingleton(def);
+        }
+    });
+}
+```
+
+### 1.4.2 对Bean实例进行Setter方法注入和字段注入
+
+剩下的就是把`createBeanAsEarlySingleton()`补充完整：
+
+```java
+public Object createBeanAsEarlySingleton(BeanDefinition def) {
+    // 检测循环依赖:
+    if (!this.creatingBeanNames.add(def.getName())) {
+        throw new UnsatisfiedDependencyException();
+    }
+
+    // 创建方式：构造方法或工厂方法:
+    Executable createFn = def.getFactoryName() == null ?
+        def.getConstructor() : def.getFactoryMethod();
+
+    // 创建参数:
+    Parameter[] parameters = createFn.getParameters();
+    Object[] args = new Object[parameters.length];
+    for (int i = 0; i < parameters.length; i++) {
+        // 从参数获取@Value和@Autowired:
+        Value value = ...
+        Autowired autowired = ...
+        // 检查Value和Autowired
+        ...
+        // 参数类型:
+        Class<?> type = param.getType();
+        if (value != null) {
+            // 参数设置为查询的@Value:
+            args[i] = this.propertyResolver.getRequiredProperty(value.value(), type);
+        } else {
+            // 参数是@Autowired,查找依赖的BeanDefinition:
+            BeanDefinition dependsOnDef = name.isEmpty() ? findBeanDefinition(type) : findBeanDefinition(name, type);
+            // 获取依赖Bean的实例:
+            Object autowiredBeanInstance = dependsOnDef.getInstance();
+            if (autowiredBeanInstance == null) {
+                // ============= 当前依赖Bean尚未初始化，【递归调用】初始化该依赖Bean ==============
+                autowiredBeanInstance = createBeanAsEarlySingleton(dependsOnDef);
+            }
+            // 参数设置为依赖的Bean实例:
+            args[i] = autowiredBeanInstance;
+        }
+    }
+    // 已拿到所有方法参数,创建Bean实例:
+    Object instance = ...
+    // 设置实例到BeanDefinition:
+    def.setInstance(instance);
+    // 返回实例:
+    return def.getInstance();
+}
+```
+
+注意到递归调用：
+
+```java
+public Object createBeanAsEarlySingleton(BeanDefinition def) {
+    ...
+    Object[] args = new Object[parameters.length];
+    for (int i = 0; i < parameters.length; i++) {
+        ...
+        // 获取依赖Bean的实例:
+        Object autowiredBeanInstance = dependsOnDef.getInstance();
+        if (autowiredBeanInstance == null && !isConfiguration) {
+            // 当前依赖Bean尚未初始化，递归调用初始化该依赖Bean:
+            autowiredBeanInstance = createBeanAsEarlySingleton(dependsOnDef);
+        }
+        ...
+    }
+    ...
+}
+```
+
+### 验证依赖
+
+假设如下的Bean依赖：
+
+```java
+@Component
+class A {
+    // 依赖B,C:
+    A(@Autowired B, @Autowired C) {}
+}
+
+@Component
+class B {
+    // 依赖C:
+    B(@Autowired C) {}
+}
+
+@Component
+class C {
+    // 无依赖:
+    C() {}
+}
+```
+
+如果按照A、B、C的顺序创建Bean实例，那么系统流程如下：
+
+1. 准备创建A；
+2. 检测到依赖B：未就绪；
+   1. 准备创建B：
+   2. 检测到依赖C：未就绪；
+      1. 准备创建C；
+      2. 完成创建C；
+   3. 完成创建B；
+3. 检测到依赖C，已就绪；
+4. 完成创建A。
+
+如果按照B、C、A的顺序创建Bean实例，那么系统流程如下：
+
+1. 准备创建B；
+2. 检测到依赖C：未就绪；
+   1. 准备创建C；
+   2. 完成创建C；
+3. 完成创建B；
+4. 准备创建A；
+5. 检测到依赖B，已就绪；
+6. 检测到依赖C，已就绪；
+7. 完成创建A。
+
+可见无论以什么顺序创建，C总是最先被实例化，A总是最后被实例化。
 
 ## 1.5 初始化Bean
 

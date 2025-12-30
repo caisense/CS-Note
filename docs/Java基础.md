@@ -2414,7 +2414,6 @@ public class Father {
 // 子类
 public class Son extends Father{
     private String sex;
-
     public Son(String sex, int age, String name) {
         super(age, name);  // 指定调用父类的某个构造函数
         this.sex = sex;
@@ -2422,32 +2421,35 @@ public class Son extends Father{
     public String getSex() { return sex; }
     public void setSex(String sex) { this.sex = sex; }
     public void say() {  System.out.println("I am Son");  }
+    public void run() {  System.out.println("Son run"); }
 }
 ```
 
-测试向上转型，可以看到father和son对象都属于Son类，但是father没有sex属性：
+测试向上转型。可以看到father和son对象都属于Son类，但是father没有sex属性：
 
 ```java
 public static void main(String[] args) {
-    Father father = new Son("M", 30, "bob");  // 隐式转换
+    Father father = new Son("M", 30, "bob");  // 隐式转换（向上转换）
     Son son = new Son("M", 30, "bob");
     System.out.println(father.getSex());  // 报错
-    System.out.println(father.getAge() + " " + father.getName() + "," + father.getClass());  // 30 bob,class Son
-    System.out.println(son.getSex()  +  " " + son.getAge()  +  "," + son.getName() +  " " + son.getClass()); //M 30,bob class Son
+    System.out.println(father.getAge() + ", " + father.getName() + ", " + father.getClass());  // 30, bob, class Son
+    System.out.println(son.getSex()  +  ", " + son.getAge()  +  ", " + son.getName() +  ", " + son.getClass()); //M, 30, bob, class Son
 }
 ```
 
-测试向下转型，可以看到father没有sex属性，但是father强制转换成Son类型的对象son后，son就有sex属性了。而father和son的地址相同，因此他们是**同一个对象的不同引用**：
+测试向下转型。可以看到father没有sex属性，但是father强制转换成Son类型的对象son后，son就有sex属性了。注意到Son类有run方法而父类没有，因此父类实例调用run方法时，不用到运行时，直接编译器报错。father和son的地址相同，因此他们是**同一个对象的不同引用**：
 
 ```java
 public static void main(String[] args) {
-    Son son = new Father(30, "bob");  // 报错，没有强制向下转型
+    Son son = new Father(30, "bob");  // ！！！报错，没有强制向下转型
     Father father = new Son("M", 30, "bob");
-	System.out.println(father.getSex() + " " + father.getAge() + " " + father.getName() + "," + father.getClass());  // 报错，没有sex属性
+	System.out.println(father.getSex() + " " + father.getAge() + " " + father.getName() + "," + father.getClass());  // ！！！报错，没有sex属性
 	Son son = (Son)father;  // 强制向下转型
-	System.out.println(son.getSex()  +  " " + son.getAge()  +  "," + son.getName() +  " " + son.getClass());  // M 30,bob class Son
-	son.say(); // I am Son
+	System.out.println(son.getSex()  +  ", " + son.getAge()  +  "," + son.getName() +  " " + son.getClass());  // M, 30,bob class Son
 	father.say(); // I am Son
+	son.say(); // I am Son
+    father.run(); // ！！！编译器报错
+    son.run(); // Son run
 	System.out.println(father.hashCode());  //621009875
 	System.out.println(son.hashCode());  //621009875
 }
@@ -2463,7 +2465,7 @@ public static void main(String[] args) {
 Father father = new Son("M", 30, "bob");  // 用Son创建的对象，类型一定是Son，哪怕用Father类型引用
 ```
 
-
+但是对象有怎样的属性和方法，是根据引用的类型决定的，如上面Father类型和Son类型的引用，本质上是同一个对象的不同类型引用，其属性和方法都不一样
 
 ## 访问控制
 
