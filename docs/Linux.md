@@ -125,6 +125,35 @@ useradd -d /home/myd tt
 
 userdel可删除用户帐号与相关的文件。若不加参数，则仅删除用户帐号，而不删除相关文件。
 
+# 挂载点
+
+## 查看所有挂载点
+
+用`df -h`查看，最后一列就是挂载点，例如：
+
+```
+Filesystem                  Size  Used  Avail  Use%  Mounted on
+/dev/mapper/unikylin-root   50G   48.5G  1.5G  97%  /
+/dev/mapper/unikylin-home   2.2T  100G   2.1T   5%  /home
+/dev/sda1                   976M  120M   780M  14%  /boot
+tmpfs                       7.8G     0   7.8G   0%  /dev/shm
+```
+
+一个反直觉的现象是，挂载点`/home`的容量竟然比`/`还大。这是因为 **Linux 中 “目录结构” 和 “存储分区” 是分离的**——`/home`虽然在目录树里属于`/`（root 根目录）的子目录，但它被**单独分区并挂载**了，所以会占用独立的存储空间，并不从`/`的 50G 空间中分配。
+
+而路径`/var/lib/docker`则属于根目录`/`，因为这个路径没有**挂载点**，就严格遵守linux的目录结构，它的空间也不可能大于根目录。
+
+## 查看一个路径的挂载点
+
+可以用`df -h [路径]`查看：
+
+```
+# df -h /dev/mapper/unikylin-home/abc
+/home
+```
+
+
+
 # 正则表达式
 
 在文件 file.txt 中查找字符串 "hello"，并打印匹配的行：
