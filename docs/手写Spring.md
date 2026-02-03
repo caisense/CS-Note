@@ -800,9 +800,17 @@ b.a = a;
 
 第一步如果遇到循环依赖则直接报错，第二步则不需要关心有没有循环依赖。
 
-### 1.4.1 创建Bean的实例，同时注入强依赖
+### 流程图
 
-我们先实现第一步：创建Bean的实例，同时注入强依赖。
+```mermaid
+flowchart 
+  A[构造函数]-->B[先创建@Configuration类型的Bean]
+  B-->C[再创建其他普通Bean]
+```
+
+### 实现
+
+先实现第一步：创建Bean的实例，同时注入强依赖。
 
 在上一节代码中，已经获得了所有的`BeanDefinition`：
 
@@ -821,16 +829,7 @@ public class AnnotationConfigApplicationContext {
 }
 ```
 
-下一步是创建Bean的实例，同时注入强依赖。此阶段必须检测循环依赖。检测循环依赖其实非常简单，就是定义一个`Set<String>`跟踪当前正在创建的所有Bean的名称：
-
-```java
-public class AnnotationConfigApplicationContext {
-    Set<String> creatingBeanNames;
-    ...
-}
-```
-
-创建Bean实例我们用方法`createBeanAsEarlySingleton()`实现，在方法开始处检测循环依赖：
+下一步是创建Bean的实例，同时注入强依赖。创建Bean实例用方法`createBeanAsEarlySingleton()`实现，在方法开始处检测循环依赖：
 
 ```java
 // 创建一个Bean，但不进行字段和方法级别的注入。如果创建的Bean不是Configuration，则在构造方法/工厂方法中注入的依赖Bean会自动创建
@@ -881,11 +880,10 @@ public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver
 }
 ```
 
-### 1.4.2 对Bean实例进行Setter方法注入和字段注入
-
-剩下的就是把`createBeanAsEarlySingleton()`补充完整：
+将创建bean的核心方法`createBeanAsEarlySingleton()`补充完整：
 
 ```java
+// 创建一个Bean，但不进行字段和方法级别的注入。如果创建的Bean不是Configuration，则在构造方法/工厂方法中注入的依赖Bean会自动创建
 public Object createBeanAsEarlySingleton(BeanDefinition def) {
     // 检测循环依赖:
     if (!this.creatingBeanNames.add(def.getName())) {
@@ -932,29 +930,7 @@ public Object createBeanAsEarlySingleton(BeanDefinition def) {
 }
 ```
 
-注意到递归调用：
-
-```java
-public Object createBeanAsEarlySingleton(BeanDefinition def) {
-    ...
-    Object[] args = new Object[parameters.length];
-    for (int i = 0; i < parameters.length; i++) {
-        ...
-        // 获取依赖Bean的实例:
-        Object autowiredBeanInstance = dependsOnDef.getInstance();
-        if (autowiredBeanInstance == null && !isConfiguration) {
-            // 当前依赖Bean尚未初始化，递归调用初始化该依赖Bean:
-            autowiredBeanInstance = createBeanAsEarlySingleton(dependsOnDef);
-        }
-        ...
-    }
-    ...
-}
-```
-
-### 验证依赖
-
-假设如下的Bean依赖：
+注意到createBeanAsEarlySingleton是**递归调用**，假设如下的Bean依赖：
 
 ```java
 @Component
@@ -1002,9 +978,61 @@ class C {
 
 可见无论以什么顺序创建，C总是最先被实例化，A总是最后被实例化。
 
+
+
 ## 1.5 初始化Bean
 
+在创建Bean实例的过程中，已经完成了强依赖的注入。然后是根据Setter方法和字段完成弱依赖注入，下一步调用用`@PostConstruct`标注的init方法，就完成了所有Bean的初始化。
 
+这个过程相对比较简单，因为只涉及到查找依赖的`@Value`和`@Autowired`，然后用反射完成调用即可：
+
+```java
+public AnnotationConfigApplicationContext(Class<?> configClass, PropertyResolver propertyResolver) {
+    ...
+
+    // 1、通过字段和set方法注入【弱依赖】:
+    this.beans.values().forEach(def -> {
+        injectBean(def);
+    });
+
+    // 2、调用init方法:
+    this.beans.values().forEach(def -> {
+        initBean(def);
+    });
+}
+```
+
+使用Setter方法和字段注入时，要注意一点，就是不仅要在当前类查找，还要在父类查找，因为有些`@Autowired`写在父类，所有子类都可使用，这样更方便。注入弱依赖代码如下：
+
+```java
+// 在当前类及父类进行字段和方法注入:
+void injectProperties(BeanDefinition def, Class<?> clazz, Object bean) {
+    // 在当前类查找Field和Method并注入:
+    for (Field f : clazz.getDeclaredFields()) {
+        tryInjectProperties(def, clazz, bean, f);
+    }
+    for (Method m : clazz.getDeclaredMethods()) {
+        tryInjectProperties(def, clazz, bean, m);
+    }
+    // 在父类查找Field和Method并注入:
+    Class<?> superClazz = clazz.getSuperclass();
+    if (superClazz != null) {
+        // ======================【注意递归调用】======================
+        injectProperties(def, superClazz, bean);
+    }
+}
+
+// 注入单个属性
+void tryInjectProperties(BeanDefinition def, Class<?> clazz, Object bean, AccessibleObject acc) {
+    ...
+}
+```
+
+>tryInjectProperties的具体实现见源码。注意此处是根据【setter方法】和【字段】进行注入，因此方法【只能有一个参数】。
+
+弱依赖注入完成后，再循环一遍所有的`BeanDefinition`，对其调用`init`方法，完成最后一步初始化。
+
+处理`@PreDestroy`方法更简单，在`ApplicationContext`关闭时遍历所有Bean，调用`destroy`方法即可。
 
 ## 1.6 实现BeanPostProcessor
 

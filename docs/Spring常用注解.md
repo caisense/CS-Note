@@ -518,8 +518,26 @@ public class AppConfig {
 3. `@Value("#{orderService3}")`
 
    - **#{}**：Spring表达式，找容器中名为orderService3的bean
+- #{orderService3.host}：找orderService3的host属性
 
-   - #{orderService3.host}：找orderService3的host属性
+> 【罕见用法】
+>
+> 也可修饰方法，但是该方法必须**有且仅有一个参数**
+>
+> Spring 会将解析后的值作为参数调用该方法（通常用于 setter 风格的方法）
+>
+> ```java
+> @Value("${app.name}")
+> public class AppConfig {
+>     private String appName;
+>     @Value("${app.name}")
+>     public void setAppName(String name) { // 注解放在方法上，非参数上
+>         this.appName = name;
+>     }
+> }
+> ```
+>
+> 
 
 # yml 占位符语法
 
