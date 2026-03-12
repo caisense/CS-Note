@@ -33,6 +33,8 @@ DCL：数据控制语言，如GRANT、REVOKE、COMMIT、ROLLBACK
 | NOT BETWEEN | 不在两值之间                     | 相当于`<min || >max`                                         |
 | <=>         | 严格比较两个值是否相等，包括NULL | 当col1，col2两个可能存在NULL值的列需要进行相等比较时，可以使用 col1 <=> col2，可以包括null=null的情况 |
 
+## 
+
 # 数据类型
 
 ## 数值类型
@@ -149,6 +151,28 @@ TIMESTAMP类型有专有的自动更新特性
 
 1. BLOB 可以储存图片，TEXT只能存纯文本（两者都可以存文本）。
 2. BLOB 大小写敏感，TEXT不敏感。
+
+
+
+## Q：为什么建议属性定义为not null？
+
+- `NULL` 代表 **未知、不存在**
+- 任何值 **和 NULL 做比较**，结果不是 `true/false`，而是 **NULL**
+
+例如：
+
+```sql
+select * from XXX表 WHERE net_no != 1076
+```
+
+只会查出net_no = 1、2、3等非1076的数据行，而不会查出net_no=null的行。
+
+因为条件`null ！= 1076`的结果不是false，而是NULL，所以`net_no=null`这一条数据在where语句的判断结果不为真，查不到这条。
+
+解决：
+
+1. net_no属性定义为`NOT NULL`
+2. where语句增加条件：`OR net_no IS NULL`
 
 ----
 
