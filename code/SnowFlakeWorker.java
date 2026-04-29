@@ -1,13 +1,5 @@
 package com.eshore.cmp.portal.controller.corp;
 
-/**
- * @Project: 5Gcmp-portal
- * @Version: 2.0
- * @Company: 天翼物联
- * @Author: Caizhitong
- * @Date: 2023-07-08 12:46
- */
-
 public class SnowFlakeWorker {
     /**
      * 开始时间截 (2015-01-01)
