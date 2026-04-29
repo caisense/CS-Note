@@ -1,5 +1,3 @@
-package com.eshore.cmp.portal.controller.corp;
-
 public class SnowFlakeWorker {
     /**
      * 开始时间截 (2015-01-01)
