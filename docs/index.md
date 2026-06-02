@@ -22,5 +22,5 @@ features:
     details: Leetcode、牛客网等
   - icon: 🍉
     title: About Me
-    details: For Self Redemption, 2023.8.2.
+    details: For Self Redemption, 2023.8.2. Rebuild with VitePress on 2026.6.2.
 ---

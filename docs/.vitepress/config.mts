@@ -4,6 +4,7 @@ export default defineConfig({
   title: '计算机面试指北',
   description: '计算机面试指北',
   base: '/CS-Note/',
+  lastUpdated: true,
 
   // 忽略旧内容中的死链（VuePress 风格的链接、localhost 演示链接等）
   ignoreDeadLinks: true,
@@ -262,7 +263,7 @@ export default defineConfig({
     // 编辑链接
     editLink: {
       pattern: 'https://github.com/caisense/CS-Note/edit/master/docs/:path',
-      text: '帮助我们改善此页面！',
+      text: '在 GitHub 上编辑此页面',
     },
 
     // 本地搜索
@@ -294,11 +295,11 @@ export default defineConfig({
     },
 
     lastUpdated: {
-      text: 'Updated at',
-      formatOptions: {
-        dateStyle: 'full',
-        timeStyle: 'medium'
-      }
+      text: '最后更新于',
+      // formatOptions: {
+      //   dateStyle: 'full',
+      //   timeStyle: 'medium'
+      // }
     },
 
     // 大纲
