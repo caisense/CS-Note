@@ -1,0 +1,80 @@
+/**
+ * Custom VitePress styles.
+ * Widen doc pages so Markdown paragraphs fit more characters per line.
+ */
+
+:root {
+  --vp-layout-max-width: 1680px;
+  --vp-sidebar-width: 220px;
+  --cs-doc-max-width: 1040px;
+  --cs-aside-width: 320px;
+}
+
+/* Wide-reading mode: remove VitePress' conservative doc-body max widths. */
+@media (min-width: 960px) {
+  .VPDoc {
+    padding-right: 24px;
+    padding-left: 24px;
+  }
+
+  .VPDoc .container,
+  .VPDoc .content,
+  .VPDoc .content-container,
+  .VPDoc.has-aside .content-container {
+    max-width: none !important;
+  }
+
+  .VPDoc .content {
+    flex: 1 1 auto;
+    width: 100%;
+    min-width: 0;
+    padding-right: 0;
+    padding-left: 24px;
+  }
+
+  .VPDoc .content-container {
+    width: 100%;
+    margin-left: 0;
+    margin-right: 0;
+  }
+
+  .VPDoc.has-aside .content-container {
+    width: min(100%, var(--cs-doc-max-width));
+  }
+
+  .VPDoc .aside {
+    flex: 0 0 var(--cs-aside-width);
+    padding-left: 20px;
+    max-width: var(--cs-aside-width);
+  }
+
+  .VPDoc .aside-container,
+  .VPDoc .aside-curtain {
+    width: calc(var(--cs-aside-width) - 20px);
+  }
+}
+
+@media (min-width: 1280px) {
+  .VPDoc .container {
+    justify-content: flex-start;
+  }
+}
+
+/* Keep wide tables and code blocks usable inside the wider reading column. */
+.vp-doc table {
+  display: table;
+  width: max-content;
+  max-width: 100%;
+}
+
+.vp-doc div[class*='language-'],
+.vp-doc pre {
+  max-width: 100%;
+}
+
+.vp-doc,
+.vp-doc p,
+.vp-doc li {
+  font-size: 14px;
+  line-height: 1.75;
+}

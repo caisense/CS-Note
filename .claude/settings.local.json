@@ -1,0 +1,31 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx vitepress *)",
+      "Bash(node -e ' *)",
+      "Bash(node -e \"const fs=require\\('fs'\\);const f='docs/images/计算机网络/vec{S' + \\\\\"'\\\\\" + '}.gif';console.log\\('exists:', fs.existsSync\\(f\\)\\);console.log\\('dir files:', fs.readdirSync\\('docs/images/计算机网络'\\).filter\\(x=>x.includes\\('vec'\\)\\)\\)\")",
+      "Bash(node -e \"const fs=require\\('fs'\\);const files=fs.readdirSync\\('docs'\\).filter\\(f=>f.endsWith\\('.md'\\)\\);files.forEach\\(f=>{if\\(f!==f.trim\\(\\)\\)console.log\\('Bad name:', JSON.stringify\\(f\\)\\)}\\)\")",
+      "PowerShell(Rename-Item *)",
+      "Bash(Select-String -Pattern \"error|Error|✓|✖|complete\")",
+      "PowerShell(cd \"D:\\\\Projects\\\\CS-Note-new\"; $output = & npx vitepress build docs 2>&1; $output | Select-String -Pattern \"error|Error|✓|✖|complete\"; if \\($LASTEXITCODE -eq 0\\) { Write-Output \"BUILD SUCCESS\" } else { Write-Output \"BUILD FAILED \\(exit $LASTEXITCODE\\)\" })",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" http://localhost:5173/CS-Note/)",
+      "Bash(kill %1)",
+      "Bash(pkill -f \"vitepress dev\")",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:5174/CS-Note/)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\" http://localhost:5174/)",
+      "Bash(curl -s -o /tmp/vp.html -w \"HTTP %{http_code}, size: %{size_download}\" http://localhost:5175/CS-Note/)",
+      "Read(//tmp/**)",
+      "Bash(curl -s -o /tmp/vp2.html -w \"HTTP %{http_code}\" http://localhost:5176/CS-Note/)",
+      "Bash(pkill -f \"vitepress\")",
+      "Bash(curl -s http://localhost:5177/CS-Note/Java基础/)",
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" http://localhost:5177/CS-Note/Java%E5%9F%BA%E7%A1%80/)",
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" http://localhost:5178/CS-Note/)",
+      "PowerShell(cd \"D:\\\\Projects\\\\CS-Note-new\"; $output = & npx vitepress build docs 2>&1; $output | Select-String -Pattern \"error|Error|✓|✖|complete|dead link\"; if \\($LASTEXITCODE -eq 0\\) { Write-Output \"BUILD SUCCESS\" } else { Write-Output \"BUILD FAILED \\(exit $LASTEXITCODE\\)\" })",
+      "mcp__ide__getDiagnostics",
+      "Bash(Remove-Item *)",
+      "Bash(npm run *)",
+      "Bash(Start-Sleep -Seconds 8)",
+      "Bash(Get-Content 'C:\\\\Users\\\\css\\\\AppData\\\\Local\\\\Temp\\\\claude\\\\D--Projects-CS-Note-new\\\\6af840eb-a99d-4eff-98f5-ee16b2a7f984\\\\tasks\\\\bi0ttbvrd.output' -Tail 20)"
+    ]
+  }
+}
